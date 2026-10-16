@@ -36,7 +36,7 @@ index 1fec701..7ae8388 100644
        .depthBiasSlopeScale = depthBiasSlopeScale,
        .depthBiasClamp = depthBiasClamp,
 diff --git a/lib/gx/texture.cpp b/lib/gx/texture.cpp
-index a56709a..d0a1d0c 100644
+index a56709a..27c0c4a 100644
 --- a/lib/gx/texture.cpp
 +++ b/lib/gx/texture.cpp
 @@ -1,3 +1,5 @@
@@ -45,7 +45,42 @@ index a56709a..d0a1d0c 100644
  #include "texture.hpp"
  
  #include "../gfx/recording.hpp"
-@@ -872,6 +874,14 @@ void resolve_sampled_textures(const ShaderInfo& info) noexcept {
+@@ -592,9 +594,33 @@ void invalidate_replacement(uint64_t replacementId) noexcept {
+   }
+ }
+ 
+-gfx::TextureHandle resolve_static_texture(const GXTexObj_& obj) {
++gfx::TextureHandle resolve_static_texture(const GXTexObj_& objIn) {
+   ZoneScoped;
+ 
++  // Port addition (SMG): a depth texture in main memory (a Z texture object, or a depth copy that
++  // isn't registered yet) has no decoder. Read it with the color format of the same layout instead
++  // of aborting: Z8 -> I8, Z16 -> IA8, Z24X8 -> RGBA8 (Z4/Z8M/Z8L/Z16L copy formats likewise).
++  GXTexObj_ obj = objIn;
++  switch (obj.format()) {
++  case GX_TF_Z8:
++  case GX_CTF_Z8M:
++  case GX_CTF_Z8L:
++    obj.mFormat = GX_TF_I8;
++    break;
++  case GX_CTF_Z4:
++    obj.mFormat = GX_TF_I4;
++    break;
++  case GX_TF_Z16:
++  case GX_CTF_Z16L:
++    obj.mFormat = GX_TF_IA8;
++    break;
++  case GX_TF_Z24X8:
++    obj.mFormat = GX_TF_RGBA8;
++    break;
++  default:
++    break;
++  }
++
+   if (obj.texObjId != 0) {
+     if (const auto it = s_textureObjectCaches.find(obj.texObjId); it != s_textureObjectCaches.end()) {
+       auto& entry = it->second;
+@@ -872,6 +898,14 @@ void resolve_sampled_textures(const ShaderInfo& info) noexcept {
        handle = texture::resolve_static_texture(obj);
      }
  
