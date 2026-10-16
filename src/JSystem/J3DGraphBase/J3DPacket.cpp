@@ -7,7 +7,9 @@
 #include "JSystem/J3DGraphBase/J3DShapeMtx.hpp"
 #include "JSystem/JKernel/JKRHeap.hpp"
 #include <cstdio>
+#if TARGET_PC
 #include <typeinfo>
+#endif
 #include <mem.h>
 
 J3DError J3DDisplayListObj::newDisplayList(u32 maxSize) {
