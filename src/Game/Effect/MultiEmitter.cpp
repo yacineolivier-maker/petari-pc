@@ -54,14 +54,23 @@ void MultiEmitter::createEmitterWithCallBack(MultiEmitterCallBackBase* pCallBack
         MR::getEffectSystem()->createSingleEmitter(pEmitter, pCallBackBase, nullptr);
     }
 
+#if TARGET_PC
+    std::for_each(mChildren.begin(), mChildren.end(), [pCallBackBase](MultiEmitter* pChild) { pChild->createEmitterWithCallBack(pCallBackBase); });
+#else
     std::for_each(mChildren.begin(), mChildren.end(),
                   std::binder2nd< std::mem_fun1_t< void, MultiEmitter, MultiEmitterCallBackBase* >, MultiEmitterCallBackBase* >(
                       std::mem_func(&MultiEmitter::createEmitterWithCallBack), pCallBackBase));
+#endif
 }
 
 void MultiEmitter::deleteEmitter() {
+#if TARGET_PC
+    std::for_each(mEmitters.begin(), mEmitters.end(), [](SingleEmitter& rEmitter) { rEmitter.deleteEmitter(); });
+    std::for_each(mChildren.begin(), mChildren.end(), [](MultiEmitter* pChild) { pChild->deleteEmitter(); });
+#else
     std::for_each_array(mEmitters.begin(), mEmitters.end(), std::mem_func(&SingleEmitter::deleteEmitter));
     std::for_each(mChildren.begin(), mChildren.end(), std::mem_func(&MultiEmitter::deleteEmitter));
+#endif
 }
 
 void MultiEmitter::forceDeleteEmitter() {
@@ -69,7 +78,11 @@ void MultiEmitter::forceDeleteEmitter() {
         MR::getEffectSystem()->forceDeleteSingleEmitter(pEmitter);
     }
 
+#if TARGET_PC
+    std::for_each(mChildren.begin(), mChildren.end(), [](MultiEmitter* pChild) { pChild->forceDeleteEmitter(); });
+#else
     std::for_each(mChildren.begin(), mChildren.end(), std::mem_func(&MultiEmitter::forceDeleteEmitter));
+#endif
 }
 
 void MultiEmitter::forceDelete(EffectSystem* pSystem) {
@@ -77,9 +90,13 @@ void MultiEmitter::forceDelete(EffectSystem* pSystem) {
         pSystem->forceDeleteSingleEmitter(pEmitter);
     }
 
+#if TARGET_PC
+    std::for_each(mChildren.begin(), mChildren.end(), [pSystem](MultiEmitter* pChild) { pChild->forceDelete(pSystem); });
+#else
     std::for_each(
         mChildren.begin(), mChildren.end(),
         std::binder2nd< std::mem_fun1_t< void, MultiEmitter, EffectSystem* >, EffectSystem* >(std::mem_func(&MultiEmitter::forceDelete), pSystem));
+#endif
 }
 
 void MultiEmitter::deleteForeverEmitter() {
@@ -89,7 +106,11 @@ void MultiEmitter::deleteForeverEmitter() {
         }
     }
 
+#if TARGET_PC
+    std::for_each(mChildren.begin(), mChildren.end(), [](MultiEmitter* pChild) { pChild->deleteForeverEmitter(); });
+#else
     std::for_each(mChildren.begin(), mChildren.end(), std::mem_func(&MultiEmitter::deleteForeverEmitter));
+#endif
 }
 
 void MultiEmitter::playCalcAndDeleteForeverEmitter() {
@@ -163,9 +184,13 @@ void MultiEmitter::create(EffectSystem* pSystem) {
 }
 
 void MultiEmitter::scanParticleEmitter(EffectSystem* pSystem) {
+#if TARGET_PC
+    std::for_each(mEmitters.begin(), mEmitters.end(), [pSystem](SingleEmitter& rEmitter) { rEmitter.scanParticleEmitter(pSystem); });
+#else
     std::for_each_array(mEmitters.begin(), mEmitters.end(),
                         std::binder2nd< std::mem_fun1_t< void, SingleEmitter, EffectSystem* >, EffectSystem* >(
                             std::mem_func(&SingleEmitter::scanParticleEmitter), pSystem));
+#endif
 }
 
 void MultiEmitter::forceFollowOn() {
@@ -240,9 +265,14 @@ void MultiEmitter::playEmitterOffClipped() {
 }
 
 void MultiEmitter::setDrawOrder(s32 index) {
+#if TARGET_PC
+    u8 groupID = static_cast< u8 >(index);
+    std::for_each(mEmitters.begin(), mEmitters.end(), [groupID](SingleEmitter& rEmitter) { rEmitter.setGroupID(groupID); });
+#else
     std::for_each_array(
         mEmitters.begin(), mEmitters.end(),
         std::binder2nd< std::mem_fun1_t< void, SingleEmitter, u8 >, u8 >(std::mem_func(&SingleEmitter::setGroupID), static_cast< u8 >(index)));
+#endif
 }
 
 void MultiEmitter::addChildEmitter(MultiEmitter* pChild) {

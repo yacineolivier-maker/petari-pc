@@ -3,7 +3,7 @@
 #include <revolution/types.h>
 
 class GameDataHolder;
-class GameEventFlag;
+struct GameEventFlag;
 class GameEventFlagStorage;
 
 class GameEventFlagChecker {

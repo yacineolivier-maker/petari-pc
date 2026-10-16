@@ -389,8 +389,13 @@ void WaterRoadModelInfo::loadMaterialHigh(const WaterRoad* pRoad) const {
     GXSetVtxDesc(GX_VA_TEX0, GX_DIRECT);
     GXSetVtxDesc(GX_VA_TEX1, GX_DIRECT);
     GXSetVtxDesc(GX_VA_TEX2, GX_DIRECT);
+#if TARGET_PC
+    GXSetArray(GX_VA_POS, mPoints, mNumPoints * sizeof(TVec3f), sizeof(TVec3f), true);
+    GXSetArray(GX_VA_NRM, mNormals, mNumPoints * sizeof(TVec3s), sizeof(TVec3s), true);
+#else
     GXSetArray(GX_VA_POS, mPoints, sizeof(TVec3f));
     GXSetArray(GX_VA_NRM, mNormals, sizeof(TVec3s));
+#endif
     GXLoadPosMtxImm(MR::getCameraViewMtx(), 0);
     GXLoadNrmMtxImm(MR::getCameraViewMtx(), 0);
     GXSetCurrentMtx(0);
@@ -490,8 +495,13 @@ void WaterRoadModelInfo::loadMaterialLow() const {
     GXSetVtxDesc(GX_VA_NRM, GX_INDEX16);
     GXSetVtxDesc(GX_VA_TEX0, GX_DIRECT);
     GXSetVtxDesc(GX_VA_TEX1, GX_DIRECT);
+#if TARGET_PC
+    GXSetArray(GX_VA_POS, mPoints, mNumPoints * sizeof(TVec3f), sizeof(TVec3f), true);
+    GXSetArray(GX_VA_NRM, mNormals, mNumPoints * sizeof(TVec3s), sizeof(TVec3s), true);
+#else
     GXSetArray(GX_VA_POS, mPoints, sizeof(TVec3f));
     GXSetArray(GX_VA_NRM, mNormals, sizeof(TVec3s));
+#endif
     GXLoadPosMtxImm(MR::getCameraViewMtx(), 0);
     GXLoadNrmMtxImm(MR::getCameraViewMtx(), 0);
     GXSetCurrentMtx(0);

@@ -71,7 +71,12 @@ void GameSystemException::handleException(OSError error, OSContext* pContext, u3
         }
 
         JUTException* exception = JUTException::sErrorManager;
+#if TARGET_PC
+        // Must match the sentinel JUTException compares against.
+        exception->mGamePad = reinterpret_cast< JUTGamePad* >(static_cast< uintptr_t >(0xFFFFFFFF));
+#else
         exception->mGamePad = reinterpret_cast< JUTGamePad* >(0xFFFFFFFF);
+#endif
         exception->mGamePadPort = JUTGamePad::Port_Unknown;
     }
 

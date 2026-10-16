@@ -95,7 +95,11 @@ void TripodBossCore::exeWait() {
     }
 
     updateTripodMatrix();
+#if TARGET_PC
+    MR::requestPointLight(this, mPosition, GXColor{0x96, 0x96, 0x96, 0xFF}, 1.0f, -1);
+#else
     MR::requestPointLight(this, mPosition, (GXColor){0x96, 0x96, 0x96, 0xFF}, 1.0f, -1);
+#endif
 
     if (MR::isDamageDemoTripodBoss()) {
         setNerve(GET_NERVE(TripodBossCore, TripodBossCoreNrvDamageDemo));
@@ -108,7 +112,11 @@ void TripodBossCore::exeDamageDemo() {
         MR::tryStartAllAnim(mBloomModel, "2ndDemo");
     }
 
+#if TARGET_PC
+    MR::requestPointLight(this, mPosition, GXColor{0xFF, 0x96, 0x96, 0xFF}, 1.0f, -1);
+#else
     MR::requestPointLight(this, mPosition, (GXColor){0xFF, 0x96, 0x96, 0xFF}, 1.0f, -1);
+#endif
 
     if (!MR::isDamageDemoTripodBoss()) {
         setNerve(GET_NERVE(TripodBossCore, TripodBossCoreNrvWarning));
@@ -117,7 +125,11 @@ void TripodBossCore::exeDamageDemo() {
 
 void TripodBossCore::exeWarning() {
     updateTripodMatrix();
+#if TARGET_PC
+    MR::requestPointLight(this, mPosition, GXColor{0xFF, 0x96, 0x96, 0xFF}, 1.0f, -1);
+#else
     MR::requestPointLight(this, mPosition, (GXColor){0xFF, 0x96, 0x96, 0xFF}, 1.0f, -1);
+#endif
 }
 
 void TripodBossCore::exeBreak() {

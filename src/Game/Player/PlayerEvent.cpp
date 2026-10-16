@@ -42,7 +42,11 @@ void EventSequencer::movement() {
 
 void EventSequencer::startEvent(const char* pName) {
     EventSequence* sequence;
+#if TARGET_PC
+    if (mHashTable->search(pName, reinterpret_cast< HashSortTable::Value* >(&sequence))) {
+#else
     if (mHashTable->search(pName, reinterpret_cast< u32* >(&sequence))) {
+#endif
         mSequence = sequence;
         mSequenceFrame = 0;
         sequence->clearFlag();

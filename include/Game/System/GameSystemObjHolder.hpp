@@ -4,7 +4,7 @@
 #include <revolution.h>
 
 namespace JMath {
-    struct TRandom_fast_;
+    class TRandom_fast_;
 };  // namespace JMath
 
 class AudSystemWrapper;

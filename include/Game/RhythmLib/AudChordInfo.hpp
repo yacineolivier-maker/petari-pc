@@ -30,6 +30,12 @@ public:
     /* 0x08 */ int mScaleCount;
     /* 0x0C */ AudChordData** mChordPtr;
     /* 0x10 */ AudScaleData** mScalePtr;
+#if TARGET_PC
+    // The resource stores 32-bit offsets, too small to be relocated in place into 64-bit pointers:
+    // mChordPtr/mScalePtr point to side tables owned by this object, and mScaleStorage holds the
+    // relocated AudScaleData (whose up/down pointers have the same problem).
+    AudScaleData* mScaleStorage;
+#endif
 };
 
 class AudChordInfo : public JASGlobalInstance< AudChordInfo > {

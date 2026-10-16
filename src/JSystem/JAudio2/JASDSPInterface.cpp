@@ -115,7 +115,12 @@ void JASDsp::initBuffer() {
     for (u8 i = 0; i < 4; i++) {
         setFXLine(i, NULL, NULL);
     }
+#if TARGET_PC
+    // TODO(pc): no DSP to hand the (32-bit) buffer addresses to. The future HLE mixer reads CH_BUF /
+    // FX_BUF and the filter tables directly (Dusklight's DsetupTable is a no-op too).
+#else
     DsetupTable(0x40, u32(CH_BUF), u32(&DSPRES_FILTER), u32(&DSPADPCM_FILTER), u32(FX_BUF));
+#endif
     flushBuffer();
 }
 

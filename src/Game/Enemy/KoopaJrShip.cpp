@@ -388,11 +388,19 @@ void KoopaJrShip::shootKillersAfterDamage() {
 }
 
 bool KoopaJrShip::isExistActiveKiller() const {
+#if TARGET_PC
+    return std::find_if(mKillers.begin(), mKillers.end(), [](const LiveActor* pActor) { return !MR::isDead(pActor); }) != mKillers.end();
+#else
     return std::find_if(mKillers.begin(), mKillers.end(), std::not1(std::ptr_fun(&MR::isDead))) != mKillers.end();
+#endif
 }
 
 bool KoopaJrShip::isExistActiveKameck() const {
+#if TARGET_PC
+    return std::find_if(mKamecks.begin(), mKamecks.end(), [](const LiveActor* pActor) { return !MR::isDead(pActor); }) != mKamecks.end();
+#else
     return std::find_if(mKamecks.begin(), mKamecks.end(), std::not1(std::ptr_fun(&MR::isDead))) != mKamecks.end();
+#endif
 }
 
 void KoopaJrShip::shootMainShells() {
@@ -769,7 +777,11 @@ void KoopaJrShip::exeTurnFront() {
         }
 
         mKamecks[0]->makeActorDeadForce();
+#if TARGET_PC
+        std::for_each(mKillers.begin(), mKillers.end(), [](HomingKiller* pKiller) { pKiller->makeActorDead(); });
+#else
         std::for_each(mKillers.begin(), mKillers.end(), std::mem_func(&HomingKiller::makeActorDead));
+#endif
     }
 
     MR::startLevelSound(this, "SE_BM_LV_KOOPAJR_SHIP_3RD_DEMO");

@@ -5,7 +5,7 @@
 #include "JSystem/JGeometry.hpp"
 #include <revolution.h>
 
-class JASSoundParams;
+struct JASSoundParams;
 class JAISoundHandles;
 
 class JAUSoundAnimationSound {

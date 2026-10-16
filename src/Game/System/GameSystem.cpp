@@ -33,6 +33,12 @@
 #include <nw4r/lyt/init.h>
 #include <revolution.h>
 
+#if TARGET_PC
+#include "pc/platform.h"
+// Renames main to aurora_main: Aurora provides the real process entry point.
+#include <aurora/main.h>
+#endif
+
 #define GX_FIFO_SIZE 0x80000
 
 #define INIT_AUDIO_KEY "オーディオ初期化"  // "Audio Initialization"
@@ -45,7 +51,13 @@ namespace NrvGameSystem {
     NEW_NERVE(GameSystemNormal, GameSystem, Normal);
 };  // namespace NrvGameSystem
 
+#if TARGET_PC
+int main(int argc, char* argv[]) {
+    // Replaces the Wii IPL: window, GX, OS layer, disc image.
+    pc_platform_init(argc, argv);
+#else
 void main(void) {
+#endif
     OSInitFastCast();
     DVDInit();
     VIInit();
@@ -65,9 +77,18 @@ void main(void) {
 
     GameSystem* pGameSystem = SingletonHolder< GameSystem >::get();
 
+#if TARGET_PC
+    while (pc_platform_begin_frame()) {
+        pGameSystem->frameLoop();
+        pc_platform_end_frame();
+    }
+    pc_platform_exit(0);
+    return 0;
+#else
     while (true) {
         pGameSystem->frameLoop();
     }
+#endif
 }
 
 GameSystem::GameSystem()

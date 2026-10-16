@@ -11,11 +11,13 @@
 #include <revolution/dsp.h>
 #include <stdint.h>
 
+#if !TARGET_PC  // On PC the game's version in Overwrite*.cpp replaces it.
 inline JASAudioThread::JASAudioThread(int stackSize, int msgCount, u32 threadPriority)
     : JKRThread(JASDram, threadPriority, msgCount, stackSize), JASGlobalInstance< JASAudioThread >(true) {
     sbPauseFlag = false;
     OSInitThreadQueue(&sThreadQueue);
 }
+#endif
 
 void JASAudioThread::create(s32 threadPriority) {
     const int size = 0x2000;

@@ -9,7 +9,9 @@
 #include <JSystem/JUtility/JUTVideo.hpp>
 #include <JSystem/JUtility/JUTXfb.hpp>
 #include <revolution/gx/GXRegs.h>
+#if !TARGET_PC
 #include <runtime.h>
+#endif
 
 MainLoopFramework* MainLoopFramework::sManager;
 
@@ -33,7 +35,11 @@ namespace {
 };  // namespace
 
 void MainLoopFramework::ctor_subroutine(bool useAlpha) {
+#if TARGET_PC
+    mClearColor = GXColor{0, 0, 0, 0};
+#else
     mClearColor = (GXColor){0, 0, 0, 0};
+#endif
     mClearZ = 0xffffff;
     mDispCopyGamma = GX_GM_1_0;
     mCopyClamp = GX_CLAMP_TOP | GX_CLAMP_BOTTOM;
@@ -317,9 +323,9 @@ void MainLoopFramework::clearEfb(int param1, int param2, int param3, int param4,
     u16 fbWidth = JUTVideo::getManager()->getRenderMode()->fbWidth;
     u16 efbHeight = JUTVideo::getManager()->getRenderMode()->efbHeight;
     Mtx44 proj;
-    C_MTXOrtho(proj, 0f, efbHeight, 0f, fbWidth, 0f, 1f);
+    C_MTXOrtho(proj, 0.0f, efbHeight, 0.0f, fbWidth, 0.0f, 1.0f);
     GXSetProjection(proj, GX_ORTHOGRAPHIC);
-    GXSetViewport(0f, 0f, fbWidth, efbHeight, 0f, 1f);
+    GXSetViewport(0.0f, 0.0f, fbWidth, efbHeight, 0.0f, 1.0f);
     GXSetScissor(0, 0, fbWidth, efbHeight);
     GXLoadPosMtxImm(e_mtx, GX_PNMTX0);
     GXSetCurrentMtx(GX_PNMTX0);
@@ -390,8 +396,8 @@ void MainLoopFramework::calcCombinationRatio() {
     }
 
     mCombinationRatio = (f32)var2 / (u32)mLastFrameTime;
-    if (mCombinationRatio > 1f) {
-        mCombinationRatio = 1f;
+    if (mCombinationRatio > 1.0f) {
+        mCombinationRatio = 1.0f;
     }
 }
 
@@ -459,7 +465,11 @@ namespace {
             OSCreateAlarm(&alarm);
             MainLoopFrameworkAlarm::sList.append(&alarm.mLink);
         }
+#if TARGET_PC
+        OSTime tick = (OSTime)(u64)(OS_BUS_CLOCK / 4 * 0.5);
+#else
         OSTime tick = __cvt_dbl_usll(OS_BUS_CLOCK / 4 * 0.5);
+#endif
         OSSetAlarm(&alarm, tick, &handleGXAbortAlarm);
         GXDrawDone();
         DrawSyncManager::resetIfAborted();
@@ -471,6 +481,12 @@ namespace {
     }
 
     void handleGXAbortAlarm(OSAlarm* alarm, OSContext* context) {
+#if TARGET_PC
+        // GP hang watchdog (GXDrawDone not done after 0.5 s): aborts the frame and resets GX. On PC
+        // GXDrawDone is synchronous and a slow frame (e.g. shader compilation) is not a GP hang.
+        (void)alarm;
+        (void)context;
+#else
         u32 ras_busy2, clocks2, xf_wait_in2, xf_wait_out2;
         u32 ras_busy, clocks, xf_wait_in, xf_wait_out;
         GXReadXfRasMetric(&xf_wait_in, &xf_wait_out, &ras_busy, &clocks);
@@ -484,5 +500,6 @@ namespace {
         GX_WRITE_U32(0x5800000f);
         GXSetDrawDone();
         DrawSyncManager::prepareReset();
+#endif
     }
 };  // namespace

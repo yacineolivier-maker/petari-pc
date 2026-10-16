@@ -84,8 +84,14 @@ public:
     /* 0xE1 */ u8 _E1;
     /* 0xE2 */ u8 _E2;
     /* 0xE3 */ u8 _E3;
+#if TARGET_PC
+    // Lowest/highest address of the placement data (pointer-sized on PC).
+    /* 0xE4 */ uintptr_t _E4;
+    /* 0xE8 */ uintptr_t _E8;
+#else
     /* 0xE4 */ u32 _E4;
     /* 0xE8 */ u32 _E8;
+#endif
     /* 0xEC */ MR::AssignableArray< JMapInfo > _EC;
     /* 0xF4 */ MR::AssignableArray< JMapInfo > _F4;
     /* 0xFC */ PlacementInfoOrdered* _FC;

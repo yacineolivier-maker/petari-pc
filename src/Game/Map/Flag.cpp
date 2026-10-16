@@ -424,7 +424,11 @@ void Flag::draw() const {
 
         const Vec2 stickCoords[] = {{1.0f, 0.0f}, {0.0f, 1.0f}, {-1.0f, 0.0f}, {1.0f, 0.0f}};
 
+#if TARGET_PC
+        GXSetArray(GX_VA_CLR0, &::sStickColors, sizeof(::sStickColors), sizeof(GXColor), true);
+#else
         GXSetArray(GX_VA_CLR0, &::sStickColors, ARRAY_SIZE(::sStickColors));
+#endif
         GXBegin(GX_TRIANGLESTRIP, GX_VTXFMT0, 8);
 
         f32 length = mStickLength + mPointIntervalV * (mNumPointsV - 1);
@@ -462,8 +466,13 @@ void Flag::loadMaterial() const {
     GXSetVtxDesc(GX_VA_CLR0, GX_INDEX8);
     GXSetVtxDesc(GX_VA_TEX0, GX_INDEX8);
 
+#if TARGET_PC
+    GXSetArray(GX_VA_CLR0, mColors, mNumPointsV * (mNumPointsU + 1) * sizeof(Color8), 4, true);
+    GXSetArray(GX_VA_TEX0, mTexST, mNumPointsV * (mNumPointsU + 1) * 2 * sizeof(f32), 8, true);
+#else
     GXSetArray(GX_VA_CLR0, mColors, 4);
     GXSetArray(GX_VA_TEX0, mTexST, 8);
+#endif
 
     GXLoadPosMtxImm(MR::getCameraViewMtx(), 0);
     GXSetCurrentMtx(0);

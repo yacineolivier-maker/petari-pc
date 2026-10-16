@@ -97,10 +97,10 @@ void JASDriver::setOutputRate(JASOutputRate param_0) {
 }
 
 const JASDriver::MixFunc JASDriver::sMixFuncs[4] = {
-    mixMonoTrack,
-    mixMonoTrackWide,
-    mixExtraTrack,
-    mixInterleaveTrack,
+    JASDriver::mixMonoTrack,
+    JASDriver::mixMonoTrackWide,
+    JASDriver::mixExtraTrack,
+    JASDriver::mixInterleaveTrack,
 };
 
 volatile u32 JASDriver::sSubFrameCounter;
@@ -200,7 +200,13 @@ void JASDriver::finishDSPFrame() {
     JASAudioThread::setDSPSyncCount(getSubFrames());
     JASProbe::start(7, "DSP-MAIN");
     u32 r27 = getFrameSamples();
+#if TARGET_PC
+    // TODO(pc): no DSP to send the (32-bit) output buffer addresses to; the future HLE mixer must render
+    // the frame into sDspDacBuffer[sDspDacWriteBuffer] (left half, right half at +r27) here. Until then
+    // the DSP output stays silent.
+#else
     JASDsp::syncFrame(getSubFrames(), u32(sDspDacBuffer[sDspDacWriteBuffer]), u32(sDspDacBuffer[sDspDacWriteBuffer] + r27));
+#endif
     sDspStatus = 1;
     updateDSP();
     if (sDspDacCallback) {

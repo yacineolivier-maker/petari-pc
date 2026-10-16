@@ -45,6 +45,9 @@ GalaxyMap::GalaxyMap()
       _70(), _71(true) {
 }
 
+// On PC the destructors are already instantiated by the constructor above (MSVC rejects a late
+// explicit specialization); the primary template's destructor is the same empty body.
+#if !TARGET_PC
 template <>
 inline MR::Vector< MR::AssignableArray< GalaxyMapIcon* > >::~Vector() {
 }
@@ -60,6 +63,7 @@ inline MR::Vector< MR::AssignableArray< GalaxyMapDomeIcon* > >::~Vector() {
 template <>
 inline MR::Vector< MR::AssignableArray< GalaxyMapTicoIcon* > >::~Vector() {
 }
+#endif
 
 void GalaxyMap::init(const JMapInfoIter& rIter) {
     initLayoutManager("MapGrandGalaxy", 1);

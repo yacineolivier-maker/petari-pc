@@ -75,8 +75,13 @@ bool JKRHeap::initArena(char** memory, u32* size, int maxHeaps) {
 
     arenaStart = OSInitAlloc(arenaLo, arenaHi, maxHeaps);
     OSBootInfo* code = (OSBootInfo*)OSPhysicalToCached(0);
+#if TARGET_PC
+    ramStart = (void*)(((uintptr_t)arenaStart + 31) & ~(uintptr_t)31);
+    ramEnd = (void*)((uintptr_t)arenaHi & ~(uintptr_t)31);
+#else
     ramStart = (void*)(((u32)arenaStart + 31) & 0xFFFFFFE0);
     ramEnd = (void*)((u32)arenaHi & 0xFFFFFFE0);
+#endif
 
     JKRHeap::mCodeStart = code;
     JKRHeap::mCodeEnd = ramStart;
@@ -88,7 +93,11 @@ bool JKRHeap::initArena(char** memory, u32* size, int maxHeaps) {
     OSSetArenaHi(ramEnd);
 
     *memory = (char*)ramStart;
+#if TARGET_PC
+    *size = (u32)((uintptr_t)ramEnd - (uintptr_t)ramStart);
+#else
     *size = (u32)ramEnd - (u32)ramStart;
+#endif
     return true;
 }
 
@@ -222,7 +231,11 @@ JKRHeap* JKRHeap::findAllHeap(void* ptr) const {
     return nullptr;
 }
 
+#if TARGET_PC
+void JKRHeap::dispose_subroutine(uintptr_t start, uintptr_t end) {
+#else
 void JKRHeap::dispose_subroutine(u32 start, u32 end) {
+#endif
     JSUListIterator< JKRDisposer > it(mDisposerList.getFirst());
     JSUListIterator< JKRDisposer > last_it;
 
@@ -247,14 +260,23 @@ void JKRHeap::dispose_subroutine(u32 start, u32 end) {
 }
 
 bool JKRHeap::dispose(void* ptr, u32 size) {
+#if TARGET_PC
+    uintptr_t begin = (uintptr_t)ptr;
+    uintptr_t end = (uintptr_t)ptr + size;
+#else
     u32 begin = (u32)ptr;
     u32 end = (u32)ptr + size;
+#endif
     dispose_subroutine(begin, end);
     return false;
 }
 
 void JKRHeap::dispose(void* begin, void* end) {
+#if TARGET_PC
+    dispose_subroutine((uintptr_t)begin, (uintptr_t)end);
+#else
     dispose_subroutine((u32)begin, (u32)end);
+#endif
 }
 
 void JKRHeap::dispose() {

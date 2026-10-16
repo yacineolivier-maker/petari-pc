@@ -653,10 +653,11 @@ s32 JASSeqParser::cmdReg(JASTrack* track, u32* args) {
     case 7:
         val ^= readReg(track, reg);
         break;
-    case 8:
+    case 8: {
         static JMath::TRandom_fast_ oRandom(0);
         val = (oRandom.rand() >> 9) % val;
         break;
+    }
     case 9:
         val = readReg(track, reg) << val;
         break;
@@ -735,7 +736,12 @@ s32 JASSeqParser::cmdDump(JASTrack* track, u32* args) {
 
 s32 JASSeqParser::cmdPrintf(JASTrack* track, u32* args) {
     char formatString[0x80];
+#if TARGET_PC
+    // Pointer-sized so that %s arguments (sequence data addresses) are not truncated.
+    uintptr_t values[4] = {0};
+#else
     u32 values[4];
+#endif
     u8 formatTypes[4];
     u32 numValues = 0, i;
     for (i = 0; i < sizeof(formatString); i++) {
@@ -790,7 +796,11 @@ s32 JASSeqParser::cmdPrintf(JASTrack* track, u32* args) {
         values[i] = track->getSeqCtrl()->readByte();
         switch (formatTypes[i]) {
         case 2:
+#if TARGET_PC
+            values[i] = (uintptr_t)track->getSeqCtrl()->getAddr(values[i]);
+#else
             values[i] = (u32)track->getSeqCtrl()->getAddr(values[i]);
+#endif
             break;
         case 3:
         case 4:

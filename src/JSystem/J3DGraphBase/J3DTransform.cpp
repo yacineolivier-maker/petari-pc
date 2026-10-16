@@ -72,6 +72,31 @@ void J3DCalcYBBoardMtx(Mtx mtx) {
     mtx[2][2] = vec.z * z;
 }
 
+#if TARGET_PC
+void J3DPSCalcInverseTranspose(__REGISTER Mtx src, __REGISTER Mtx33 dst) {
+    // Inverse transpose of the upper 3x3 (cofactors / determinant); dst is left untouched if singular.
+    f32 a = src[0][0], b = src[0][1], c = src[0][2];
+    f32 d = src[1][0], e = src[1][1], f = src[1][2];
+    f32 g = src[2][0], h = src[2][1], i = src[2][2];
+    f32 c00 = e * i - h * f, c01 = f * g - i * d, c02 = d * h - e * g;
+    f32 c10 = h * c - b * i, c11 = i * a - c * g, c12 = b * g - a * h;
+    f32 c20 = b * f - e * c, c21 = c * d - f * a, c22 = a * e - b * d;
+    f32 det = a * c00 + d * c10 + g * c20;
+    if (det == 0.0f) {
+        return;
+    }
+    f32 inv = 1.0f / det;
+    dst[0][0] = c00 * inv;
+    dst[0][1] = c01 * inv;
+    dst[0][2] = c02 * inv;
+    dst[1][0] = c10 * inv;
+    dst[1][1] = c11 * inv;
+    dst[1][2] = c12 * inv;
+    dst[2][0] = c20 * inv;
+    dst[2][1] = c21 * inv;
+    dst[2][2] = c22 * inv;
+}
+#else
 asm void J3DPSCalcInverseTranspose(__REGISTER Mtx src, __REGISTER Mtx33 dst) {
 #ifdef __MWERKS__  // clang-format off
 	psq_l    f0, 0(src), 1, 0
@@ -128,6 +153,7 @@ lbl_8005F118:
 	blr
 #endif  // clang-format on
 }
+#endif
 
 void J3DGetTranslateRotateMtx(const J3DTransformInfo& tx, Mtx dst) {
     f32 cxsz;
@@ -261,6 +287,15 @@ void J3DGetTextureMtxMayaOld(const J3DTextureSRTInfo& srt, Mtx dst) {
     dst[2][2] = 1.0f;
 }
 
+#if TARGET_PC
+void J3DScaleNrmMtx(__REGISTER Mtx mtx, const __REGISTER Vec& scl) {
+    for (int r = 0; r < 3; r++) {
+        mtx[r][0] *= scl.x;
+        mtx[r][1] *= scl.y;
+        mtx[r][2] *= scl.z;
+    }
+}
+#else
 asm void J3DScaleNrmMtx(__REGISTER Mtx mtx, const __REGISTER Vec& scl) {
 #ifdef __MWERKS__  // clang-format off
 	nofralloc;
@@ -296,7 +331,17 @@ asm void J3DScaleNrmMtx(__REGISTER Mtx mtx, const __REGISTER Vec& scl) {
 	blr
 #endif  // clang-format on
 }
+#endif
 
+#if TARGET_PC
+void J3DScaleNrmMtx33(__REGISTER Mtx33 mtx, const __REGISTER Vec& scale) {
+    for (int r = 0; r < 3; r++) {
+        mtx[r][0] *= scale.x;
+        mtx[r][1] *= scale.y;
+        mtx[r][2] *= scale.z;
+    }
+}
+#else
 asm void J3DScaleNrmMtx33(__REGISTER Mtx33 mtx, const __REGISTER Vec& scale) {
 #ifdef __MWERKS__  // clang-format off
 	psq_l    f0, 0(mtx), 0, 0
@@ -322,7 +367,21 @@ asm void J3DScaleNrmMtx33(__REGISTER Mtx33 mtx, const __REGISTER Vec& scale) {
 	blr
 #endif  // clang-format on
 }
+#endif
 
+#if TARGET_PC
+void J3DMtxProjConcat(__REGISTER Mtx mtx1, __REGISTER Mtx mtx2, __REGISTER Mtx dst) {
+    // mtx2 is a 4x4 matrix (rows 0..3 are read).
+    Mtx tmp;
+    for (int r = 0; r < 3; r++) {
+        f32 a0 = mtx1[r][0], a1 = mtx1[r][1], a2 = mtx1[r][2], a3 = mtx1[r][3];
+        for (int col = 0; col < 4; col++) {
+            tmp[r][col] = a0 * mtx2[0][col] + a1 * mtx2[1][col] + a2 * mtx2[2][col] + a3 * mtx2[3][col];
+        }
+    }
+    JMath::gekko_ps_copy12(dst, tmp);
+}
+#else
 asm void J3DMtxProjConcat(__REGISTER Mtx mtx1, __REGISTER Mtx mtx2, __REGISTER Mtx dst) {
 #ifdef __MWERKS__  // clang-format off
 	psq_l    f2, 0(mtx1), 0, 0
@@ -400,6 +459,7 @@ asm void J3DMtxProjConcat(__REGISTER Mtx mtx1, __REGISTER Mtx mtx2, __REGISTER M
 	blr
 #endif  // clang-format on
 }
+#endif
 
 static f32 Unit01[2] = {0.0f, 1.0f};
 
@@ -507,5 +567,12 @@ loop:
 #undef FP15
 #undef FP31
 #undef UNIT_R
+}
+#else
+void J3DPSMtxArrayConcat(Mtx mA, Mtx mB, Mtx mAB, u32 count) {
+    for (u32 i = 0; i < count; i++) {
+        // mB/mAB are arrays of 3x4 matrices.
+        PSMTXConcat(mA, mB + i * 3, mAB + i * 3);
+    }
 }
 #endif  // clang-format on

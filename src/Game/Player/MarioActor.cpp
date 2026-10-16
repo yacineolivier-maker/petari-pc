@@ -1334,7 +1334,7 @@ void MarioActor::updateSwingAction() {
 
     u8 action = selectAction("スピンアタック");
     switch (action) {
-    case 1:
+    case 1: {
         bool didSpinPunch = true;
         if (!mMario->mMovementStates._F && isJumping() && !mMario->isDamaging() && !mMario->mMovementStates._2B) {
             bool tmp = false;
@@ -1384,6 +1384,7 @@ void MarioActor::updateSwingAction() {
         }
 
         break;
+    }
     case 2:
         if (isEnableSpinPunch() && !mMario->isSwimming()) {
             shootFireBall();
@@ -1397,7 +1398,7 @@ void MarioActor::updateSwingAction() {
         }
 
         break;
-    case 4:
+    case 4: {
         if (mMario->_418 != 0) {
             break;
         }
@@ -1406,6 +1407,7 @@ void MarioActor::updateSwingAction() {
         const MarioConstTable* pConstants = mConst->getTable();
         _946 = pConstants->mTeresaWallThroughTime + pConstants->mSpinIntervalTime;
         break;
+    }
     case 5:
         if (!isEnableSpinPunch()) {
             break;

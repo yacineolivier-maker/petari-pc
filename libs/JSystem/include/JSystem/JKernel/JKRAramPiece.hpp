@@ -7,9 +7,16 @@
 class JKRDecompCommand;
 class JKRAramBlock;
 
+// Main RAM side of an ARAM transfer holds a pointer: needs pointer width on PC.
+#if TARGET_PC
+typedef uintptr_t JKRAramAddr;
+#else
+typedef u32 JKRAramAddr;
+#endif
+
 class JKRAMCommand {
 public:
-    typedef void (*AsyncCallback)(u32);
+    typedef void (*AsyncCallback)(JKRAramAddr);
 
     JKRAMCommand();
     ~JKRAMCommand();
@@ -21,8 +28,8 @@ public:
 
     /* 0x40 */ s32 mTransferDirection;
     /* 0x44 */ u32 mDataLength;
-    /* 0x48 */ u32 mSrc;
-    /* 0x4C */ u32 mDst;
+    /* 0x48 */ JKRAramAddr mSrc;
+    /* 0x4C */ JKRAramAddr mDst;
     /* 0x50 */ JKRAramBlock* mAramBlock;
     /* 0x54 */ u32 field_0x54;
     /* 0x58 */ AsyncCallback mCallback;
@@ -48,13 +55,19 @@ struct JKRAramCommand {
 
 class JKRAramPiece {
 public:
-    static JKRAMCommand* prepareCommand(int direction, u32 src, u32 dst, u32 length, JKRAramBlock* block, JKRAMCommand::AsyncCallback callback);
+    static JKRAMCommand* prepareCommand(int direction, JKRAramAddr src, JKRAramAddr dst, u32 length, JKRAramBlock* block,
+                                        JKRAMCommand::AsyncCallback callback);
     static void sendCommand(JKRAMCommand*);
-    static JKRAMCommand* orderAsync(int direction, u32 source, u32 destination, u32 length, JKRAramBlock* block,
+    static JKRAMCommand* orderAsync(int direction, JKRAramAddr source, JKRAramAddr destination, u32 length, JKRAramBlock* block,
                                     JKRAMCommand::AsyncCallback callback);
     static BOOL sync(JKRAMCommand*, int);
+#if TARGET_PC
+    static BOOL orderSync(int, JKRAramAddr, JKRAramAddr, unsigned long, JKRAramBlock*);
+    static void doneDMA(JKRAramAddr);
+#else
     static BOOL orderSync(int, unsigned long, unsigned long, unsigned long, JKRAramBlock*);
     static void doneDMA(unsigned long);
+#endif
     static void startDMA(JKRAMCommand*);
 
     static OSMutex mMutex;
@@ -72,6 +85,6 @@ inline void JKRAramPcs_SendCommand(JKRAMCommand* command) {
     JKRAramPiece::sendCommand(command);
 }
 
-inline BOOL JKRAramPcs(int direction, u32 source, u32 destination, u32 length, JKRAramBlock* block) {
+inline BOOL JKRAramPcs(int direction, JKRAramAddr source, JKRAramAddr destination, u32 length, JKRAramBlock* block) {
     return JKRAramPiece::orderSync(direction, source, destination, length, block);
 }

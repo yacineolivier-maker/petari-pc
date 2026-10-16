@@ -43,5 +43,10 @@ s16* SpkWave::getWave(s32 wave) const {
 }
 
 WaveData* SpkWave::getWaveData(s32 wave) const {
+#if TARGET_PC
+    // TODO(pc): the offset table is big-endian; read natively here until the endian layer exists.
+    return (WaveData*)((u8*)mResource + *(u32*)((u8*)mResource + wave * 4 + 8));
+#else
     return (WaveData*)((u32)mResource + *(u32*)((u32)mResource + wave * 4 + 8));
+#endif
 }

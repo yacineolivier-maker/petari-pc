@@ -45,7 +45,11 @@
 #include <JSystem/JGeometry/TMatrix.hpp>
 #include <JSystem/JGeometry/TUtil.hpp>
 #include <cstdio>
+#if TARGET_PC
+#include <cstdarg>
+#else
 #include <va_list.h>
+#endif
 
 void ObjUtil_FORCE_MATCH_SDATA2() {
     (void)57.2957802f;

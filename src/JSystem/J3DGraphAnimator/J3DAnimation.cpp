@@ -548,6 +548,32 @@ inline f32 J3DHermiteInterpolation(__REGISTER f32 pp1, __REGISTER s16 const* pp2
     }
 
     return value;
+#else
+    // psq_l with GQR5 = s16, scale 0 (set in J3DSys::drawInit): plain s16 -> f32 conversion.
+    f32 time1 = (f32)*pp2;
+    f32 value1 = (f32)*pp3;
+    f32 tangent1 = (f32)*pp4;
+    f32 time2 = (f32)*pp5;
+    f32 value2 = (f32)*pp6;
+    f32 tangent2 = (f32)*pp7;
+
+    f32 duration = time2 - time1;
+    f32 t = (pp1 - time1) / duration;
+    f32 t2 = t * t;
+
+    f32 delta = (value2 - value1) - duration * tangent1;
+
+    f32 v = tangent2 * duration + value1;
+    v = v - value2;
+    v = v - delta;
+    f32 e = t2 * v;
+
+    f32 out = duration * tangent1 + e;
+    out = out * t + value1;
+    out = delta * t2 + out;
+    out = out - e;
+
+    return out;
 #endif
 }
 
@@ -817,6 +843,9 @@ J3DAnmVtxColor::J3DAnmVtxColor() {
 
     for (int i = 0; i < 2; i++) {
         mAnmVtxColorIndexData[i] = nullptr;
+#if TARGET_PC
+        mColorIndexBase[i] = nullptr;
+#endif
     }
 }
 

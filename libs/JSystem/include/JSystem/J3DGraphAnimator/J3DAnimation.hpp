@@ -59,7 +59,13 @@ struct J3DAnmColorKeyTable {
 
 struct J3DAnmVtxColorIndexData {
     /* 0x00 */ u16 mNum;
+#if TARGET_PC
+    // File data: index offset (in u16 units) from J3DAnmVtxColor::mColorIndexBase. A 64-bit pointer
+    // doesn't fit here, so the loader keeps the offset instead of patching in a pointer.
+    /* 0x04 */ u32 mpData;
+#else
     /* 0x04 */ void* mpData;
+#endif
 };
 
 struct J3DAnmColorFullTable {
@@ -579,6 +585,10 @@ public:
 
     /* 0x0C */ u16 mAnmTableNum[2];
     /* 0x10 */ J3DAnmVtxColorIndexData* mAnmVtxColorIndexData[2];
+#if TARGET_PC
+    // Index array base: entry i's data is mColorIndexBase[n] + mAnmVtxColorIndexData[n][i].mpData.
+    u16* mColorIndexBase[2];
+#endif
 };  // Size: 0x18
 class J3DAnmVtxColorFull : public J3DAnmVtxColor {
 public:

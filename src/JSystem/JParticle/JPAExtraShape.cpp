@@ -115,6 +115,8 @@ void JPAExtraShape::init() {
     }
 }
 
+#if !TARGET_PC  // Aurora's OSFastCast.h already defines it (same body)
 static void OSf32tou8(f32* f, u8* out) {
     *out = __OSf32tou8(*f);
 }
+#endif

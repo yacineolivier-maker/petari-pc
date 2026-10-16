@@ -78,6 +78,14 @@ void* DrawSyncManager::threadFunc(void* pArg) {
         OSMessage message;
         OSReceiveMessage(&pManager->mQueue, &message, OS_MESSAGE_BLOCK);
 
+#if TARGET_PC
+        // On PC no FIFO breakpoints are pushed and draw-sync tokens are not queued (Aurora runs
+        // the GP in order and fires the draw-sync callback synchronously): only the quit message
+        // (0x10000) arrives here.
+        if (reinterpret_cast< uintptr_t >(message) == 0x10000) {
+            break;
+        }
+#else
         if (reinterpret_cast< u32 >(message) >= 0x80000000) {
             pManager->mFifo->push(message);
             const bool aborted = pManager->mAborted;
@@ -100,6 +108,7 @@ void* DrawSyncManager::threadFunc(void* pArg) {
         } else {
             break;
         }
+#endif
     }
 
     return nullptr;
@@ -125,7 +134,9 @@ DrawSyncManager::DrawSyncManager(u32 capacity, s32 priority) {
 
 DrawSyncManager::~DrawSyncManager() {
     GXSetDrawSyncCallback(nullptr);
+#if !TARGET_PC
     GXDisableBreakPt();
+#endif
     OSSendMessage(&mQueue, reinterpret_cast< OSMessage >(0x10000), OS_MESSAGE_BLOCK);
     OSJoinThread(&mThread, nullptr);
 }
@@ -160,9 +171,11 @@ void DrawSyncManager::reset(bool preparing) {
 
 void DrawSyncManager::drawSyncCallbackSub(u16 token) {
     if (token == 0) {
+#if !TARGET_PC
         if ((mFlags & 2) == 0) {
             OSSendMessage(&mQueue, reinterpret_cast< OSMessage >(token), OS_MESSAGE_BLOCK);
         }
+#endif
 
         return;
     }
@@ -171,9 +184,11 @@ void DrawSyncManager::drawSyncCallbackSub(u16 token) {
         if (mTokenRanges[i].mCallback != nullptr && mTokenRanges[i].mStart <= token && token <= mTokenRanges[i].mEnd) {
             mTokenRanges[i].mCallback->drawSyncCallback(token);
 
+#if !TARGET_PC
             if ((mFlags & 2) == 0) {
                 OSSendMessage(&mQueue, reinterpret_cast< OSMessage >(token), OS_MESSAGE_BLOCK);
             }
+#endif
 
             break;
         }
@@ -181,6 +196,9 @@ void DrawSyncManager::drawSyncCallbackSub(u16 token) {
 }
 
 void DrawSyncManager::pushBreakPoint() {
+#if TARGET_PC
+    // TODO(pc): no FIFO breakpoints on PC (the CPU never gets ahead of Aurora's GP).
+#else
     if ((mFlags & 3) == 0) {
         GXFlush();
         GXFifoObj fifoObj;
@@ -191,6 +209,7 @@ void DrawSyncManager::pushBreakPoint() {
         GXGetFifoPtrs(&fifoObj, &pRead, &pWrite);
         OSSendMessage(&mQueue, pWrite, OS_MESSAGE_BLOCK);
     }
+#endif
 }
 
 #if (VERSION == RMGJ01 || VERSION == RMGE01 || VERSION == RMGP01)

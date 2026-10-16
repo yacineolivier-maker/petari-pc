@@ -137,7 +137,11 @@ void StarPointerBlur::draw() const {
     initDraw();
     switch (::sDrawMode) {
     case 0:
+#if TARGET_PC
+        draw0(GXColor{0, 0, 0, 0});  // NOTE: indicated by debug symbols, color is a dummy
+#else
         draw0((GXColor){0, 0, 0, 0});  // NOTE: indicated by debug symbols, color is a dummy
+#endif
         break;
     case 1:
         draw1();  // NOTE: indicated by debug symbols

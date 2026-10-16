@@ -29,3 +29,48 @@ inline const WGPipe wgpipe{};
 #undef GXWGFifo
 #define GXWGFifo (::pc_gx::wgpipe)
 #endif
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+// Implemented in Aurora (GXLighting.cpp) but not declared in its headers.
+void GXInitSpecularDirHA(GXLightObj* lt_obj, f32 nx, f32 ny, f32 nz, f32 hx, f32 hy, f32 hz);
+#ifdef __cplusplus
+}
+#endif
+
+// Wii SDK inline (GXVert.h): writes a raw f32 to the command FIFO.
+static inline void GXCmd1f32(f32 v) {
+    u32 bits;
+    memcpy(&bits, &v, sizeof(bits));
+    GXCmd1u32(bits);
+}
+
+// TODO(pc): Aurora does not implement GXSetZScaleOffset (depth scale/offset is lost).
+static inline void GXSetZScaleOffset(f32 scale, f32 offset) {
+    (void)scale;
+    (void)offset;
+}
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+// Implemented in pc/src/os/os_stubs.cpp (runs the draw-sync callback synchronously).
+void GXSetDrawSync(u16 token);
+#ifdef __cplusplus
+}
+#endif
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+// Wii SDK GX functions missing from Aurora's headers.
+// Need PC implementations (Aurora's GXGet.cpp has them as TODO): read back GXTexObj fields.
+void GXGetTexObjAll(const GXTexObj* obj, void** image_ptr, u16* width, u16* height, GXTexFmt* format,
+                    GXTexWrapMode* wrap_s, GXTexWrapMode* wrap_t, GXBool* mipmap);
+void GXGetTexObjLODAll(const GXTexObj* obj, GXTexFilter* min_filt, GXTexFilter* mag_filt, f32* min_lod,
+                       f32* max_lod, f32* lod_bias, GXBool* bias_clamp, GXBool* do_edge_lod,
+                       GXAnisotropy* max_aniso);
+#ifdef __cplusplus
+}
+#endif

@@ -616,13 +616,21 @@ void Mario::tryTornadoJump() {
 
 void Mario::startTornadoCentering(HitSensor* pSensor) {
     pushTask(reinterpret_cast< Task >(&Mario::taskOnTornadoCentering), 0x400);
+#if TARGET_PC
+    _A38 = pSensor;
+#else
     _A38 = reinterpret_cast< u32 >(pSensor);
+#endif
     _A34 = 0x1E;
 }
 
 bool Mario::taskOnTornadoCentering(u32 a1) {
     if (_A34 != 0) {
+#if TARGET_PC
+        TVec3f sensorOffset(_A38->mHost->mPosition - mPosition);
+#else
         TVec3f sensorOffset(reinterpret_cast< HitSensor* >(_A38)->mHost->mPosition - mPosition);
+#endif
         MR::vecKillElement(sensorOffset, *getGravityVec(), &sensorOffset);
 
         f32 mag = sensorOffset.length();

@@ -3,6 +3,7 @@
 #include "JSystem/JAudio2/JASBasicInst.hpp"
 #include "JSystem/JAudio2/JASChannel.hpp"
 
+#if !TARGET_PC  // On PC the game's version in Overwrite*.cpp replaces it.
 JASChannel* JASBank::noteOn(JASBank const* pBank, int progNo, u8 pitch, u8 velocity, u16 priority, JASChannel::Callback pCallback,
                             void* pChannelMgr) {
     if (progNo >= 0xf0) {
@@ -66,6 +67,7 @@ JASChannel* JASBank::noteOn(JASBank const* pBank, int progNo, u8 pitch, u8 veloc
     }
     return channel;
 }
+#endif
 
 static JASOscillator::Point const OSC_RELEASE_TABLE[] = {
     {0x0001, 0x000A, 0x0000},

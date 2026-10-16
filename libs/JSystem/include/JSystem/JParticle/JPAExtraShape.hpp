@@ -2,7 +2,7 @@
 
 #include <revolution/types.h>
 
-class JPAEmitterWorkData;
+struct JPAEmitterWorkData;
 class JPABaseParticle;
 
 struct JPAExtraShapeData {

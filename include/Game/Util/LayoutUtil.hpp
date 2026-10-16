@@ -10,7 +10,7 @@ class J3DFrameCtrl;
 class LayoutActor;
 class LayoutHolder;
 class Nerve;
-class ResTIMG;
+struct ResTIMG;
 class SimpleLayout;
 
 namespace nw4r {
@@ -23,7 +23,7 @@ namespace nw4r {
 
     namespace ut {
         class Font;
-        class Rect;
+        struct Rect;
     };  // namespace ut
 };  // namespace nw4r
 

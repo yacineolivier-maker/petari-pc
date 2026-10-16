@@ -4,7 +4,7 @@
 #include "JSystem/JAudio2/JAIStream.hpp"
 #include "JSystem/JAudio2/JASGlobal.hpp"
 
-class JAIStreamAramMgr;
+struct JAIStreamAramMgr;
 struct JAIStreamDataMgr;
 
 class JAIStreamMgr : public JASGlobalInstance< JAIStreamMgr > {

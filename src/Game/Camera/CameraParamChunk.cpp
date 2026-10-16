@@ -26,6 +26,9 @@ CameraGeneralParam& CameraGeneralParam::operator=(const CameraGeneralParam& rOth
     mNum1 = rOther.mNum1;
     mNum2 = rOther.mNum2;
     mString = rOther.mString;
+#if TARGET_PC
+    mAnimData = rOther.mAnimData;
+#endif
 
     return *this;
 }

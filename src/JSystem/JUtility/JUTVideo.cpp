@@ -164,7 +164,11 @@ void JUTVideo::postRetraceProc(u32 retrace_count) {
         sManager->mPostCallback(retrace_count);
     }
 
+#if TARGET_PC
+    OSMessage message = reinterpret_cast< OSMessage >((uintptr_t)VIGetRetraceCount());
+#else
     OSMessage message = reinterpret_cast< OSMessage >(VIGetRetraceCount());
+#endif
     OSSendMessage(&sManager->mMessageQueue, message, OS_MESSAGE_NOBLOCK);
 }
 

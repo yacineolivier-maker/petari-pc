@@ -283,7 +283,7 @@ namespace NWC24MessengerSub {
     }
 
     void SendState::exeWait() {
-        if (selectTask() == nullptr) {
+        if (selectTask() == 0) {
             return;
         }
 
@@ -345,7 +345,7 @@ namespace NWC24MessengerSub {
         } else {
             doneTask();
 
-            if (selectTask() != nullptr) {
+            if (selectTask() != 0) {
                 if (!mTask->mIsBG) {
                     setNerve(GET_NERVE_GLOBAL(SendStateNrvRunFG));
                 } else {

@@ -90,7 +90,11 @@ public:
 
     template < typename T >
     void addEventSequence(const char* pName) {
+#if TARGET_PC
+        mHashTable->add(pName, reinterpret_cast< HashSortTable::Value >(new T()), false);
+#else
         mHashTable->add(pName, reinterpret_cast< u32 >(new T()), false);
+#endif
     }
 
 private:

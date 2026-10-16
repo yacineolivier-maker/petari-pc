@@ -1061,7 +1061,7 @@ void Mario::fixFrontVecByGravity() {
     }
 
     TVec3f front = _344.cross(up);
-    if (MR::normalizeOrZero(&front) == nullptr) {
+    if (MR::normalizeOrZero(&front) == 0) {
         setFrontVec(front);
         _22C = mFrontVec;
         f32 _328mag = _328.length();
@@ -1219,7 +1219,7 @@ void Mario::setFrontVecKeepSide(const TVec3f& rFront) {
     }
 
     headVec.cross(mFrontVec, mSideVec);
-    if (MR::normalizeOrZero(&headVec) != nullptr) {
+    if (MR::normalizeOrZero(&headVec) != 0) {
         const TVec3f* gravity = getGravityVec();
         TVec3f up = -(*gravity);
         mHeadVec = up;

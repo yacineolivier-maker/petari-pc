@@ -191,6 +191,46 @@ namespace StarPointerFunction {
 
         return true;
     }
+
+#if TARGET_PC
+    // Not decompiled yet; written from the RMGE01 assembly (0x80385C1C). Moves rPos along rDir to
+    // the screen edge (inset by the margins), trying the vertical edges first, then the horizontal
+    // ones. Returns false if rPos is off screen or no edge point is on screen.
+    bool forceOutsideScreenEdge(TVec2f* pOut, const TVec2f& rPos, const TVec2f& rDir, f32 marginX, f32 marginY) {
+        if (!isInScreen(rPos, marginX, marginY)) {
+            return false;
+        }
+
+        TVec2f dir(rDir.x, rDir.y);
+        MR::normalizeOrZero(&dir);
+
+        if (dir.x != 0.0f) {
+            f32 edge = 0.0f < dir.x ? MR::getScreenWidth() - marginX : marginX;
+            f32 t = (edge - rPos.x) / dir.x;
+            TVec2f edgePos(rPos.x + dir.x * t, rPos.y + dir.y * t);
+
+            if (isInScreen(edgePos, marginX, marginY)) {
+                pOut->x = edgePos.x;
+                pOut->y = edgePos.y;
+                return true;
+            }
+        }
+
+        if (dir.y != 0.0f) {
+            f32 edge = 0.0f < dir.y ? MR::getScreenHeight() - marginY : marginY;
+            f32 t = (edge - rPos.y) / dir.y;
+            TVec2f edgePos(rPos.x + dir.x * t, rPos.y + dir.y * t);
+
+            if (isInScreen(edgePos, marginX, marginY)) {
+                pOut->x = edgePos.x;
+                pOut->y = edgePos.y;
+                return true;
+            }
+        }
+
+        return false;
+    }
+#endif
 #endif
 
     bool isOnScreenEdge(const TVec2f& rPos, f32 marginX, f32 marginY) {

@@ -7,6 +7,13 @@ class JKRAMCommand;
 
 enum EJKRCompression { JKR_COMPRESSION_NONE = 0, JKR_COMPRESSION_SZP = 1, JKR_COMPRESSION_SZS = 2, JKR_COMPRESSION_ASR = 3 };
 
+// The callback receives the command's address.
+#if TARGET_PC
+typedef void (*JKRDecompCallback)(uintptr_t);
+#else
+typedef void (*JKRDecompCallback)(unsigned long);
+#endif
+
 class JKRDecompCommand {
 public:
     JKRDecompCommand();
@@ -16,7 +23,7 @@ public:
     /* 0x08 */ u8* mDst;
     /* 0x0C */ u32 mCompressedSize;
     /* 0x10 */ u32 mDecompressedSize;
-    /* 0x14 */ void (*_14)(u32);
+    /* 0x14 */ JKRDecompCallback _14;
     /* 0x18 */ JKRDecompCommand* mThis;
     /* 0x1C */ OSMessageQueue* _1C;
     /* 0x20 */ s32 _20;
@@ -33,7 +40,7 @@ public:
     virtual void* run();
 
     static JKRDecomp* create(long);
-    static JKRDecompCommand* prepareCommand(unsigned char*, unsigned char*, unsigned long, unsigned long, void (*)(unsigned long));
+    static JKRDecompCommand* prepareCommand(unsigned char*, unsigned char*, unsigned long, unsigned long, JKRDecompCallback);
     static void sendCommand(JKRDecompCommand*);
     static bool sync(JKRDecompCommand*, int);
     static bool orderSync(unsigned char*, unsigned char*, unsigned long, unsigned long);

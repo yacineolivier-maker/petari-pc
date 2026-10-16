@@ -239,6 +239,15 @@ namespace nw4r {
             return textWidth;
         }
 
+#if TARGET_PC
+        // TODO(pc): PrintImpl is not decompiled. The game only prints wide strings (its wchar_t
+        // version comes from the game code); the char version is only needed by the explicit
+        // instantiation below and never existed in the original.
+        template <>
+        f32 TextWriterBase< char >::PrintImpl(StreamType, int) {
+            return 0.0f;
+        }
+#endif
         template class TextWriterBase< char >;
         template class TextWriterBase< wchar_t >;
     };  // namespace ut

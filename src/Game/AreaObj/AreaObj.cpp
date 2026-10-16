@@ -6,8 +6,12 @@
 #include "Game/Util/AreaObjUtil.hpp"
 #include "Game/Util/JMapUtil.hpp"
 #include "Game/Util/ObjUtil.hpp"
+#if TARGET_PC
+// MSL's rfind_if/mem_func/binder2nd extensions don't exist in the host STL (see find_in).
+#else
 #include <algorithm>
 #include <functional.hpp>
+#endif
 
 AreaObj::AreaObj(int formType, const char* pName)
     : NameObj(pName), mFormType(formType), mIsValid(true), _15(true), mIsAwake(true), mObjArg0(-1), mObjArg1(-1), mObjArg2(-1), mObjArg3(-1),
@@ -109,6 +113,19 @@ void AreaObjMgr::entry(AreaObj* pAreaObj) {
 }
 
 AreaObj* AreaObjMgr::find_in(const TVec3f& rVec) const {
+#if TARGET_PC
+    // Same search as the original: last AreaObj (scanning backwards) whose volume contains rVec.
+    AreaObj* const* Begin = mArray.begin();
+    AreaObj* const* End = mArray.end();
+    for (AreaObj* const* p = End; p != Begin;) {
+        --p;
+        if ((*p)->isInVolume(rVec)) {
+            return *p;
+        }
+    }
+
+    return nullptr;
+#else
     AreaObj* const* Begin = mArray.begin();
     AreaObj* const* End = mArray.end();
     AreaObj* const* p = std::rfind_if(
@@ -122,4 +139,5 @@ AreaObj* AreaObjMgr::find_in(const TVec3f& rVec) const {
     }
 
     return nullptr;
+#endif
 }

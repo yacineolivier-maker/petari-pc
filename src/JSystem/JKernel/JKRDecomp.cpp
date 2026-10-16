@@ -43,7 +43,11 @@ void* JKRDecomp::run() {
         }
 
         if (command._14 != nullptr) {
+#if TARGET_PC
+            command._14(reinterpret_cast< uintptr_t >(&command));
+#else
             command._14(reinterpret_cast< u32 >(&command));
+#endif
             continue;
         }
 
@@ -56,7 +60,7 @@ void* JKRDecomp::run() {
 }
 
 JKRDecompCommand* JKRDecomp::prepareCommand(unsigned char* pSrc, unsigned char* pDst, unsigned long compressedSize, unsigned long decompressedSize,
-                                            void (*a5)(unsigned long)) {
+                                            JKRDecompCallback a5) {
     JKRDecompCommand* command = new (JKRHeap::sSystemHeap, -4) JKRDecompCommand();
 
     command->mSrc = pSrc;
@@ -193,7 +197,11 @@ void JKRDecomp::decodeSZP(u8* src, u8* dst, u32 srcLength, u32 dstLength) {
 }
 
 void JKRDecomp::decodeSZS(u8* pSrc, u8* pDst, u32 compressedSize, u32 a4) {
+#if TARGET_PC
+    u8* decompEnd = pDst + JKRDecompExpandSize(pSrc) - a4;  // size read big-endian
+#else
     u32 decompSize = ((s32)pDst + *(u32*)(pSrc + 4)) - a4;
+#endif
     u8* copySrc;
     s32 validBitCount = 0;
     u32 curBlock;
@@ -259,7 +267,11 @@ void JKRDecomp::decodeSZS(u8* pSrc, u8* pDst, u32 compressedSize, u32 a4) {
 
         curBlock <<= 1;
         validBitCount--;
+#if TARGET_PC
+    } while (pDst != decompEnd);
+#else
     } while ((u32)pDst != decompSize);
+#endif
 }
 
 EJKRCompression JKRDecomp::checkCompressed(unsigned char* pSrc) {

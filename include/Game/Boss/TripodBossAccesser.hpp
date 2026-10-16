@@ -44,7 +44,12 @@ namespace MR {
     bool isRideMarioTripodBoss();
     bool tryDamageDemoTripodBoss();
     void requestEndDamageDemoTripodBoss();
+#if TARGET_PC
+    // The ID is the accesser's address (compared against PlanetGravity::mHost): pointer-sized on PC.
+    uintptr_t getTripodBossGravityHostID();
+#else
     u32 getTripodBossGravityHostID();
+#endif
     void setTripodBossJointAttachBaseMatrix(const TPos3f&, s32);
     void requestStartTripodBossStepSequence(s32);
     void addTripodBossStepPoint(TripodBossStepPoint*);

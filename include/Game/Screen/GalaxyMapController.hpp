@@ -8,7 +8,7 @@ class GalaxyMapBackground;
 class GalaxyMapSelectButton;
 class JUTTexture;
 class PowerStarList;
-class ResTIMG;
+struct ResTIMG;
 class WipeFade;
 
 class GalaxyMapController : public LayoutActor {

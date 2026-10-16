@@ -6,7 +6,7 @@
 class CollisionZone;
 class HitInfo;
 class HitSensor;
-class KC_PrismData;
+struct KC_PrismData;
 class KCollisionServer;
 class Triangle;
 class TriangleFilterBase;

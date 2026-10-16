@@ -2,7 +2,7 @@
 #include "JSystem/JAudio2/JASGlobal.hpp"
 #include "JSystem/JSupport/JSUList.hpp"
 
-struct JAIAudience;
+class JAIAudience;
 class JAISeq;
 
 class JAISeqMgr : public JASGlobalInstance< JAISeqMgr >, public JAISeqDataUser, public JAISoundActivityMgr {

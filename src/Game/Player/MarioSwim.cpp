@@ -17,6 +17,13 @@
 #include "Game/Util/SceneUtil.hpp"
 #include "Game/Util/SoundUtil.hpp"
 
+#if TARGET_PC
+// From libs/RVL_SDK/include/macros.h (not included on PC: it redefines alignas).
+#ifndef DEG_TO_RAD
+#define DEG_TO_RAD(x) ((x) * (3.1415926f / 180.0f))
+#endif
+#endif
+
 void MarioSwim_FORCE_MATCH_SDATA2() {
     (void)100.0f;
     (void)50.0f;

@@ -171,7 +171,11 @@ MultiEmitter* EffectKeeper::getEmitter(const char* pParam1) const {
     }
 
     if (_18 != nullptr && _18->mHasBeenSorted) {
+#if TARGET_PC
+        HashSortTable::Value result = 0;
+#else
         u32 result = 0;
+#endif
 
         if (_18->search(pParam1, &result)) {
             return reinterpret_cast< MultiEmitter* >(result);
@@ -346,11 +350,19 @@ void EffectKeeper::registMultiEmitter(MultiEmitter* pEmitter, const char* pParam
         pEmitter->setName(pParam3);
 
         if (_18 != nullptr) {
+#if TARGET_PC
+            _18->add(pParam3, reinterpret_cast< HashSortTable::Value >(pEmitter), 0);
+#else
             _18->add(pParam3, reinterpret_cast< u32 >(pEmitter), 0);
+#endif
         }
     } else {
         if (_18 != nullptr) {
+#if TARGET_PC
+            _18->add(pParam2, reinterpret_cast< HashSortTable::Value >(pEmitter), 0);
+#else
             _18->add(pParam2, reinterpret_cast< u32 >(pEmitter), 0);
+#endif
         }
     }
 

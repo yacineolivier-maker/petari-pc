@@ -569,7 +569,13 @@ u32 CArGBAOdh::huffmanCoder(u16* pCoefficients, SArCDJ_HuffmanRequest* pRequest)
             }
         }
 
+#if TARGET_PC
+        // The original tests address bit 1 (pStart is 4-byte aligned): the second (even) pass ends
+        // the loop. Test the element offset instead of the pointer.
+        if (((pCoefficients - pStart) & 1) == 0) {
+#else
         if ((reinterpret_cast< u32 >(pCoefficients) & 2) == 0) {
+#endif
             break;
         }
 

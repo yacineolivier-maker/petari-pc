@@ -11,7 +11,11 @@ void CannonShellHolder::registerCannonShell(CannonShellBase* pShell) {
 }
 
 CannonShellBase* CannonShellHolder::getValidShell() const {
+#if TARGET_PC
+    CannonShellBase* const* found = std::find_if(mShells.begin(), mShells.end(), [](const CannonShellBase* pShell) { return MR::isDead(pShell); });
+#else
     CannonShellBase* const* found = std::find_if(mShells.begin(), mShells.end(), std::ptr_fun(&MR::isDead));
+#endif
 
     if (found != mShells.end()) {
         return *found;

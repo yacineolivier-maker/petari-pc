@@ -57,6 +57,10 @@ OSTime c3bcnt[4] = {0, 0, 0, 0};
 JUTException::JUTException(JUTDirectPrint* pDirectPrint) : JKRThread(0x4000, 16, 0) {
     mDirectPrint = pDirectPrint;
 
+#if TARGET_PC
+    // TODO(pc): no PowerPC exceptions on PC. Hook a host crash handler (SEH / vectored exception
+    // handler) here if crash reports through this screen are wanted; panic() works as is.
+#else
     OSSetErrorHandler(OS_ERROR_DSI, reinterpret_cast< OSErrorHandler >(errorHandler));
     OSSetErrorHandler(OS_ERROR_ISI, reinterpret_cast< OSErrorHandler >(errorHandler));
     OSSetErrorHandler(OS_ERROR_PROGRAM, reinterpret_cast< OSErrorHandler >(errorHandler));
@@ -64,6 +68,7 @@ JUTException::JUTException(JUTDirectPrint* pDirectPrint) : JKRThread(0x4000, 16,
     OSSetErrorHandler(OS_ERROR_PROTECTION, reinterpret_cast< OSErrorHandler >(errorHandler));
     __OSFpscrEnableBits = 0;
     OSSetErrorHandler(OS_ERROR_FPE, nullptr);
+#endif
 
     sPreUserCallback = nullptr;
     sPostUserCallback = nullptr;
@@ -86,7 +91,9 @@ JUTException* JUTException::create(JUTDirectPrint* pDirectPrint) {
 }
 
 void* JUTException::run() {
+#if !TARGET_PC  // MSR (FP / machine-check enable bits) doesn't exist on PC
     PPCMtmsr(PPCMfmsr() & ~0x0900);
+#endif
     OSInitMessageQueue(&sMessageQueue, sMessageBuffer, sizeof(sMessageBuffer) / sizeof(*sMessageBuffer));
     OSMessage msg;
 
@@ -102,9 +109,14 @@ void* JUTException::run() {
         u32 dsisr = obj->dsisr;
         u32 dar = obj->dar;
 
+#if TARGET_PC
+        // No register context on PC: the stack trace page is disabled (see showStack).
+        mStackPointer = 0;
+#else
         if (error < OS_ERROR_MAX) {
             mStackPointer = context->gpr[1];
         }
+#endif
 
         mFrameMemory = static_cast< JUTExternalFB* >(VIGetCurrentFrameBuffer());
 
@@ -129,18 +141,26 @@ void* JUTException::run() {
 }
 
 void JUTException::errorHandler(OSError error, OSContext* pContext, u32 dsisr, u32 dar) {
+#if TARGET_PC
+    // No MSR / FPSCR / FPU context on PC.
+    msr = 0;
+    fpscr = 0;
+#else
     msr = PPCMfmsr();
     fpscr = pContext->fpscr;
 
     OSFillFPUContext(pContext);
+#endif
     OSSetErrorHandler(error, nullptr);
 
+#if !TARGET_PC
     if (error == OS_ERROR_PROTECTION) {
         OSProtectRange(/* OS_PROTECT_CHAN0 */ 0, nullptr, 0, /* OS_PROTECT0_BIT | OS_PROTECT1_BIT*/ 3);
         OSProtectRange(/* OS_PROTECT_CHAN1 */ 1, nullptr, 0, /* OS_PROTECT0_BIT | OS_PROTECT1_BIT*/ 3);
         OSProtectRange(/* OS_PROTECT_CHAN2 */ 2, nullptr, 0, /* OS_PROTECT0_BIT | OS_PROTECT1_BIT*/ 3);
         OSProtectRange(/* OS_PROTECT_CHAN3 */ 3, nullptr, 0, /* OS_PROTECT0_BIT | OS_PROTECT1_BIT*/ 3);
     }
+#endif
 
     exCallbackObject.callback = sPreUserCallback;
     exCallbackObject.error = error;
@@ -162,9 +182,15 @@ void JUTException::panic_f_va(const char* file, int line, const char* format, va
     }
 
     static OSContext context;
+#if TARGET_PC
+    // No PowerPC register context / stack pointer to capture on PC.
+    memset(&context, 0, sizeof(OSContext));
+    sErrorManager->mStackPointer = 0;
+#else
     memcpy(&context, OSGetCurrentContext(), sizeof(OSContext));
 
     sErrorManager->mStackPointer = OSGetStackPointer();
+#endif
 
     exCallbackObject.callback = sPreUserCallback;
     exCallbackObject.error = 0xFF;
@@ -188,7 +214,7 @@ void JUTException::panic_f(const char* file, int line, const char* format, ...) 
     va_list args;
     va_start(args, format);
     panic_f_va(file, line, format, args);
-    va_end();
+    va_end(args);
 }
 
 #define __signbit(x) ((*reinterpret_cast< unsigned char* >(&(x))) & 0x80)
@@ -210,6 +236,12 @@ void JUTException::showFloatSub(int index, f32 value) {
 }
 
 void JUTException::showFloat(OSContext* context) {
+#if TARGET_PC
+    // TODO(pc): no FPR context on PC.
+    if (sConsole) {
+        sConsole->print("  (not available on PC)\n");
+    }
+#else
     if (!sConsole) {
         return;
     }
@@ -227,9 +259,14 @@ void JUTException::showFloat(OSContext* context) {
     sConsole->print(" ");
     showFloatSub(21, context->fpr[21]);
     sConsole->print("\n");
+#endif
 }
 
 bool JUTException::searchPartialModule(u32 address, u32* module_id, u32* section_id, u32* section_offset, u32* name_offset) {
+#if TARGET_PC
+    // No REL module list (0x800030C8) on PC.
+    return false;
+#else
     if (!address) {
         return false;
     }
@@ -258,9 +295,16 @@ bool JUTException::searchPartialModule(u32 address, u32* module_id, u32* section
     }
 
     return false;
+#endif
 }
 
 void JUTException::showStack(OSContext* context) {
+#if TARGET_PC
+    // TODO(pc): no PowerPC back chain to walk; could use CaptureStackBackTrace.
+    if (sConsole) {
+        sConsole->print("  (not available on PC)\n");
+    }
+#else
     if (!sConsole) {
         return;
     }
@@ -283,6 +327,7 @@ void JUTException::showStack(OSContext* context) {
         waitTime(mPrintWaitTime1);
         stackPointer = reinterpret_cast< u32* >(stackPointer[0]);
     }
+#endif
 }
 
 void JUTException::showMainInfo(u16 error, OSContext* context, u32 dsisr, u32 dar) {
@@ -341,11 +386,19 @@ void JUTException::showMainInfo(u16 error, OSContext* context, u32 dsisr, u32 da
             sConsole->print_f(" FPE: Inexact result\n");
         }
     }
+#if !TARGET_PC  // no SRR0/SRR1 on PC
     sConsole->print_f("SRR0:   %08XH   SRR1:%08XH\n", context->srr0, context->srr1);
+#endif
     sConsole->print_f("DSISR:  %08XH   DAR: %08XH\n", dsisr, dar);
 }
 
 void JUTException::showGPR(OSContext* context) {
+#if TARGET_PC
+    // TODO(pc): no GPR context on PC.
+    if (sConsole) {
+        sConsole->print("  (not available on PC)\n");
+    }
+#else
     if (!sConsole) {
         return;
     }
@@ -355,6 +408,7 @@ void JUTException::showGPR(OSContext* context) {
         sConsole->print_f("R%02d:%08XH  R%02d:%08XH  R%02d:%08XH\n", i, context->gpr[i], i + 11, context->gpr[i + 11], i + 22, context->gpr[i + 22]);
     }
     sConsole->print_f("R%02d:%08XH  R%02d:%08XH\n", 10, context->gpr[10], 21, context->gpr[21]);
+#endif
 }
 
 static void search_name_part(u8* src, u8* dst, int dst_length) {
@@ -396,7 +450,11 @@ bool JUTException::showMapInfo_subroutine(u32 address, bool begin_with_newline) 
 
     bool result = searchPartialModule(address, &module_id, &section_id, &section_offset, &name_offset);
     if (result == true) {
+#if TARGET_PC
+        search_name_part(reinterpret_cast< u8* >(static_cast< uintptr_t >(name_offset)), name_part, 32);  // unreachable on PC
+#else
         search_name_part(reinterpret_cast< u8* >(name_offset), name_part, 32);
+#endif
         sConsole->print_f("%s %s:%x section:%d\n", new_line, name_part, section_offset, section_id);
         begin_with_newline = false;
     }
@@ -424,6 +482,12 @@ bool JUTException::showMapInfo_subroutine(u32 address, bool begin_with_newline) 
 }
 
 void JUTException::showGPRMap(OSContext* context) {
+#if TARGET_PC
+    // TODO(pc): no GPR context on PC.
+    if (sConsole) {
+        sConsole->print("  (not available on PC)\n");
+    }
+#else
     if (!sConsole) {
         return;
     }
@@ -449,9 +513,16 @@ void JUTException::showGPRMap(OSContext* context) {
     if (!found_address_register) {
         sConsole->print("  no register which seem to address.\n");
     }
+#endif
 }
 
 void JUTException::showSRR0Map(OSContext* context) {
+#if TARGET_PC
+    // TODO(pc): no SRR0 on PC.
+    if (sConsole) {
+        sConsole->print("  (not available on PC)\n");
+    }
+#else
     if (!sConsole) {
         return;
     }
@@ -465,6 +536,7 @@ void JUTException::showSRR0Map(OSContext* context) {
         }
         JUTConsoleManager::getManager()->drawDirect(true);
     }
+#endif
 }
 
 void JUTException::printDebugInfo(JUTException::EInfoPage page, OSError error, OSContext* context, u32 param_3, u32 param_4) {
@@ -487,7 +559,11 @@ void JUTException::printDebugInfo(JUTException::EInfoPage page, OSError error, O
 }
 
 bool JUTException::isEnablePad() const {
+#if TARGET_PC
+    if (mGamePad == reinterpret_cast< JUTGamePad* >(static_cast< uintptr_t >(0xFFFFFFFF))) {
+#else
     if (mGamePad == reinterpret_cast< JUTGamePad* >(0xFFFFFFFF)) {
+#endif
         return true;
     }
 
@@ -669,8 +745,13 @@ void JUTException::createFB() {
     void* end = OSGetArenaHi();
     u32 size = (static_cast< u16 >(ALIGN_NEXT(renderMode->fbWidth, 16)) * renderMode->xfbHeight) * 2;
 
+#if TARGET_PC
+    void* begin = reinterpret_cast< void* >(ALIGN_PREV(reinterpret_cast< uintptr_t >(end) - size, 32));
+    void* object = reinterpret_cast< void* >(ALIGN_PREV(reinterpret_cast< uintptr_t >(begin) - sizeof(JUTExternalFB), 32));
+#else
     void* begin = reinterpret_cast< void* >(ALIGN_PREV(reinterpret_cast< u32 >(end) - size, 32));
     void* object = reinterpret_cast< void* >(ALIGN_PREV(reinterpret_cast< u32 >(begin) - sizeof(JUTExternalFB), 32));
+#endif
     new (object) JUTExternalFB(renderMode, GX_GM_1_7, begin, size);
 
     mDirectPrint->changeFrameBuffer(begin, renderMode->fbWidth, renderMode->efbHeight);

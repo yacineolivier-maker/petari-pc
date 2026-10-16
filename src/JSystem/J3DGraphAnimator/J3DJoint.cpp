@@ -13,7 +13,11 @@ void J3DMtxCalcJ3DSysInitBasic::init(Vec const& scale, Mtx const& mtx) {
 }
 
 void J3DMtxCalcJ3DSysInitMaya::init(Vec const& scale, Mtx const& mtx) {
+#if TARGET_PC
+    J3DSys::mParentS = Vec{1.0f, 1.0f, 1.0f};
+#else
     J3DSys::mParentS = (Vec){1.0f, 1.0f, 1.0f};
+#endif
     J3DSys::mCurrentS = scale;
     JMAMTXApplyScale(mtx, J3DSys::mCurrentMtx, scale.x, scale.y, scale.z);
 }

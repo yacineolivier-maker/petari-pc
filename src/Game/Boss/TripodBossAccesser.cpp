@@ -160,9 +160,15 @@ namespace MR {
         getTripodBossAccesser()->getTriPodBoss()->requestEndDamageDemo();
     }
 
+#if TARGET_PC
+    uintptr_t getTripodBossGravityHostID() {
+        return reinterpret_cast< uintptr_t >(getTripodBossAccesser());
+    }
+#else
     u32 getTripodBossGravityHostID() {
         return reinterpret_cast< u32 >(getTripodBossAccesser());
     }
+#endif
 
     void setTripodBossJointAttachBaseMatrix(const TPos3f& rPos, s32 id) {
         getTripodBossAccesser()->getTriPodBoss()->setJointAttachBaseMatrix(rPos, ::convertBoneIDToIndex(id));

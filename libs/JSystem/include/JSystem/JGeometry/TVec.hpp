@@ -22,7 +22,11 @@ namespace JGeometry {
     }
 
 #else
-    inline void negateInternal(const f32* rSrc, f32* rDest);
+    inline void negateInternal(const f32* rSrc, f32* rDest) {
+        rDest[0] = -rSrc[0];
+        rDest[1] = -rSrc[1];
+        rDest[2] = -rSrc[2];
+    }
 #endif
 
 #ifdef __MWERKS__
@@ -58,7 +62,11 @@ namespace JGeometry {
     }
 
 #else
-    void mulInternal(const f32* vec1, const f32* vec2, f32* dst);
+    inline void mulInternal(const f32* vec1, const f32* vec2, f32* dst) {
+        dst[0] = vec1[0] * vec2[0];
+        dst[1] = vec1[1] * vec2[1];
+        dst[2] = vec1[2] * vec2[2];
+    }
 #endif
 
     template < typename T >
@@ -344,7 +352,11 @@ namespace JGeometry {
         }
 
 #else
-        TVec3(const Vec& vec);
+        TVec3(const Vec& vec) {
+            x = vec.x;
+            y = vec.y;
+            z = vec.z;
+        }
 #endif
 #ifdef __MWERKS__
         // Used inlined and non-inlined?
@@ -365,7 +377,11 @@ namespace JGeometry {
         }
 
 #else
-        TVec3(const TVec3< f32 >& vec);
+        TVec3(const TVec3< f32 >& vec) {
+            x = vec.x;
+            y = vec.y;
+            z = vec.z;
+        }
 #endif
 
         template < typename T >
@@ -640,7 +656,11 @@ namespace JGeometry {
         }
 
 #else
-        void setPSZeroVec();
+        void setPSZeroVec() {
+            x = gZeroVec.x;
+            y = gZeroVec.y;
+            z = gZeroVec.z;
+        }
 #endif
         f32 dot(const TVec3& rOther) const NO_INLINE {
             // TODO: this is *never* uninlined except in the specific
@@ -810,7 +830,12 @@ namespace JGeometry {
             return sqdist;
         };
 #else
-        f32 squared(const TVec3& rB) const;
+        f32 squared(const TVec3& rB) const {
+            f32 dx = x - rB.x;
+            f32 dy = y - rB.y;
+            f32 dz = z - rB.z;
+            return dx * dx + dy * dy + dz * dz;
+        }
 #endif
 
         bool isZero() const {

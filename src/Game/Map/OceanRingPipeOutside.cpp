@@ -73,8 +73,13 @@ void OceanRingPipeOutside::loadMaterial() const {
     GXSetVtxDesc(GX_VA_POS, GX_INDEX16);
     GXSetVtxDesc(GX_VA_NRM, GX_INDEX16);
     GXSetVtxDesc(GX_VA_TEX0, GX_DIRECT);
+#if TARGET_PC
+    GXSetArray(GX_VA_POS, mRingPipe->_A0, mRingPipe->_94 * sizeof(TVec3f), 12, true);
+    GXSetArray(GX_VA_NRM, mRingPipe->_A4, mRingPipe->_94 * sizeof(TVec3s), 6, true);
+#else
     GXSetArray(GX_VA_POS, mRingPipe->_A0, 12);
     GXSetArray(GX_VA_NRM, mRingPipe->_A4, 6);
+#endif
     GXLoadPosMtxImm(MR::getCameraViewMtx(), 0);
     GXLoadNrmMtxImm(MR::getCameraViewMtx(), 0);
     GXSetCurrentMtx(0);

@@ -61,6 +61,13 @@ void JASCalc::bcopyfast(const void* src, void* dest, u32 size) {
     }
 }
 
+#if TARGET_PC
+// Integer type used to test pointer alignment (only the low bits matter).
+typedef uintptr_t JASCalcPtrBits;
+#else
+typedef u32 JASCalcPtrBits;
+#endif
+
 void JASCalc::bcopy(const void* src, void* dest, u32 size) {
     u32* usrc;
     u32* udest;
@@ -68,8 +75,8 @@ void JASCalc::bcopy(const void* src, void* dest, u32 size) {
     u8* bsrc = (u8*)src;
     u8* bdest = (u8*)dest;
 
-    u8 endbitsSrc = (reinterpret_cast< u32 >(bsrc) & 0x03);
-    u8 enbitsDst = (reinterpret_cast< u32 >(bdest) & 0x03);
+    u8 endbitsSrc = (reinterpret_cast< JASCalcPtrBits >(bsrc) & 0x03);
+    u8 enbitsDst = (reinterpret_cast< JASCalcPtrBits >(bdest) & 0x03);
     if ((endbitsSrc) == (enbitsDst) && (size & 0x0f) == 0) {
         bcopyfast(src, dest, size);
     } else if ((endbitsSrc == enbitsDst) && (size >= 16)) {
@@ -116,12 +123,12 @@ void JASCalc::bzerofast(void* dest, u32 size) {
 void JASCalc::bzero(void* dest, u32 size) {
     u32* udest;
     u8* bdest = (u8*)dest;
-    if ((size & 0x1f) == 0 && (reinterpret_cast< u32 >(dest) & 0x1f) == 0) {
+    if ((size & 0x1f) == 0 && (reinterpret_cast< JASCalcPtrBits >(dest) & 0x1f) == 0) {
         DCZeroRange(dest, size);
         return;
     }
 
-    u8 alignedbitsDst = reinterpret_cast< u32 >(bdest) & 0x3;
+    u8 alignedbitsDst = reinterpret_cast< JASCalcPtrBits >(bdest) & 0x3;
 
     if ((size & 0xf) == 0 && alignedbitsDst == 0) {
         bzerofast(dest, size);

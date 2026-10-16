@@ -202,7 +202,11 @@ void MarioActor::initMaterialEffect() {
     _BA4 = new HashSortTable(entryCount);
     entry = cMaterialEffectTable;
     for (int i = 0; i < entryCount; i++) {
+#if TARGET_PC
+        _BA4->add(cMaterialEffectTable[i].mName, reinterpret_cast< HashSortTable::Value >(&cMaterialEffectTable[i]), false);
+#else
         _BA4->add(cMaterialEffectTable[i].mName, reinterpret_cast< u32 >(&cMaterialEffectTable[i]), false);
+#endif
     }
 
     _BA4->sort();
@@ -308,7 +312,11 @@ s32 MarioActor::getFloorMaterialIndex(u32 flags) const {
 
 MultiEmitter* MarioActor::playMaterialEffect(const char* pName) {
     MaterialEffectEntry* entry = nullptr;
+#if TARGET_PC
+    _BA4->search(pName, reinterpret_cast< HashSortTable::Value* >(&entry));
+#else
     _BA4->search(pName, reinterpret_cast< u32* >(&entry));
+#endif
 
     const s32 materialIndex = getFloorMaterialIndex(entry->mFlag.mByte0);
     if (materialIndex == -1) {
@@ -354,7 +362,11 @@ MultiEmitter* MarioActor::playMaterialEffect(const char* pName) {
 
 void MarioActor::stopMaterialEffect(const char* pName) {
     MaterialEffectEntry* entry = nullptr;
+#if TARGET_PC
+    _BA4->search(pName, reinterpret_cast< HashSortTable::Value* >(&entry));
+#else
     _BA4->search(pName, reinterpret_cast< u32* >(&entry));
+#endif
 
     if (entry->mCurrent != nullptr) {
         MR::deleteEffect(this, entry->mCurrent);

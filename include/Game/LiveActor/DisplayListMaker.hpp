@@ -5,7 +5,7 @@
 
 class FogCtrl;
 class J3DAnmBase;
-class J3DGXColor;
+struct J3DGXColor;
 class J3DModel;
 class J3DModelData;
 class MarioShadowProjmapMtxSetter;

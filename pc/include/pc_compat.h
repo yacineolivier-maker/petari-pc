@@ -29,9 +29,17 @@
 
 #include <revolution/types.h>
 
-// MSL's math.h defines M_PI (as a float).
+// MSL's math.h defines M_PI (as a float) and DEG_TO_RAD.
 #ifndef M_PI
 #define M_PI 3.14159265358979323846f
+#endif
+#ifndef DEG_TO_RAD
+#define DEG_TO_RAD(degrees) ((degrees) * (M_PI / 180.0f))
+#endif
+
+#if defined(_MSC_VER)
+#define strcasecmp _stricmp
+#define strncasecmp _strnicmp
 #endif
 
 #if defined(_MSC_VER) && !defined(__clang__)
@@ -110,3 +118,6 @@ using ::sqrtf;
 using ::tanf;
 }  // namespace std
 #endif
+
+// MSL C++ <functional>/<algorithm> extensions (binder2nd<F, T>, mem_fun, for_each_array, ...).
+#include "pc_msl_cpp.h"

@@ -65,10 +65,18 @@ void DemoExecutor::movement() {
             mPlayerKeeper->update();
             mCameraKeeper->update();
             mActionKeeper->update();
+#if TARGET_PC
+            std::for_each(mSheetKeeper.begin(), mSheetKeeper.end(), [](DemoSheetKeeperBase* pKeeper) { pKeeper->update(); });
+#else
             std::for_each(mSheetKeeper.begin(), mSheetKeeper.end(), std::mem_func(&DemoSheetKeeperBase::update));
+#endif
         }
 
+#if TARGET_PC
+        std::for_each(mTalkAnimCtrl.begin(), mTalkAnimCtrl.end(), [](DemoTalkAnimCtrl* pCtrl) { pCtrl->updateDemo(); });
+#else
         std::for_each(mTalkAnimCtrl.begin(), mTalkAnimCtrl.end(), std::mem_func(&DemoTalkAnimCtrl::updateDemo));
+#endif
     }
 }
 
@@ -79,9 +87,17 @@ void DemoExecutor::start(NameObj* pParam1, const char* pParam2, s32 param3) {
 
     mTimeKeeper->start();
     mCameraKeeper->start();
+#if TARGET_PC
+    std::for_each(mSheetKeeper.begin(), mSheetKeeper.end(), [](DemoSheetKeeperBase* pKeeper) { pKeeper->start(); });
+#else
     std::for_each(mSheetKeeper.begin(), mSheetKeeper.end(), std::mem_func(&DemoSheetKeeperBase::start));
+#endif
 
+#if TARGET_PC
+    std::for_each(mTalkAnimCtrl.begin(), mTalkAnimCtrl.end(), [](DemoTalkAnimCtrl* pCtrl) { pCtrl->startDemo(); });
+#else
     std::for_each(mTalkAnimCtrl.begin(), mTalkAnimCtrl.end(), std::mem_func(&DemoTalkAnimCtrl::startDemo));
+#endif
 
     mActor.clear();
 
@@ -101,9 +117,13 @@ void DemoExecutor::start(NameObj* pParam1, const char* pParam2, s32 param3) {
 }
 
 void DemoExecutor::startPart(NameObj* pParam1, const char* pParam2, const char* pParam3, s32 param4) {
+#if TARGET_PC
+    std::for_each(mTalkAnimCtrl.begin(), mTalkAnimCtrl.end(), [pParam3](DemoTalkAnimCtrl* pCtrl) { pCtrl->setupStartDemoPart(pParam3); });
+#else
     std::for_each(mTalkAnimCtrl.begin(), mTalkAnimCtrl.end(),
                   std::binder2nd< std::mem_fun1_t< void, DemoTalkAnimCtrl, const char* >, const char* >(
                       std::mem_func(&DemoTalkAnimCtrl::setupStartDemoPart), pParam3));
+#endif
     start(pParam1, pParam2, param4);
     mTimeKeeper->setStartPart(pParam3);
 }
@@ -117,9 +137,13 @@ void DemoExecutor::startProperDemoSystem() {
 }
 
 void DemoExecutor::startDemoSystemPart(const char* pParam1, s32 param2) {
+#if TARGET_PC
+    std::for_each(mTalkAnimCtrl.begin(), mTalkAnimCtrl.end(), [pParam1](DemoTalkAnimCtrl* pCtrl) { pCtrl->setupStartDemoPart(pParam1); });
+#else
     std::for_each(mTalkAnimCtrl.begin(), mTalkAnimCtrl.end(),
                   std::binder2nd< std::mem_fun1_t< void, DemoTalkAnimCtrl, const char* >, const char* >(
                       std::mem_func(&DemoTalkAnimCtrl::setupStartDemoPart), pParam1));
+#endif
 
     switch (param2) {
     case 1:
@@ -142,9 +166,13 @@ bool DemoExecutor::tryStartProperDemoSystem() {
 }
 
 bool DemoExecutor::tryStartDemoSystemPart(const char* pParam1, s32 param2) {
+#if TARGET_PC
+    std::for_each(mTalkAnimCtrl.begin(), mTalkAnimCtrl.end(), [pParam1](DemoTalkAnimCtrl* pCtrl) { pCtrl->setupStartDemoPart(pParam1); });
+#else
     std::for_each(mTalkAnimCtrl.begin(), mTalkAnimCtrl.end(),
                   std::binder2nd< std::mem_fun1_t< void, DemoTalkAnimCtrl, const char* >, const char* >(
                       std::mem_func(&DemoTalkAnimCtrl::setupStartDemoPart), pParam1));
+#endif
 
     bool result = false;
 
@@ -217,7 +245,11 @@ void DemoExecutor::end() {
     mTimeKeeper->end();
     mSubPartKeeper->end();
     mCameraKeeper->end();
+#if TARGET_PC
+    std::for_each(mSheetKeeper.begin(), mSheetKeeper.end(), [](DemoSheetKeeperBase* pKeeper) { pKeeper->end(); });
+#else
     std::for_each(mSheetKeeper.begin(), mSheetKeeper.end(), std::mem_func(&DemoSheetKeeperBase::end));
+#endif
 
     switch (_4C) {
     case 1:
@@ -236,7 +268,11 @@ void DemoExecutor::end() {
     _48 = nullptr;
     _4C = -1;
 
+#if TARGET_PC
+    std::for_each(mActor.begin(), mActor.end(), [](LiveActor* pActor) { MR::validateClipping(pActor); });
+#else
     std::for_each(mActor.begin(), mActor.end(), std::ptr_fun(MR::validateClipping));
+#endif
 
     mActor.clear();
 }

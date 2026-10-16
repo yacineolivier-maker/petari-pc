@@ -493,7 +493,11 @@ void CameraManGame::createStartAnimCamera() {
         CameraDirector* director = CameraLocalUtil::getCameraDirector();
         chunk->setCameraType("CAM_TYPE_ANIM", director->mHolder);
 
+#if TARGET_PC
+        chunk->mGeneralParam->setAnimData(data);
+#else
         chunk->mGeneralParam->mNum1 = reinterpret_cast< s32 >(data);
+#endif
         chunk->_64 = true;
     }
 }

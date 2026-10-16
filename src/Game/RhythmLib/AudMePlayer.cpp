@@ -385,6 +385,21 @@ void AudMePlayingParamsHolder::setResource(void* pRes) {
 
     mNumEntries = numEntries;
 
+#if TARGET_PC
+    // The name table holds 32-bit offsets that can't be relocated in place into 64-bit pointers:
+    // build a side table instead (owned by this holder, mNames is always PC-allocated).
+    // TODO(pc): the resource is big-endian; values are read natively here until the endian layer exists.
+    mParams = (AudMePlayingParams*)((u8*)pRes + entryOff);
+
+    const u32* nameOffsets = (const u32*)((u8*)pRes + namesOff);
+    const char** names = new const char*[numEntries];
+    for (u32 i = 0; i < numEntries; i++) {
+        names[i] = (const char*)pRes + nameOffsets[i];
+    }
+
+    delete[] mNames;
+    mNames = names;
+#else
     const char** offsets = (const char**)((s32)pRes + namesOff);
     mParams = (AudMePlayingParams*)((s32)pRes + entryOff);
 
@@ -393,4 +408,5 @@ void AudMePlayingParamsHolder::setResource(void* pRes) {
     }
 
     mNames = (const char**)offsets;
+#endif
 }

@@ -38,6 +38,11 @@
 
 #include <cstdarg>
 #include <revolution/sc.h>
+#if TARGET_PC
+// Aurora extension (dolphin/ar.h, which can't be included next to revolution/aralt.h): host
+// address of the emulated ARAM buffer; ARAM addresses are offsets into it.
+extern "C" void* ARGetStorageAddress(void);
+#endif
 
 void Overwrite_FORCE_MATCH_SDATA2() {
     (void)-2607.5945f;
@@ -162,7 +167,11 @@ s32 JKRExpHeap::adjustSize() {
 }
 
 u32 JKRHeap::getMaxAllocatableSize(int alignment) {
+#if TARGET_PC
+    u32 address = static_cast< u32 >(reinterpret_cast< uintptr_t >(getMaxFreeBlock()));  // low bits only
+#else
     u32 address = reinterpret_cast< u32 >(getMaxFreeBlock());
+#endif
     return ~(alignment - 1) & (getFreeSize() - ((alignment - 1) & (alignment - (address & 0xF))));
 }
 
@@ -195,11 +204,13 @@ JSUOutputStream::~JSUOutputStream() {
 JSUInputStream::~JSUInputStream() {
 }
 
+#if !TARGET_PC  // On PC Aurora's MTXRotRad is used (same function).
 extern "C" void PSMTXRotRad(Mtx pMtx, char axis, f32 radians) {
     f32 sin = JMASinRadian(radians);
     f32 cos = JMACosRadian(radians);
     PSMTXRotTrig(pMtx, axis, sin, cos);
 }
+#endif
 
 bool JUTException::readPad(u32* pTrigger, u32* pHold) {
     OSTime startTime = OSGetTime();
@@ -1049,6 +1060,33 @@ void JPADrawRotYBillboard(JPAEmitterWorkData* pWork, JPABaseParticle* pParticle)
     GXCallDisplayList(jpa_dl, 32);
 }
 
+#if TARGET_PC
+void JKRAramPiece::startDMA(JKRAMCommand* pCommand) {
+    // The Wii only transfers when the source is in main RAM (>= 0x80000000), i.e. main RAM -> ARAM.
+    // Host pointers can't be classified by value, so the transfer direction is checked instead.
+    if (pCommand->mTransferDirection != 0 /* main RAM -> ARAM */) {
+        doneDMA(reinterpret_cast< uintptr_t >(pCommand));
+        return;
+    }
+
+    if (pCommand->mDst >= 0x04000000) {
+        doneDMA(reinterpret_cast< uintptr_t >(pCommand));
+        return;
+    }
+
+    if (pCommand->mDataLength > 0x00E00000) {
+        doneDMA(reinterpret_cast< uintptr_t >(pCommand));
+        return;
+    }
+
+    // ARStartDMA takes a 32-bit main memory address: copy into Aurora's ARAM buffer directly.
+    u8* pAram = static_cast< u8* >(ARGetStorageAddress());
+    if (pAram != nullptr && pCommand->mDst + pCommand->mDataLength <= ARGetSize()) {
+        memcpy(pAram + pCommand->mDst, reinterpret_cast< const void* >(pCommand->mSrc), pCommand->mDataLength);
+    }
+    doneDMA(reinterpret_cast< uintptr_t >(pCommand));
+}
+#else
 void JKRAramPiece::startDMA(JKRAMCommand* pCommand) {
     if (pCommand->mSrc < 0x80000000) {
         doneDMA(reinterpret_cast< u32 >(pCommand));
@@ -1068,6 +1106,7 @@ void JKRAramPiece::startDMA(JKRAMCommand* pCommand) {
     ARStartDMA(pCommand->mTransferDirection, pCommand->mSrc, pCommand->mDst, pCommand->mDataLength);
     doneDMA(reinterpret_cast< u32 >(pCommand));
 }
+#endif
 
 void JAU_JASInitializer::initJASystem(JKRSolidHeap* pHeap) {
     if (JASAudioThread::getThreadPointer() == nullptr && JASDvd::getThreadPointer() == nullptr) {

@@ -2,6 +2,14 @@
 
 #include "Game/LiveActor/Spine.hpp"
 
+// Nerve instances are defined in headers as weak symbols. MSVC has no weak symbols:
+// __declspec(selectany) gives the same "keep one copy" behaviour.
+#if TARGET_PC
+#define NERVE_INSTANCE_DEF(name) __declspec(selectany) name name::sInstance;
+#else
+#define NERVE_INSTANCE_DEF(name) name name::sInstance ATTRIBUTE_WEAK;
+#endif
+
 /// @brief Used for executing states of a LiveActor.
 class Nerve {
 public:
@@ -22,7 +30,7 @@ public:
         };                                                                                                                                           \
         static name sInstance;                                                                                                                       \
     };                                                                                                                                               \
-    name name::sInstance ATTRIBUTE_WEAK;
+    NERVE_INSTANCE_DEF(name)
 
 #define NEW_NERVE_ONEND(name, parent_class, executor_name, executorOnEnd_name)                                                                       \
     class name : public Nerve {                                                                                                                      \
@@ -37,7 +45,7 @@ public:
         };                                                                                                                                           \
         static name sInstance;                                                                                                                       \
     };                                                                                                                                               \
-    name name::sInstance ATTRIBUTE_WEAK;
+    NERVE_INSTANCE_DEF(name)
 
 /* easy alternative to get a nerve instance (in the standard format) */
 #define GET_NERVE(cls, nerve) (&Nrv##cls::nerve::sInstance)

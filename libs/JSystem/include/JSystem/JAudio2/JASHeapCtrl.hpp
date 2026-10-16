@@ -7,7 +7,7 @@
 #include <revolution/os.h>
 #include <revolution/types.h>
 
-class JASDisposer;
+struct JASDisposer;
 class JKRHeap;
 class JKRSolidHeap;
 

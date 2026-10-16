@@ -47,12 +47,22 @@ void OdhConverter::convert() {
     pScreenTexImage = MR::getScreenTexImage();
     pRenderModeObj = JUTVideo::getManager()->getRenderMode();
 
+#if TARGET_PC
+    // Aurora declares the arrays non-const.
+    GXSetCopyFilter(GX_FALSE, const_cast< u8(*)[2] >(pRenderModeObj->sample_pattern), GX_FALSE, const_cast< u8* >(pRenderModeObj->vfilter));
+#else
     GXSetCopyFilter(GX_FALSE, pRenderModeObj->sample_pattern, GX_FALSE, pRenderModeObj->vfilter);
+#endif
     GXSetTexCopySrc(::cTexPosX, ::cTexPosY, mCaptureWidth, mCaptureHeight);
     GXSetTexCopyDst(mCaptureWidth, mCaptureHeight, GX_TF_RGB565, GX_FALSE);
     GXCopyTex(pScreenTexImage, GX_FALSE);
     GXDrawDone();
+#if TARGET_PC
+    // Aurora declares the arrays non-const.
+    GXSetCopyFilter(GX_FALSE, const_cast< u8(*)[2] >(pRenderModeObj->sample_pattern), GX_TRUE, const_cast< u8* >(pRenderModeObj->vfilter));
+#else
     GXSetCopyFilter(GX_FALSE, pRenderModeObj->sample_pattern, GX_TRUE, pRenderModeObj->vfilter);
+#endif
     DCStoreRange(pScreenTexImage, mCaptureWidth * mCaptureHeight * 2);
 
     mImageSize = ODHEncodeRGB565(pScreenTexImage, mImage, mCaptureWidth, mCaptureHeight, mLimitSize, ::cQuality, mCaptureImage);
@@ -105,7 +115,7 @@ namespace MR {
 
     u32 getOdhImageSize() {
         if (!isExistSceneObj(SceneObj_OdhConverter)) {
-            return nullptr;
+            return 0;
         }
 
         return ::getConverter()->getImageSize();

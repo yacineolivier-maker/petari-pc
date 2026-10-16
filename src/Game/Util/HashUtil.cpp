@@ -2,14 +2,28 @@
 #include "Game/Util/MathUtil.hpp"
 #include <locale.h>
 
+#if TARGET_PC
+// MSL's "C" locale lower map only folds ASCII A-Z; the host tolower is UB for negative chars.
+static inline int hashToLower(int c) {
+    return (c >= 'A' && c <= 'Z') ? c + ('a' - 'A') : c;
+}
+#define tolower hashToLower
+#else
 // needed here for inlining reasons
 inline int tolower(int c) {
     return ((c < 0) || (c >= 0x100)) ? c : (int)(_current_locale.ctype_cmpt_ptr->lower_map_ptr[c]);
 }
+#endif
+
+#if TARGET_PC
+typedef HashSortTable::Value HashSortValue;
+#else
+typedef u32 HashSortValue;
+#endif
 
 HashSortTable::HashSortTable(u32 cnt) {
     mHashCodes = new u32[cnt];
-    _8 = new u32[cnt];
+    _8 = new HashSortValue[cnt];
     _C = new u16[0x100];
     _10 = new u16[0x100];
     mCurrentLength = 0;
@@ -17,7 +31,7 @@ HashSortTable::HashSortTable(u32 cnt) {
     mHasBeenSorted = false;
 }
 
-bool HashSortTable::add(const char* pName, u32 a2, bool isValidSkip) {
+bool HashSortTable::add(const char* pName, HashSortValue a2, bool isValidSkip) {
     u32 hash = MR::getHashCode(pName);
 
     if (isValidSkip) {
@@ -27,7 +41,7 @@ bool HashSortTable::add(const char* pName, u32 a2, bool isValidSkip) {
     }
 }
 
-bool HashSortTable::add(u32 a1, u32 a2) {
+bool HashSortTable::add(u32 a1, HashSortValue a2) {
     mHashCodes[mCurrentLength] = a1;
     _8[mCurrentLength] = a2;
     mCurrentLength++;
@@ -35,7 +49,7 @@ bool HashSortTable::add(u32 a1, u32 a2) {
     return true;
 }
 
-bool HashSortTable::addOrSkip(u32 a1, u32 a2) {
+bool HashSortTable::addOrSkip(u32 a1, HashSortValue a2) {
     for (u32 i = 0; i < mCurrentLength; i++) {
         if (a1 == mHashCodes[i]) {
             return false;
@@ -56,7 +70,7 @@ void HashSortTable::sort() {
 
     s32 originalIndices[0x400];
     MR::sortSmall(mCurrentLength, mHashCodes, originalIndices);
-    u32 swapArray[0x400];
+    HashSortValue swapArray[0x400];
 
     for (int i = 0; i < mCurrentLength; i++) {
         swapArray[i] = _8[originalIndices[i]];
@@ -108,7 +122,7 @@ void HashSortTable::sort() {
     mHasBeenSorted = true;
 }
 
-bool HashSortTable::search(u32 a1, u32* a2) {
+bool HashSortTable::search(u32 a1, HashSortValue* a2) {
     u8 upperByte = a1 >> 24;
 
     if (a2 != nullptr) {
@@ -142,17 +156,39 @@ bool HashSortTable::search(u32 a1, u32* a2) {
     return false;
 }
 
-bool HashSortTable::search(const char* a1, u32* a2) {
+bool HashSortTable::search(const char* a1, HashSortValue* a2) {
     u32 hash = MR::getHashCode(a1);
 
     return search(hash, a2);
 }
 
-bool HashSortTable::search(const char* a1, const char* a2, u32* a3) {
+bool HashSortTable::search(const char* a1, const char* a2, HashSortValue* a3) {
     u32 hash = MR::getHashCode(a1) + MR::getHashCode(a2);
 
     return search(hash, a3);
 }
+
+#if TARGET_PC
+// Users that store indices read them back through u32 pointers.
+bool HashSortTable::search(u32 a1, u32* a2) {
+    HashSortValue value;
+    bool found = search(a1, &value);
+
+    if (a2 != nullptr) {
+        *a2 = (u32)value;
+    }
+
+    return found;
+}
+
+bool HashSortTable::search(const char* a1, u32* a2) {
+    return search(MR::getHashCode(a1), a2);
+}
+
+bool HashSortTable::search(const char* a1, const char* a2, u32* a3) {
+    return search(MR::getHashCode(a1) + MR::getHashCode(a2), a3);
+}
+#endif
 
 void HashSortTable::swap(const char* a1, const char* a2) {
     u32 hash = MR::getHashCode(a1);

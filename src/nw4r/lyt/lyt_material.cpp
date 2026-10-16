@@ -720,7 +720,12 @@ namespace nw4r {
 
                     math::MTX34 mtx;
                     CalcTextureMtx(&mtx, pTexSrt[i]);
+#if TARGET_PC
+                    // Aurora takes const void*: pick the matrix conversion explicitly.
+                    GXLoadTexMtxImm(static_cast< MtxPtr >(mtx), GetTexMtx(i), GX_MTX2x4);
+#else
                     GXLoadTexMtxImm(mtx, GetTexMtx(i), GX_MTX2x4);
+#endif
                 }
             }
 

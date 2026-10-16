@@ -1004,7 +1004,11 @@ public:
     /* 0x984 */ Task _984[0xb];
     /* 0xA08 */ u32 _A08[11];
     /* 0xA34 */ u16 _A34;
+#if TARGET_PC
+    /* 0xA38 */ HitSensor* _A38;  // tornado sensor (a u32 on Wii)
+#else
     /* 0xA38 */ u32 _A38;
+#endif
     /* 0xA3C */ u16 _A3C;
     /* 0xA40 */ TVec3f _A40;
     /* 0xA4C */ TVec3f _A4C;

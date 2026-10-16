@@ -17,6 +17,13 @@
 #include "Game/Util/SoundUtil.hpp"
 #include "Game/Util/StarPointerUtil.hpp"
 
+#if TARGET_PC
+// From libs/RVL_SDK/include/macros.h (not included on PC: it redefines alignas).
+#ifndef DEG_TO_RAD
+#define DEG_TO_RAD(x) ((x) * (3.1415926f / 180.0f))
+#endif
+#endif
+
 namespace NrvButterfly {
     NEW_NERVE(HostTypeWait, Butterfly, Wait);
     NEW_NERVE(HostTypeRunAway, Butterfly, RunAway);

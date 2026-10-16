@@ -53,12 +53,32 @@ void JKRMemArchive::fixedInit(long entryNum) {
     sCurrentDirID = 0;
 }
 
+#if TARGET_PC
+// mountFixed uses the data address as the archive's entry number (identity key for
+// check_mount_already). A 64-bit address doesn't fit in s32: fold it into a negative key, which
+// can't collide with real DVD entry numbers (>= 0).
+// TODO(pc): two fixed archives whose folded addresses match would be confused (very unlikely).
+static s32 JKRMemArchive_fixedEntryNum(void* pData) {
+    uintptr_t addr = reinterpret_cast< uintptr_t >(pData);
+    u32 folded = (u32)(addr & 0x7FFFFFFF) ^ (u32)((addr >> 31) & 0x7FFFFFFF);
+    return (s32)(0x80000000 | folded);
+}
+#endif
+
 bool JKRMemArchive::mountFixed(void* a1, JKRMemBreakFlag breakFlag) {
+#if TARGET_PC
+    if (check_mount_already(JKRMemArchive_fixedEntryNum(a1)) != nullptr) {
+        return false;
+    }
+
+    fixedInit(JKRMemArchive_fixedEntryNum(a1));
+#else
     if (check_mount_already(reinterpret_cast< s32 >(a1)) != nullptr) {
         return false;
     }
 
     fixedInit(reinterpret_cast< s32 >(a1));
+#endif
 
     if (!open(a1, 0xFFFF, breakFlag)) {
         return false;
@@ -119,7 +139,11 @@ bool JKRMemArchive::open(long entryNum, EMountDirection mountDir) {
         mDirs = reinterpret_cast< SDIDirEntry* >(&reinterpret_cast< u8* >(mInfoBlock)[mInfoBlock->mDirOffset]);
         mFiles = reinterpret_cast< SDIFileEntry* >(&reinterpret_cast< u8* >(mInfoBlock)[mInfoBlock->mFileOffset]);
         mStringTable = reinterpret_cast< char* >(&reinterpret_cast< u8* >(mInfoBlock)[mInfoBlock->mStringTableOffset]);
+#if TARGET_PC
+        mFileDataStart = reinterpret_cast< u8* >(mHeader) + mHeader->mHeaderSize + mHeader->mFileDataOffset;
+#else
         mFileDataStart = reinterpret_cast< u8* >(mHeader->mFileDataOffset + (reinterpret_cast< u32 >(mHeader) + mHeader->mHeaderSize));
+#endif
         _6C = true;
     }
 
@@ -132,7 +156,11 @@ bool JKRMemArchive::open(void* pData, unsigned long a2, JKRMemBreakFlag breakFla
     mDirs = reinterpret_cast< SDIDirEntry* >(&reinterpret_cast< u8* >(mInfoBlock)[mInfoBlock->mDirOffset]);
     mFiles = reinterpret_cast< SDIFileEntry* >(&reinterpret_cast< u8* >(mInfoBlock)[mInfoBlock->mFileOffset]);
     mStringTable = reinterpret_cast< char* >(&reinterpret_cast< u8* >(mInfoBlock)[mInfoBlock->mStringTableOffset]);
+#if TARGET_PC
+    mFileDataStart = reinterpret_cast< u8* >(mHeader) + mHeader->mHeaderSize + mHeader->mFileDataOffset;
+#else
     mFileDataStart = reinterpret_cast< u8* >(mHeader->mFileDataOffset + (reinterpret_cast< u32 >(mHeader) + mHeader->mHeaderSize));
+#endif
     _6C = breakFlag == JKR_MEM_BREAK_FLAG_1;
     mHeap = JKRHeap::findFromRoot(pData);
     _5C = 0;
@@ -222,7 +250,7 @@ s32 JKRMemArchive::fetchResource_subroutine(unsigned char* pSrc, unsigned long s
 
         return srcSize;
     case JKR_COMPRESSION_SZP:
-    case JKR_COMPRESSION_SZS:
+    case JKR_COMPRESSION_SZS: {
         u32 size = JKRDecompExpandSize(pSrc);
 
         if (size > dstSize) {
@@ -231,6 +259,7 @@ s32 JKRMemArchive::fetchResource_subroutine(unsigned char* pSrc, unsigned long s
 
         JKRDecomp::orderSync(pSrc, pDst, size, 0);
         return size;
+    }
     default:
         JUTException::panic(__FILE__, 723, "??? bad sequence\n");
         break;

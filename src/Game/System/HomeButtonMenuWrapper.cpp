@@ -3,6 +3,9 @@
 #include "Game/Util/MemoryUtil.hpp"
 #include <JSystem/JKernel/JKRExpHeap.hpp>
 #include <revolution/rso.h>
+#if TARGET_PC
+#include <revolution/pc_extras/hbm.h>
+#endif
 
 void (*HBMCreateRSO)(const HBMDataInfo*);
 void (*HBMInitRSO)(void);
@@ -22,6 +25,23 @@ static RSOExportFuncTable exp_tbl[] = {{"HBMCreateRSO", (u32*)&HBMCreateRSO},
 
 typedef void (*ProloguePtr)(BOOL);
 
+#if TARGET_PC
+// The Wii loads the HOME Button Menu from a PowerPC RSO module (HomeButtonMenuWrapperRSO.rso) and
+// binds its exports. On PC the entry points are bound straight to the native HBM implementation.
+static void HBMCalcPC(const HBMControllerData* pController) {
+    ::HBMCalc(pController);
+}
+
+void RSO::setupRsoHomeButtonMenu() {
+    HBMCreateRSO = ::HBMCreate;
+    HBMInitRSO = ::HBMInit;
+    HBMCalcRSO = HBMCalcPC;
+    HBMDrawRSO = ::HBMDraw;
+    HBMGetSelectBtnNumRSO = ::HBMGetSelectBtnNum;
+    HBMSetAdjustFlagRSO = ::HBMSetAdjustFlag;
+    HBMStartBlackOutRSO = ::HBMStartBlackOut;
+}
+#else
 void RSO::setupRsoHomeButtonMenu() {
     u32 i;
     RSOObjectHeader* rsoPtr;
@@ -59,6 +79,7 @@ void RSO::setupRsoHomeButtonMenu() {
         }
     }
 }
+#endif
 
 void RSO::HBMCreate(const HBMDataInfo* pHBInfo) {
     (*HBMCreateRSO)(pHBInfo);

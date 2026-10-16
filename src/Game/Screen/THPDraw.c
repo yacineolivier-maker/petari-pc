@@ -87,10 +87,24 @@ void THPGXYuv2RgbSetup(GXRenderModeObj* rmode) {
     GXSetTevAlphaOp(GX_TEVSTAGE3, GX_TEV_ADD, GX_TB_ZERO, GX_CS_SCALE_1, GX_TRUE, GX_TEVPREV);
     GXSetTevSwapMode(GX_TEVSTAGE3, GX_TEV_SWAP0, GX_TEV_SWAP0);
     GXSetTevKColorSel(GX_TEVSTAGE3, GX_TEV_KCSEL_K2);
+#if TARGET_PC
+    {
+        // MSVC's C mode has no compound literals.
+        GXColorS10 reg0 = {-90, 0, -114, 135};
+        GXColor k0 = {0, 0, 226, 88};
+        GXColor k1 = {179, 0, 0, 182};
+        GXColor k2 = {255, 0, 255, 128};
+        GXSetTevColorS10(GX_TEVREG0, reg0);
+        GXSetTevKColor(GX_KCOLOR0, k0);
+        GXSetTevKColor(GX_KCOLOR1, k1);
+        GXSetTevKColor(GX_KCOLOR2, k2);
+    }
+#else
     GXSetTevColorS10(GX_TEVREG0, (GXColorS10){-90, 0, -114, 135});
     GXSetTevKColor(GX_KCOLOR0, (GXColor){0, 0, 226, 88});
     GXSetTevKColor(GX_KCOLOR1, (GXColor){179, 0, 0, 182});
     GXSetTevKColor(GX_KCOLOR2, (GXColor){255, 0, 255, 128});
+#endif
     GXSetTevSwapModeTable(GX_TEV_SWAP0, GX_CH_RED, GX_CH_GREEN, GX_CH_BLUE, GX_CH_ALPHA);
 }
 

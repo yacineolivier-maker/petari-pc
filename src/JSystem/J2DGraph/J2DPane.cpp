@@ -2,6 +2,11 @@
 #include "JSystem/J2DGraph/J2DAnimation.hpp"
 #include <cmath>
 
+#if TARGET_PC && !defined(DEG_TO_RAD)
+// MSL's <cmath> defines this; the host one doesn't.
+#define DEG_TO_RAD(degrees) (degrees * (M_PI / 180.0f))
+#endif
+
 J2DPane::J2DPane() : mBounds(), mGlobalBounds(), mClipRect(), mPaneTree(this) {
     mTransform = NULL;
     mKind = 'PAN1';

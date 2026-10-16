@@ -5,7 +5,7 @@
 #include "JSystem/JAudio2/JASGlobal.hpp"
 #include "JSystem/JAudio2/JASHeapCtrl.hpp"
 
-struct JAIAudience;
+class JAIAudience;
 struct JASSoundParams;
 
 // TODO: is this actually correct?

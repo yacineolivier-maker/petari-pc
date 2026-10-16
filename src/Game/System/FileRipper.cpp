@@ -53,7 +53,11 @@ void* FileRipper::loadToMainRAM(const char* fpath, u8* dest, bool decompress, JK
 
     if (decompress) {
         u8 buf[0x60];
+#if TARGET_PC
+        copySrc = (u8*)((uintptr_t)(buf + 0x3f) / 0x40 * 0x40);
+#else
         copySrc = (u8*)((u32)(buf + 0x3f) / 0x40 * 0x40);
+#endif
         while (true) {
             s32 result = DVDReadPrio(&fileInfo, copySrc, 0x20, 0, 2);
             if (result >= 0) {

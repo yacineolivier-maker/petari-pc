@@ -80,7 +80,11 @@ public:
 
     JKRHeap* find(void*) const;
     JKRHeap* findAllHeap(void*) const;
+#if TARGET_PC
+    void dispose_subroutine(uintptr_t, uintptr_t);
+#else
     void dispose_subroutine(u32, u32);
+#endif
     s32 getTotalFreeSize();
 
     u32 getMaxAllocatableSize(int alignment);

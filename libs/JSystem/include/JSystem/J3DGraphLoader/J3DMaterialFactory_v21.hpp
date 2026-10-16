@@ -5,7 +5,7 @@
 
 class J3DMaterial;
 struct J3DTexCoord2Info;
-struct J3DCurrentMtxInfo;
+class J3DCurrentMtxInfo;
 
 struct J3DMaterialInitData_v21 {
     /* 0x000 */ u8 mMaterialMode;

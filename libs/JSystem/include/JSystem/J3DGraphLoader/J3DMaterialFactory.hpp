@@ -64,7 +64,7 @@ struct J3DDisplayListInit {
 };  // size 8
 
 struct J3DTexCoord2Info;
-struct J3DCurrentMtxInfo;
+class J3DCurrentMtxInfo;
 class J3DMaterial;
 
 class J3DMaterialFactory {

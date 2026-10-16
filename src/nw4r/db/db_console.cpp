@@ -1,5 +1,9 @@
 #include "nw4r/db/console.h"
+#if TARGET_PC
+#include <cstdarg>
+#else
 #include <va_list.h>
+#endif
 
 namespace nw4r {
     namespace db {

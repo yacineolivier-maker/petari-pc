@@ -46,7 +46,7 @@ def main():
     for arg in sys.argv[1:]:
         entry = by_file.get((ROOT / arg).resolve())
         if entry is None:
-            print(f"== {arg}: not in compile_commands.json (add its library to WW_PC_LIBS)")
+            print(f"== {arg}: not in compile_commands.json (add its library to SMG_PC_LIBS in CMakeLists.txt)")
             ok = False
             continue
         ok = compile_one(entry, arg) and ok

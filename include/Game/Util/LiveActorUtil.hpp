@@ -26,7 +26,7 @@ class MsgSharedGroup;
 class Nerve;
 class PartsModel;
 class ProjmapEffectMtxSetter;
-class ResTIMG;
+struct ResTIMG;
 class ResourceHolder;
 class TexMtxCtrl;
 class TriangleFilterBase;

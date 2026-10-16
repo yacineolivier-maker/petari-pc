@@ -3,7 +3,7 @@
 #include "Game/NameObj/NameObj.hpp"
 
 class JUTTexture;
-class ResTIMG;
+struct ResTIMG;
 
 struct TimingInfo {
     /* 0x0 */ const char* mName;

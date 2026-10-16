@@ -3,7 +3,7 @@
 #include "Game/NameObj/NameObj.hpp"
 #include <JSystem/JGeometry/TVec.hpp>
 
-class ResTIMG;
+struct ResTIMG;
 class JUTTexture;
 class FootPrintInfo;
 

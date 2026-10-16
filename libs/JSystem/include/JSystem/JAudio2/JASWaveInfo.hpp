@@ -2,7 +2,7 @@
 
 #include <revolution/types.h>
 
-class JASWaveArc;
+struct JASWaveArc;
 
 struct JASWaveInfo {
     JASWaveInfo() {

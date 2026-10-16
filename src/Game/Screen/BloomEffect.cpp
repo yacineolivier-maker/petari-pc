@@ -65,7 +65,9 @@ BloomEffect::BloomEffect(const char* pName) : ImageEffectBase(pName), _14(255), 
         initBlurMtx(&_4C[i * ::sL2RoundPoints], ::sL2RoundPoints, ::sL2RadAndOfs[i]._0, ::sL2RadAndOfs[i]._4);
     }
 
-    PPCSync();
+#if !TARGET_PC
+    PPCSync();  // CPU write barrier for the GP reading the matrices; meaningless on PC.
+#endif
 }
 
 void BloomEffect::preDraw() const {
@@ -275,7 +277,10 @@ void BloomEffect::initBlur(JUTTexture* pTexture, u32 param2, f32 intensity) cons
 }
 
 void BloomEffect::drawBlur(s32 divisions, s32 tile, Mtx* pMtx, u32 stageCount, u32 matrixCount) const {
+#if !TARGET_PC
+    // On PC the matrices are loaded immediately below (Aurora has no indexed matrix loads).
     GXSetArray(GX_TEX_MTX_ARRAY, pMtx, sizeof(Mtx));
+#endif
 
     s32 row = tile / divisions;
     s32 column = tile % divisions;
@@ -298,7 +303,11 @@ void BloomEffect::drawBlur(s32 divisions, s32 tile, Mtx* pMtx, u32 stageCount, u
         }
 
         for (u32 j = 0; j < stageCount; j++) {
+#if TARGET_PC
+            GXLoadTexMtxImm(pMtx[i + j], ::sTexMtxID[j], GX_MTX3x4);
+#else
             GXLoadTexMtxIndx(i + j, ::sTexMtxID[j], GX_MTX3x4);
+#endif
         }
 
         GXBegin(GX_TRIANGLESTRIP, GX_VTXFMT0, 4);

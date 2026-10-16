@@ -68,7 +68,7 @@ void AstroCore::startDemo() {
 }
 
 void AstroCore::startAnimGrow() {
-    s32 v3 = MR::clamp(AstroDemoFunction::getOpenedAstroDomeNum() + 1, 0, 6);
+    s32 v3 = MR::clamp(static_cast< s32 >(AstroDemoFunction::getOpenedAstroDomeNum() + 1), 0, 6);
     s32 v4 = MR::clamp(v3, 0, 6);
     char animName[32];
     snprintf(animName, sizeof(animName), "Revival%d", v4);
@@ -77,7 +77,7 @@ void AstroCore::startAnimGrow() {
 }
 
 void AstroCore::setStateBeforeGrow() {
-    s32 v3 = MR::clamp(AstroDemoFunction::getOpenedAstroDomeNum(), 0, 6);
+    s32 v3 = MR::clamp(static_cast< s32 >(AstroDemoFunction::getOpenedAstroDomeNum()), 0, 6);
     s32 v4 = MR::clamp(v3, 0, 6);
     char animName[32];
     snprintf(animName, sizeof(animName), "Revival%d", v4);

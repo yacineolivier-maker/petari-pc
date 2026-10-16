@@ -230,7 +230,7 @@ void AudAnmSoundObject::startAnimSound(const TVec3f& rPos, f32 speed, JAISoundSt
         mLoopSoundIndex++;
     }
 
-    JAISoundHandle* handle = getAnimatorHandles()->getHandleUserData((u32)sound);
+    JAISoundHandle* handle = getAnimatorHandles()->getHandleUserData((uintptr_t)sound);
     if (handle == nullptr) {
         handle = getFreeHandle(sound);
     }
@@ -257,7 +257,7 @@ void AudAnmSoundObject::startAnimSound(const TVec3f& rPos, f32 speed, JAISoundSt
     }
 
     handle->getSound()->setAnimationState(1);
-    handle->getSound()->setUserData((u32)sound);
+    handle->getSound()->setUserData((uintptr_t)sound);
 
     setMapCodeToPort(handle, soundID);
     setCutoffToPort(handle, soundID);

@@ -75,6 +75,12 @@ void TalkBalloon::close() {
     MR::startAnim(this, "End", 0);
 }
 
+#if TARGET_PC
+// The CRT already declares fmin/fmax(float, float); keep this file's own versions under other names.
+#define fmin TalkBalloon_fmin
+#define fmax TalkBalloon_fmax
+#endif
+
 inline f32 fmin(f32 a, f32 b) {
     return b >= a ? a : b;
 }

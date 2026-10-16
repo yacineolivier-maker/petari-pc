@@ -220,23 +220,34 @@ void J3DMtxBuffer::calcWeightEnvelopeMtx() {
     indices = mJointTree->getWEvlpMixMtxIndex() - 1;
     weights = mJointTree->getWEvlpMixWeight() - 1;
 
+#if TARGET_PC
+#else
     asm {
         psq_l var_f24, 0(var_r7), 0, 0
         ps_merge00 var_f11, var_f24, var_f24
         ps_merge00 var_f13, var_f24, var_f24
         ps_merge00 var_f30, var_f24, var_f24
     }
+#endif
 
     while (++i < max) {
         pScale = &mpEvlpScaleFlagArr[i];
         *pScale = 1;
         weightAnmMtx = mpWeightEvlpMtx[i];
 
+#if TARGET_PC
+        for (int r = 0; r < 3; r++) {
+            for (int c = 0; c < 4; c++) {
+                weightAnmMtx[r][c] = 0.0f;
+            }
+        }
+#else
         asm {
             ps_merge00 var_f10, var_f24, var_f24
             ps_merge00 var_f12, var_f24, var_f24
             ps_merge00 var_f31, var_f24, var_f24
         }
+#endif
 
         j = 0;
         mixNum = mJointTree->getWEvlpMixMtxNum(i);
@@ -245,6 +256,17 @@ void J3DMtxBuffer::calcWeightEnvelopeMtx() {
             invMtx = mJointTree->getInvJointMtx((u16)idx);
             worldMtx = mpAnmMtx[idx];
 
+#if TARGET_PC
+            // weightAnmMtx += weight * (worldMtx * invMtx)
+            weight = *++weights;
+            Mtx mtx;
+            PSMTXConcat(worldMtx, invMtx, mtx);
+            for (int r = 0; r < 3; r++) {
+                for (int c = 0; c < 4; c++) {
+                    weightAnmMtx[r][c] += mtx[r][c] * weight;
+                }
+            }
+#else
             asm {
                 lfsu weight, 0x4(weights)
                 psq_l var_f2, 0x0(invMtx), 0, 0
@@ -290,9 +312,12 @@ void J3DMtxBuffer::calcWeightEnvelopeMtx() {
                 ps_madds0 var_f13, var_f26, weight, var_f13
                 ps_madds0 var_f30, var_f7, weight, var_f30
             }
+#endif
 
             *pScale &= mpScaleFlagArr[idx];
         } while (++j < mixNum);
+#if TARGET_PC
+#else
         asm {
             psq_st var_f11, 8(weightAnmMtx), 0, 0
             ps_merge00 var_f11, var_f24, var_f24
@@ -301,6 +326,7 @@ void J3DMtxBuffer::calcWeightEnvelopeMtx() {
             psq_st var_f30, 40(weightAnmMtx), 0, 0
             ps_merge00 var_f30, var_f24, var_f24
         }
+#endif
     }
 }
 

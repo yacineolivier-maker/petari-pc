@@ -5,7 +5,11 @@
 #include "Game/Util/ScreenUtil.hpp"
 #include <JSystem/JUtility/JUTVideo.hpp>
 #include <cstdio>
+#if TARGET_PC
+#include <cstdarg>
+#else
 #include <va_list.h>
+#endif
 
 IntermissionScene::IntermissionScene() : Scene("IntermissionScene") {
     _54 = 0;
@@ -30,6 +34,10 @@ void IntermissionScene::setCurrentSceneControllerState(const char* pState, ...) 
     va_list list;
     va_start(list, pState);
     vsnprintf(mState, sizeof(mState), pState, list);
+#if TARGET_PC
+    va_end(list);
+#else
     va_end();
+#endif
     _54 = 0;
 }

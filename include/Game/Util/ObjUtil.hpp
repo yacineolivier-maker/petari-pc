@@ -15,7 +15,7 @@ class ModelObj;
 class NameObj;
 class NameObjAdaptor;
 class NameObjGroup;
-class ResTIMG;
+struct ResTIMG;
 class ResourceHolder;
 class StageSwitchCtrl;
 

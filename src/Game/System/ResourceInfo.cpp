@@ -2,7 +2,11 @@
 #include "Game/Util.hpp"
 #include <cstdio>
 #include <cstring>
+#if TARGET_PC
+#include <cstddef>
+#else
 #include <size_t.h>
+#endif
 
 ResFileInfo::ResFileInfo() {
     mName = 0;

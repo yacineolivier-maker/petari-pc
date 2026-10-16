@@ -2,7 +2,7 @@
 
 #include <revolution/gx.h>
 
-class JPAEmitterWorkData;
+struct JPAEmitterWorkData;
 
 struct JPAExTexShapeData {
     // Common header.

@@ -70,7 +70,13 @@ namespace nw4r {
         }
 
         void TexMap::ReplaceImage(TPLPalette* p, u32 id) {
+#if TARGET_PC
+            // TODO(pc): "not bound yet" = still a file offset. TPL data is big-endian with 32-bit
+            // offsets; this needs the asset endian/layout pass.
+            if (reinterpret_cast< uintptr_t >(p->descriptorArray) < 0x80000000) {
+#else
             if (reinterpret_cast< u32 >(p->descriptorArray) < 0x80000000) {
+#endif
                 TPLBind(p);
             }
 

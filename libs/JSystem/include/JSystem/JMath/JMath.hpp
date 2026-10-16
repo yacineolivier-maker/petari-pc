@@ -20,6 +20,13 @@ inline f32 JMAFastSqrt(__REGISTER const f32 input) {
     } else {
         return input;
     }
+#else
+    if (input > 0.0f) {
+        // frsqrte is only an estimate on hardware; the exact value is fine here.
+        return std::sqrt(input);
+    } else {
+        return input;
+    }
 #endif
 }
 
@@ -52,6 +59,14 @@ inline f32 JMAHermiteInterpolation(__REGISTER f32 p1, __REGISTER f32 p2, __REGIS
     }
     // clang-format on
     return ff25;
+#else
+    // Same computation as the asm above.
+    f32 a = p1 - p2;
+    f32 t = a / (p5 - p2);
+    f32 tt_t = t * t - t;
+    f32 h = (2.0f * t * tt_t - t * t) * (p3 - p6) + p3;
+    f32 g = t * p4 - (p7 * tt_t + (p4 * tt_t + p4));
+    return h - a * g;
 #endif
 }
 
@@ -81,6 +96,12 @@ namespace JMath {
             psq_st x, 0(dest), 0, 0
             stfs y, 8(dest)
         }
+#else
+        const f32* s = (const f32*)src;
+        f32* d = (f32*)dest;
+        d[0] = s[0];
+        d[1] = s[1];
+        d[2] = s[2];
 #endif
     }
 
@@ -94,6 +115,12 @@ namespace JMath {
             psq_st x, 0(dest), 0, 0
             psq_st y, 8(dest), 0, 0
             psq_st z, 16(dest), 0, 0
+        }
+#else
+        const f32* s = (const f32*)src;
+        f32* d = (f32*)dest;
+        for (int i = 0; i < 6; i++) {
+            d[i] = s[i];
         }
 #endif
     }
@@ -117,6 +144,12 @@ namespace JMath {
                 psq_st    f_5, 0x28(pDest), 0, 0
         }
         ;
+#else
+        const f32* s = (const f32*)pSrc;
+        f32* d = (f32*)pDest;
+        for (int i = 0; i < 12; i++) {
+            d[i] = s[i];
+        }
 #endif
     }
 
@@ -143,6 +176,12 @@ namespace JMath {
                 psq_st    f_7, 0x38(pDest), 0, 0
         }
         ;
+#else
+        const f32* s = (const f32*)pSrc;
+        f32* d = (f32*)pDest;
+        for (int i = 0; i < 16; i++) {
+            d[i] = s[i];
+        }
 #endif
     }
 };  // namespace JMath
@@ -264,14 +303,44 @@ namespace JMathInlineVEC {
         return sqdist;
     }
 #else
-    void PSVECCopy(const Vec*, Vec*);
-    void PSVECAdd(const Vec*, const Vec*, Vec*);
-    void PSVECSubtract(const Vec*, const Vec*, Vec*);
-    f32 PSVECDotProduct(const Vec*, const Vec*);
-    f32 PSVECSquareMag(const Vec*);
-    void PSVECNegate(const Vec*, Vec*);
-    f32 PSVECSquareDistance(const Vec*, const Vec*);
-    void PSVECMultiply(const Vec*, const Vec*, Vec*);
+    // C versions of the paired-single inlines above (same results, evaluated in f32).
+    inline f32 PSVECDotProduct(const Vec* pA, const Vec* pB) {
+        return pA->x * pB->x + pA->y * pB->y + pA->z * pB->z;
+    }
+    inline void PSVECCopy(const Vec* src, Vec* dest) {
+        dest->x = src->x;
+        dest->y = src->y;
+        dest->z = src->z;
+    }
+    inline void PSVECAdd(const Vec* vec1, const Vec* vec2, Vec* dst) {
+        dst->x = vec1->x + vec2->x;
+        dst->y = vec1->y + vec2->y;
+        dst->z = vec1->z + vec2->z;
+    }
+    inline void PSVECSubtract(const Vec* vec1, const Vec* vec2, Vec* dst) {
+        dst->x = vec1->x - vec2->x;
+        dst->y = vec1->y - vec2->y;
+        dst->z = vec1->z - vec2->z;
+    }
+    inline void PSVECMultiply(const Vec* vec1, const Vec* vec2, Vec* dst) {
+        dst->x = vec1->x * vec2->x;
+        dst->y = vec1->y * vec2->y;
+        dst->z = vec1->z * vec2->z;
+    }
+    inline f32 PSVECSquareMag(const Vec* src) {
+        return src->x * src->x + src->y * src->y + src->z * src->z;
+    }
+    inline void PSVECNegate(const Vec* src, Vec* dst) {
+        dst->x = -src->x;
+        dst->y = -src->y;
+        dst->z = -src->z;
+    }
+    inline f32 PSVECSquareDistance(const Vec* a, const Vec* b) {
+        f32 dx = a->x - b->x;
+        f32 dy = a->y - b->y;
+        f32 dz = a->z - b->z;
+        return dx * dx + dy * dy + dz * dz;
+    }
 #endif
 };  // namespace JMathInlineVEC
 

@@ -6,6 +6,13 @@
 extern "C" void JUTWarningConsole(const char*);
 extern "C" void JUTReportConsole(const char*);
 
+// Address arithmetic on heap blocks: pointer-sized on PC.
+#if TARGET_PC
+typedef uintptr_t JKRExpAddr;
+#else
+typedef u32 JKRExpAddr;
+#endif
+
 static u32 DBfoundSize;
 static u32 DBfoundOffset;
 static JKRExpHeap::CMemBlock* DBfoundBlock;
@@ -83,7 +90,7 @@ JKRExpHeap* JKRExpHeap::create(void* ptr, u32 size, JKRHeap* pParent, bool error
     }
 
     void* data = static_cast< u8* >(ptr) + heapSize;
-    u32 alignSize = ALIGN_PREV(reinterpret_cast< u32 >(ptr) + size - reinterpret_cast< u32 >(data), 0x10);
+    u32 alignSize = (u32)ALIGN_PREV(reinterpret_cast< JKRExpAddr >(ptr) + size - reinterpret_cast< JKRExpAddr >(data), 0x10);
     if (ptr != nullptr) {
         heap = new (ptr) JKRExpHeap(data, alignSize, parent, errorFlag);
     }
@@ -160,7 +167,7 @@ void* JKRExpHeap::do_alloc(u32 size, int align) {
 }
 
 void* JKRExpHeap::allocFromHead(u32 size, int align) {
-    u32 content;
+    JKRExpAddr content;
     u32 blockSize;
     u32 foundOffset;
     int foundSize;
@@ -173,9 +180,9 @@ void* JKRExpHeap::allocFromHead(u32 size, int align) {
     CMemBlock* newUsedBlock = nullptr;
 
     for (CMemBlock* block = mHeadFreeList; block; block = block->mNext) {
-        content = reinterpret_cast< u32 >(block->getContent());
+        content = reinterpret_cast< JKRExpAddr >(block->getContent());
         blockSize = block->mSize;
-        u32 offset = ALIGN_PREV(align + content - 1, align) - content;
+        u32 offset = (u32)(ALIGN_PREV(align + content - 1, align) - content);
         if (blockSize < size + offset) {
             continue;
         }
@@ -231,7 +238,7 @@ void* JKRExpHeap::allocFromHead(u32 size, int align) {
                 CMemBlock* prev = foundBlock->mPrev;
                 CMemBlock* next = foundBlock->mNext;
                 removeFreeBlock(foundBlock);
-                newUsedBlock = reinterpret_cast< CMemBlock* >(reinterpret_cast< u32 >(foundBlock) + foundOffset);
+                newUsedBlock = reinterpret_cast< CMemBlock* >(reinterpret_cast< JKRExpAddr >(foundBlock) + foundOffset);
                 newUsedBlock->mSize = foundBlock->mSize - foundOffset;
                 newFreeBlock = newUsedBlock->allocFore(size, mCurrentGroupId, static_cast< u8 >(foundOffset), 0, 0);
                 if (newFreeBlock) {
@@ -300,11 +307,11 @@ void* JKRExpHeap::allocFromTail(u32 size, int align) {
     CMemBlock* foundBlock = nullptr;
     CMemBlock* newBlock = nullptr;
     u32 usedSize;
-    u32 start;
+    JKRExpAddr start;
 
     for (CMemBlock* block = mTailFreeList; block; block = block->mPrev) {
-        start = ALIGN_PREV(reinterpret_cast< u32 >(block->getContent()) + block->mSize - size, align);
-        usedSize = reinterpret_cast< u32 >(block->getContent()) + block->mSize - start;
+        start = ALIGN_PREV(reinterpret_cast< JKRExpAddr >(block->getContent()) + block->mSize - size, align);
+        usedSize = (u32)(reinterpret_cast< JKRExpAddr >(block->getContent()) + block->mSize - start);
         if (block->mSize >= usedSize) {
             foundBlock = block;
             offset = block->mSize - usedSize;
@@ -417,7 +424,7 @@ s32 JKRExpHeap::do_changeGroupID(u8 groupId) {
 }
 
 s32 JKRExpHeap::do_resize(void* ptr, u32 size) {
-    u32 end;
+    JKRExpAddr end;
     CMemBlock* foundBlock;
 
     lock();
@@ -434,7 +441,7 @@ s32 JKRExpHeap::do_resize(void* ptr, u32 size) {
     }
 
     if (size > block->mSize) {
-        end = reinterpret_cast< u32 >(block + 1);
+        end = reinterpret_cast< JKRExpAddr >(block + 1);
         end += block->mSize;
         foundBlock = nullptr;
         for (CMemBlock* freeBlock = mHeadFreeList; freeBlock; freeBlock = freeBlock->mNext) {
@@ -671,9 +678,9 @@ void JKRExpHeap::recycleFreeBlock(JKRExpHeap::CMemBlock* block) {
 }
 
 void JKRExpHeap::joinTwoBlocks(CMemBlock* block) {
-    u32 endAddr = reinterpret_cast< u32 >(block + 1) + block->mSize;
+    JKRExpAddr endAddr = reinterpret_cast< JKRExpAddr >(block + 1) + block->mSize;
     CMemBlock* next = block->mNext;
-    u32 nextAddr = reinterpret_cast< u32 >(next) - (next->mFlags & 0x7f);
+    JKRExpAddr nextAddr = reinterpret_cast< JKRExpAddr >(next) - (next->mFlags & 0x7f);
     if (endAddr > nextAddr) {
         JUTWarningConsole_f(":::Heap may be broken. (block = %x)", block);
 
@@ -726,7 +733,7 @@ bool JKRExpHeap::check() {
                 JUTWarningConsole_f(":::addr %08x: bad previous pointer (%08x)\n", block->mNext, block->mNext->mPrev);
             }
 
-            if (reinterpret_cast< u32 >(block) + block->mSize + sizeof(CMemBlock) > reinterpret_cast< u32 >(block->mNext)) {
+            if (reinterpret_cast< JKRExpAddr >(block) + block->mSize + sizeof(CMemBlock) > reinterpret_cast< JKRExpAddr >(block->mNext)) {
                 ok = false;
                 JUTWarningConsole_f(":::addr %08x: bad block size (%08x)\n", block, block->mSize);
             }
@@ -807,14 +814,22 @@ bool JKRExpHeap::dump_sort() {
     } else {
         CMemBlock* previousBlock = nullptr;
         while (true) {
+#if TARGET_PC
+            CMemBlock* block = reinterpret_cast< CMemBlock* >(~(JKRExpAddr)0);
+#else
             CMemBlock* block = reinterpret_cast< CMemBlock* >(0xffffffff);
+#endif
             for (CMemBlock* iterBlock = mHeadUsedList; iterBlock; iterBlock = iterBlock->mNext) {
                 if (previousBlock < iterBlock && iterBlock < block) {
                     block = iterBlock;
                 }
             }
 
+#if TARGET_PC
+            if (reinterpret_cast< JKRExpAddr >(block) == ~(JKRExpAddr)0) {
+#else
             if (reinterpret_cast< u32 >(block) == 0xffffffff) {
+#endif
                 break;
             }
 
@@ -863,7 +878,7 @@ JKRExpHeap::CMemBlock* JKRExpHeap::CMemBlock::allocFore(u32 size, u8 group_1, u8
     mFlags = align_1;
 
     if (mSize >= size + sizeof(CMemBlock)) {
-        block = reinterpret_cast< CMemBlock* >(reinterpret_cast< u32 >(this) + size);
+        block = reinterpret_cast< CMemBlock* >(reinterpret_cast< JKRExpAddr >(this) + size);
         block[1].mGroupId = group_2;
         block[1].mFlags = align_2;
         block[1].mSize = mSize - (size + sizeof(CMemBlock));
@@ -878,7 +893,7 @@ JKRExpHeap::CMemBlock* JKRExpHeap::CMemBlock::allocBack(u32 size, u8 group_1, u8
     CMemBlock* block = nullptr;
 
     if (mSize >= size + sizeof(CMemBlock)) {
-        block = reinterpret_cast< CMemBlock* >(reinterpret_cast< u32 >(this) + mSize - size);
+        block = reinterpret_cast< CMemBlock* >(reinterpret_cast< JKRExpAddr >(this) + mSize - size);
         block->mGroupId = group_2;
         block->mFlags = align_2 | 0x80;
         block->mSize = size;
@@ -929,10 +944,10 @@ void JKRExpHeap::state_register(JKRHeap::TState* p, u32 id) const {
     for (CMemBlock* block = mHeadUsedList; block; block = block->mNext) {
         if (id <= 0xff) {
             if (block->mGroupId == id) {
-                checkCode += reinterpret_cast< u32 >(block) * 3;
+                checkCode += (u32)reinterpret_cast< JKRExpAddr >(block) * 3;
             }
         } else {
-            checkCode += reinterpret_cast< u32 >(block) * 3;
+            checkCode += (u32)reinterpret_cast< JKRExpAddr >(block) * 3;
         }
     }
     setState_u32CheckCode_(p, checkCode);

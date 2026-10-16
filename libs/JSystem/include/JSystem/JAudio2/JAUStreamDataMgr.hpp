@@ -62,7 +62,12 @@ public:
 
     virtual bool deleteStreamAram(u32 addr) {
         for (s32 i = 0; i < Base::mSize; i++) {
+#if TARGET_PC
+            // ARAM heap "pointers" are ARAM addresses (offsets into the emulated ARAM): 32 bits are enough.
+            if (Base::mBits.test(i) && addr == (u32)(uintptr_t)Base::mHeaps[i].mBase) {
+#else
             if (Base::mBits.test(i) && addr == (u32)Base::mHeaps[i].mBase) {
+#endif
                 Base::mBits.reset(i);
                 return true;
             }

@@ -38,7 +38,11 @@ JKRUnitHeap* JKRUnitHeap::create(u32 unitSize, u32 size, u32 alignment, JKRHeap*
     }
 
     u8* memoryEnd = memory + size;
+#if TARGET_PC
+    u8* units = reinterpret_cast< u8* >(ALIGN_NEXT(reinterpret_cast< uintptr_t >(bat + ALIGN_NEXT(unitCount / 8, 4)), alignment));
+#else
     u8* units = reinterpret_cast< u8* >(ALIGN_NEXT(reinterpret_cast< u32 >(bat + ALIGN_NEXT(unitCount / 8, 4)), alignment));
+#endif
     unitCount = (memoryEnd - units) / alignedUnitSize;
     JKRUnitHeap* heap = new (memory) JKRUnitHeap(bat, units, alignedUnitSize, unitCount, memoryEnd - units, alignment, parent, errorFlag);
     if (heap == nullptr) {
@@ -86,7 +90,11 @@ void JKRUnitHeap::clearBatArea() {
         ++bat;
     }
 
+#if TARGET_PC
+    while (reinterpret_cast< uintptr_t >(bat) & 3) {
+#else
     while (reinterpret_cast< u32 >(bat) & 3) {
+#endif
         *bat++ = 0xFF;
     }
 }

@@ -33,7 +33,11 @@ namespace NrvStarPointerCommandStream {
 };  // namespace NrvStarPointerCommandStream
 
 namespace {
+#if TARGET_PC
+    static Color8 hOutColor = Color8(GXColor{0xFF, 0x00, 0x00, 0xFF});
+#else
     static Color8 hOutColor = Color8((GXColor){0xFF, 0x00, 0x00, 0xFF});
+#endif
 };  // namespace
 
 StarPointerCommandStream::StarPointerCommandStream(const TVec2f* pScreenPos)

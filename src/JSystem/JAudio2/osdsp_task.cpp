@@ -20,7 +20,12 @@ void osdsp_task_FORCE_MATCH_RODATA(void* pTask) {
 
 extern "C" void __DSPHandler(__OSInterrupt interrupt, OSContext* pContext) {
     OSContext funcContext;
+#if TARGET_PC
+    // TODO(pc): no DSP hardware. This interrupt handler is never raised on PC; the DSP side of
+    // JAudio2 is to be replaced by an HLE software mixer (like Dusklight's src/dusk/audio).
+#else
     __DSPRegs[5] = ((u16)(__DSPRegs[5]) & ~0x28) | 0x80;
+#endif
     OSClearContext(&funcContext);
     OSSetCurrentContext(&funcContext);
 

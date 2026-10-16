@@ -121,6 +121,19 @@ void HeapMemoryWatcher::createRootHeap() {
     void* newHi;
     u32 arenaHi, arenaLo;
 
+#if TARGET_PC
+    JKRExpHeap::createRoot(1, true);
+    {
+        u8* pArenaLo = static_cast< u8* >(OSGetMEM2ArenaLo());
+        u8* pArenaHi = static_cast< u8* >(OSGetMEM2ArenaHi());
+        newHi = pArenaLo + 0xE00000;
+        OSSetMEM2ArenaHi(newHi);
+        // TODO(pc): the 14 MB below newHi is the Wii's "alternate ARAM" for the DSP. On PC the
+        // audio ARAM is Aurora's own buffer, so its start address is 0 there.
+        JKRHeap::setAltAramStartAdr(0);
+        pHeap = JKRExpHeap::create(newHi, static_cast< u32 >(pArenaHi - static_cast< u8* >(newHi)), JKRHeap::sRootHeap, true);
+    }
+#else
     JKRExpHeap::createRoot(1, true);
     arenaLo = reinterpret_cast< u32 >(OSGetMEM2ArenaLo());
     arenaHi = reinterpret_cast< u32 >(OSGetMEM2ArenaHi());
@@ -128,6 +141,7 @@ void HeapMemoryWatcher::createRootHeap() {
     OSSetMEM2ArenaHi(newHi);
     JKRHeap::setAltAramStartAdr(arenaLo);
     pHeap = JKRExpHeap::create(newHi, arenaHi - reinterpret_cast< u32 >(newHi), JKRHeap::sRootHeap, true);
+#endif
 
     if (MR::isEqualCurrentHeap(pHeap)) {
         JKRHeap::sRootHeap->becomeCurrentHeap();

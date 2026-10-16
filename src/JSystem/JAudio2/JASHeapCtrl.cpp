@@ -14,7 +14,11 @@ void JASHeap::initRootHeap(void* pBase, u32 size) {
     OSLockMutex(&mMutex);
     mBase = (u8*)OSRoundUp32B(pBase);
     mHeap = nullptr;
+#if TARGET_PC
+    mSize = size - (uintptr_t(mBase) - uintptr_t(pBase));
+#else
     mSize = size - (u32(mBase) - u32(pBase));
+#endif
     OSUnlockMutex(&mMutex);
 }
 
@@ -47,7 +51,11 @@ bool JASHeap::alloc(JASHeap* pParent, u32 size) {
             break;
         }
 
+#if TARGET_PC
+        u32 gapSize = uintptr_t(it->mBase) - uintptr_t(pCurrent);
+#else
         u32 gapSize = u32(it->mBase) - u32(pCurrent);
+#endif
         if (gapSize >= size && gapSize < smallestGap) {
             pNext = &*it;
             pAddress = pCurrent;
@@ -277,7 +285,12 @@ void JASKernel::setupAramHeap(u32 base, u32 size) {
     OSReport("setupAramHeap %x, %x, %x\n", base, ARGetBaseAddress(), size);
     base = ARGetBaseAddress();
     sAramBase = base;
+#if TARGET_PC
+    // The ARAM heap's "pointers" are ARAM addresses (offsets into Aurora's emulated ARAM), never dereferenced.
+    audioAramHeap.initRootHeap((void*)(uintptr_t)sAramBase, size);
+#else
     audioAramHeap.initRootHeap((void*)sAramBase, size);
+#endif
 }
 
 JASHeap* JASKernel::getAramHeap() {

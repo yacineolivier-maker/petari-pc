@@ -103,7 +103,7 @@ set(SMG_JSYSTEM_LIBS JSupport JKernel JUtility JGadget JMath J2DGraph J3DGraphBa
         J3DGraphAnimator J3DGraphLoader JParticle JAudio2)
 set(SMG_NW4R_LIBS libnw4r_ut libnw4r_db libnw4r_math libnw4r_lyt)
 set(SMG_GAME_LIBS Animation AreaObj AudioLib Boss Camera Demo Effect Enemy GameAudio Gravity
-        LiveActor Map MapObj NPC NameObj Player RhythmLib Ride Scene Screen Speaker System Util)
+        LiveActor Map MapObj NPC NWC24 NameObj Player RhythmLib Ride Scene Screen Speaker System Util)
 set(SMG_PC_LIBS ${SMG_JSYSTEM_LIBS} ${SMG_NW4R_LIBS} ${SMG_GAME_LIBS})
 foreach (lib IN LISTS SMG_PC_LIBS)
     smg_add_lib(smg_${lib} ${LIB_${lib}_FILES})
@@ -111,3 +111,57 @@ endforeach ()
 
 # THPDraw.c uses Aurora's GD helpers, which are C++-only.
 set_source_files_properties(src/Game/Screen/THPDraw.c PROPERTIES LANGUAGE CXX)
+
+# PC platform layer: OS (threads, mutexes, alarms, messages), Wii services (Wii Remote via the
+# gamepad, NAND saves, system settings, MEM2) and the Aurora bring-up.
+smg_add_lib(smg_pc
+        pc/src/platform.cpp
+        pc/src/sdk_stubs.cpp
+        pc/src/game_missing.cpp
+        pc/src/rfl_stubs.cpp
+        pc/src/os/OSAlarm.cpp
+        pc/src/os/OSContext.cpp
+        pc/src/os/OSMutex.cpp
+        pc/src/os/OSReport.cpp
+        pc/src/os/OSThread.cpp
+        pc/src/os/os_stubs.cpp
+        pc/src/os/user_files.cpp
+        pc/src/os/wii_arena.cpp
+        pc/src/os/wii_system.cpp
+        pc/src/input/wiimote.cpp)
+if (WIN32)
+    target_link_libraries(smg_pc PUBLIC dbghelp psapi)
+endif ()
+
+# Data tables the decomp still links from the original binary (embedded BCSV tables), copied out
+# of the user's main.dol at build time (never committed).
+find_package(Python3 REQUIRED COMPONENTS Interpreter)
+set(SMG_DOL ${CMAKE_SOURCE_DIR}/orig/RMGE01/sys/main.dol)
+set(SMG_DOL_DATA ${CMAKE_BINARY_DIR}/generated/dol_data.cpp)
+add_custom_command(OUTPUT ${SMG_DOL_DATA}
+        COMMAND Python3::Interpreter ${CMAKE_SOURCE_DIR}/tools/pc/gen_dol_data.py ${SMG_DOL}
+                ${CMAKE_SOURCE_DIR}/config/RMGE01/symbols.txt ${SMG_DOL_DATA}
+        DEPENDS ${SMG_DOL} ${CMAKE_SOURCE_DIR}/tools/pc/gen_dol_data.py
+        COMMENT "Extracting data tables from main.dol")
+target_sources(smg_pc PRIVATE ${SMG_DOL_DATA})
+
+# The game. The entry point is main() in src/Game/System/GameSystem.cpp (renamed aurora_main by
+# aurora/main.h; Aurora provides the real process entry point).
+set(SMG_GAME_TARGETS smg_pc)
+foreach (lib IN LISTS SMG_PC_LIBS)
+    list(APPEND SMG_GAME_TARGETS smg_${lib})
+endforeach ()
+add_executable(smgpc pc/src/game_main_stub.cpp)
+target_link_libraries(smgpc PRIVATE smg_game_headers ${SMG_GAME_TARGETS}
+        aurora::main aurora::gx aurora::gd aurora::si aurora::vi aurora::pad aurora::mtx
+        aurora::os aurora::dvd aurora::thp)
+if (MSVC)
+    # The game libraries reference each other in every direction.
+    target_link_options(smgpc PRIVATE /OPT:REF)
+    # JKRHeap.cpp replaces the global operator new/delete on PC. Pull it in before the CRT's
+    # versions get picked to resolve the first reference.
+    target_link_options(smgpc PRIVATE
+            "/INCLUDE:??2@YAPEAX_K@Z" "/INCLUDE:??3@YAXPEAX@Z" "/INCLUDE:??_U@YAPEAX_K@Z"
+            "/INCLUDE:??_V@YAXPEAX@Z")
+endif ()
+aurora_copy_runtime_dlls(smgpc)

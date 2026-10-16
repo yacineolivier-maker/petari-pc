@@ -10,7 +10,7 @@
 #include "JSystem/JAudio2/JASTrackPort.hpp"
 #include "JSystem/JGadget/linklist.hpp"
 
-class JASSoundParams;
+struct JASSoundParams;
 class JASChannel;
 class JASDefaultBankTable;
 

@@ -3,6 +3,9 @@
 #include "JSystem/J3DGraphAnimator/J3DModel.hpp"
 #include "JSystem/J3DGraphBase/J3DVertex.hpp"
 #include "JSystem/JMath/JMATrigonometric.hpp"
+#if TARGET_PC
+#include <revolution/base/PPCArch.h>  // PPCSync (pulled in by revolution/os.h on Wii)
+#endif
 
 void J3DDeformData::deform(J3DModel* model) {
     deform(model->getVertexBuffer());

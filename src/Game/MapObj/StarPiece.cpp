@@ -50,7 +50,11 @@ namespace NrvStarPiece {
 
 StarPiece::StarPiece(const char* pName)
     : LiveActor(pName), _8C(0, 0, 1), _98(0.02f), _9C(), _A0(), _A4(), _A8(0, 0, 0), _B4(0, 0, 0), mDelegator(nullptr), mTargetSensor(), _C8(-1),
+#if TARGET_PC
+      mGettableDelayCounter(-1), mFallKillTimer(), mColor(GXColor{0, 0, 0, 255}), mGroupType(groupType_noGroup), mHostInfo(nullptr),
+#else
       mGettableDelayCounter(-1), mFallKillTimer(), mColor((GXColor){0, 0, 0, 255}), mGroupType(groupType_noGroup), mHostInfo(nullptr),
+#endif
       mReceiverInfo(0), mNumGift(1) {
     MR::incNumStarPieceNewed();
 

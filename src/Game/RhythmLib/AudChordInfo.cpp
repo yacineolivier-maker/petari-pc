@@ -7,8 +7,14 @@ void AudScaleData::initScaleData(u32 base) {
     down += base;
 }
 
+#if TARGET_PC
+AudChordTable::AudChordTable()
+    : mLoaded(false), mChordCount(0), mScaleCount(0), mChordPtr(nullptr), mScalePtr(nullptr), mScaleStorage(nullptr) {
+}
+#else
 AudChordTable::AudChordTable() : mLoaded(false), mChordCount(0), mScaleCount(0), mChordPtr(nullptr), mScalePtr(nullptr) {
 }
+#endif
 
 bool AudChordTable::setChordTable(s32 id, JKRArchive* pArchive) {
     mLoaded = false;
@@ -41,6 +47,38 @@ bool AudChordTable::setChordTableResource(void* pRes) {
     cursor++;
 
     u8* base = (u8*)cursor;
+#if TARGET_PC
+    // TODO(pc): the resource is big-endian; counts and offsets are read natively here, like the
+    // original, until the endian layer exists.
+    (void)alreadyRelocated;
+    (void)initialized;
+    mChordCount = *(u16*)(base + 0);
+    mScaleCount = *(u16*)(base + 2);
+
+    const u32* chordOffsets = (const u32*)(base + 4);
+    const u32* scaleOffsets = (const u32*)(base + 4 + mChordCount * 4);
+
+    delete[] mChordPtr;
+    delete[] mScalePtr;
+    delete[] mScaleStorage;
+    mChordPtr = new AudChordData*[mChordCount];
+    mScalePtr = new AudScaleData*[mScaleCount];
+    mScaleStorage = new AudScaleData[mScaleCount];
+
+    for (s32 i = 0; i < mChordCount; i++) {
+        mChordPtr[i] = (AudChordData*)((u8*)pRes + chordOffsets[i]);
+    }
+
+    for (s32 i = 0; i < mScaleCount; i++) {
+        // File layout of a scale entry: two u32 offsets (up, down) from the start of the resource.
+        const u32* scaleFile = (const u32*)((u8*)pRes + scaleOffsets[i]);
+        mScaleStorage[i].up = (u8*)pRes + scaleFile[0];
+        mScaleStorage[i].down = (u8*)pRes + scaleFile[1];
+        mScalePtr[i] = &mScaleStorage[i];
+    }
+
+    return true;
+#else
     mChordCount = *(u16*)(base + 0);
     mScaleCount = *(u16*)(base + 2);
     mChordPtr = (AudChordData**)(base + 4);
@@ -62,6 +100,7 @@ bool AudChordTable::setChordTableResource(void* pRes) {
     }
 
     return true;
+#endif
 }
 
 AudChordInfo::AudChordInfo()

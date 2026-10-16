@@ -27,6 +27,25 @@ namespace nw4r {
             }
         }  // namespace detail
 
+#if TARGET_PC
+        // Default constructor used by Picture(u8) / Picture(const TexMap&). The Wii build inlines
+        // it there; here it needs an out-of-line definition. Defaults: visible, centred, opaque.
+        Pane::Pane() {
+            Init();
+            mBasePosition = 4;
+            std::memset(mName, 0, sizeof(mName));
+            std::memset(mUserData, 0, sizeof(mUserData));
+            mTranslate = math::VEC3(0.0f, 0.0f, 0.0f);
+            mRotate = math::VEC3(0.0f, 0.0f, 0.0f);
+            mScale = math::VEC2(1.0f, 1.0f);
+            mSize = Size(0.0f, 0.0f);
+            mAlpha = 255;
+            mGlbAlpha = 255;
+            mFlag = 0;
+            SetVisible(true);
+        }
+#endif
+
         Pane::Pane(const res::Pane* pRes) {
             Init();
 
@@ -343,7 +362,11 @@ namespace nw4r {
                 pMtx = &mGlbMtx;
             }
 
+#if TARGET_PC
+            GXLoadPosMtxImm(static_cast< MtxPtr >(*pMtx), GX_PNMTX0);
+#else
             GXLoadPosMtxImm(*pMtx, GX_PNMTX0);
+#endif
             GXSetCurrentMtx(GX_PNMTX0);
         }
 

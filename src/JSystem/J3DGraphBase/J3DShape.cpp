@@ -215,12 +215,50 @@ void J3DShape::makeVtxArrayCmd() {
         }
     }
 
+#if TARGET_PC
+    // Aurora needs the byte size of each array. J3DVertexData doesn't keep per-array sizes:
+    // use the element counts computed by J3DModelLoader::readVertex, capped by the start of the
+    // next array of the VTX1 block (the arrays are laid out back to back).
+    // TODO(pc): pass little_endian = true once the J3D vertex data is byte-swapped at load time.
+    const void* allArrays[13] = {
+        mVertexData->getVtxPosArray(), mVertexData->getVtxNrmArray(), mVertexData->getVtxNBTArray(),
+        mVertexData->getVtxColorArray(0), mVertexData->getVtxColorArray(1),
+    };
+    for (u32 i = 0; i < 8; i++) {
+        allArrays[5 + i] = mVertexData->getVtxTexCoordArray(i);
+    }
+    for (u32 i = 0; i < 12; i++) {
+        GXAttr attr = (GXAttr)(i + GX_VA_POS);
+        if (array[i] != 0) {
+            u32 count;
+            if (attr == GX_VA_POS)
+                count = mVertexData->mVtxNum;
+            else if (attr == GX_VA_NRM)
+                count = mVertexData->mNrmNum;
+            else if (attr == GX_VA_CLR0 || attr == GX_VA_CLR1)
+                count = mVertexData->mColNum;
+            else
+                count = mVertexData->mTexCoordNum;
+            uintptr_t start = (uintptr_t)array[i];
+            uintptr_t size = (uintptr_t)count * stride[i];
+            for (u32 j = 0; j < 13; j++) {
+                uintptr_t other = (uintptr_t)allArrays[j];
+                if (other > start && other - start < size)
+                    size = other - start;
+            }
+            GDSetArraySized(attr, array[i], (u32)size, stride[i], false);
+        } else {
+            GDSetArraySized(attr, NULL, 0, stride[i], false);
+        }
+    }
+#else
     for (u32 i = 0; i < 12; i++) {
         if (array[i] != 0)
             GDSetArray((GXAttr)(i + GX_VA_POS), array[i], stride[i]);
         else
             GDSetArrayRaw((GXAttr)(i + GX_VA_POS), nullptr, stride[i]);
     }
+#endif
 }
 
 void J3DShape::makeVcdVatCmd() {

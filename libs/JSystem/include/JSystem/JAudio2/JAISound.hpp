@@ -5,7 +5,7 @@
 #include <stdint.h>
 
 class JAISound;
-class JASTrack;
+struct JASTrack;
 
 class JAISoundID {
 public:
@@ -394,7 +394,7 @@ public:
 
 class JAISoundHandle;
 class JAIAudible;
-struct JAIAudience;
+class JAIAudience;
 class JAISe;
 class JAISeq;
 struct JAISoundChild;

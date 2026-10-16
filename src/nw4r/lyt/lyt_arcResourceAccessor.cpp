@@ -1,6 +1,10 @@
 #include "nw4r/lyt/arcResourceAccessor.h"
 #include <cstdio>
+#if TARGET_PC
+#include <string.h>
+#else
 #include <extras.h>
+#endif
 #include <revolution/arc.h>
 
 namespace {

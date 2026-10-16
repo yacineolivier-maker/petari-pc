@@ -201,9 +201,11 @@ JASBasicBank* JASBNKParser::Ver1::createBasicBank(void const* stream, JKRHeap* h
     return bank;
 }
 
+#if !TARGET_PC  // On PC the game's version in Overwrite*.cpp replaces it.
 inline JASInstParam::JASInstParam() {
     init();
 }
+#endif
 
 JASBasicBank* JASBNKParser::Ver0::createBasicBank(void const* stream, JKRHeap* heap) {
     if (heap == nullptr) {

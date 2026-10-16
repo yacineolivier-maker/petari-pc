@@ -6,7 +6,13 @@ namespace nw4r {
         namespace {
             template < typename T >
             inline void ResolveOffset(T*& rpPtr, void* pBase) {
+#if TARGET_PC
+                // TODO(pc): the pointer field holds a 32-bit file offset; BRFNT blocks are big-endian
+                // with 4-byte pointer slots, to be handled by the asset endian/layout pass.
+                rpPtr = reinterpret_cast< T* >(static_cast< char* >(pBase) + static_cast< s32 >(reinterpret_cast< intptr_t >(rpPtr)));
+#else
                 rpPtr = reinterpret_cast< T* >(static_cast< char* >(pBase) + reinterpret_cast< s32 >(rpPtr));
+#endif
             }
 
         }  // namespace

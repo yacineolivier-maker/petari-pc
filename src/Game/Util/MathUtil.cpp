@@ -1174,6 +1174,14 @@ f32 PSVECKillElement(__REGISTER const Vec* pSrc, __REGISTER const Vec* pKill, __
         psq_st     f2, 4(pDst),  0, 0
     }  // clang-format on
     return dot;
+#else
+    // dst = src - (src . kill) * kill; returns the dot product.
+    f32 dot = pSrc->x * pKill->x + pSrc->y * pKill->y + pSrc->z * pKill->z;
+    Vec* pOut = const_cast< Vec* >(pDst);
+    pOut->x = pSrc->x - dot * pKill->x;
+    pOut->y = pSrc->y - dot * pKill->y;
+    pOut->z = pSrc->z - dot * pKill->z;
+    return dot;
 #endif
 }
 
@@ -1201,6 +1209,12 @@ namespace MR {
             psq_st f2, 8(pA1), 1, 0
         }
 
+#else
+        // *pA1 += *pA2 * a3
+        TVec3f* pDst = const_cast< TVec3f* >(pA1);
+        pDst->x = pA2->x * a3 + pA1->x;
+        pDst->y = pA2->y * a3 + pA1->y;
+        pDst->z = pA2->z * a3 + pA1->z;
 #endif
     }
 
@@ -1219,6 +1233,11 @@ namespace MR {
             psq_st    f3, 8(pA3), 1, 0
         }
 
+#else
+        // *pA3 = *pA1 * a4 + *pA2 * a5
+        pA3->x = pA2->x * a5 + pA1->x * a4;
+        pA3->y = pA2->y * a5 + pA1->y * a4;
+        pA3->z = pA2->z * a5 + pA1->z * a4;
 #endif
     }
 
@@ -1556,14 +1575,26 @@ namespace MR {
     }
 
     void setNan(TVec3f& rDst) {
+#if TARGET_PC
+        // Same bit pattern (0xFFFFFFFF = NaN) without instantiating TVec3<int> (ambiguous ctor on MSVC).
+        const u32 nanBits = 0xFFFFFFFF;
+        memcpy(&rDst.x, &nanBits, sizeof(f32));
+        memcpy(&rDst.y, &nanBits, sizeof(f32));
+        memcpy(&rDst.z, &nanBits, sizeof(f32));
+#else
         JGeometry::TVec3< int >* tmp = (JGeometry::TVec3< int >*)&rDst;
         tmp->x = -1;
         tmp->y = -1;
         tmp->z = -1;
+#endif
     }
 
     bool isNan(const TVec3f& rVec) {
+#if TARGET_PC
+        if (std::isnan(rVec.x) || std::isnan(rVec.y) || std::isnan(rVec.z)) {  // MSL: __fpclassifyf() == FP_NAN (1)
+#else
         if (__fpclassifyf(rVec.x) == 1 || __fpclassifyf(rVec.y) == 1 || __fpclassifyf(rVec.z) == 1) {
+#endif
             return true;
         }
 
@@ -1629,7 +1660,11 @@ f32 JMASqrt(__REGISTER f32 value) {
     }
 
     __REGISTER f32 inverse;
+#if TARGET_PC
+    inverse = __frsqrte(value);  // exact 1/sqrt instead of the hardware estimate
+#else
     __asm { frsqrte inverse, value }
+#endif
     f32 estimate = inverse * value;
     inverse = -(estimate * inverse - 3.0f);
     inverse *= estimate;

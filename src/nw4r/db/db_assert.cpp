@@ -2,7 +2,11 @@
 #include "nw4r/db/console.h"
 #include "nw4r/db/directPrint.h"
 #include "nw4r/db/mapFile.h"
+#if TARGET_PC
+#include <cstdarg>
+#else
 #include <va_list.h>
+#endif
 
 namespace nw4r {
     namespace db {
@@ -41,6 +45,13 @@ namespace nw4r {
             }
         }
 
+#if TARGET_PC
+        // TODO(pc): no PPC back-chain walk on PC (could use CaptureStackBackTrace + symbols).
+        static void ShowStack_(uintptr_t sp) {
+            (void)sp;
+            Assertion_Printf_("-------------------------------- TRACE\n");
+        }
+#else
         static void ShowStack_(u32 sp) {
             Assertion_Printf_("-------------------------------- TRACE\n");
             u32 i;
@@ -63,13 +74,19 @@ namespace nw4r {
 
             return;
         }
+#endif
 
+#if TARGET_PC
+        void VPanic(const char* file, int line, const char* fmt, va_list vlist, bool halt) {
+            uintptr_t stackPointer = 0;  // TODO(pc): no stack trace on PC
+#else
         __declspec(weak) void VPanic(const char* file, int line, const char* fmt, va_list vlist, bool halt) {
             register u32 stackPointer;
             asm {
         mr  stackPointer, r1
             }
             stackPointer = *((u32*)stackPointer);
+#endif
             (void)OSDisableInterrupts();
             (void)OSDisableScheduler();
 
@@ -96,16 +113,28 @@ namespace nw4r {
             }
 
             if (halt) {
+#if TARGET_PC
+                abort();
+#else
                 PPCHalt();
+#endif
             }
         }
 
+#if TARGET_PC
+        void Panic(const char* file, int line, const char* fmt, ...) {
+#else
         __declspec(weak) void Panic(const char* file, int line, const char* fmt, ...) {
+#endif
             va_list vlist;
             va_start(vlist, fmt);
             nw4r::db::VPanic(file, line, fmt, vlist, true);
             va_end(vlist);
+#if TARGET_PC
+            abort();
+#else
             PPCHalt();
+#endif
         }
 
     };  // namespace db

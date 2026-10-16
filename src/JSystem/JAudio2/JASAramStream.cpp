@@ -584,10 +584,17 @@ void JASAramStream::updateChannel(u32 i_callbackType, JASChannel* i_channel, JAS
     i_channel->setPauseFlag(_0AE != 0);
 }
 
+#if TARGET_PC
+// Messages carry small integers in a pointer-sized OSMessage.
+#define JAS_MSG_U32(msg) ((u32)(uintptr_t)(msg))
+#else
+#define JAS_MSG_U32(msg) ((u32)(msg))
+#endif
+
 s32 JASAramStream::channelProc() {
     OSMessage msg;
     while (OSReceiveMessage(&_020, &msg, OS_MESSAGE_NOBLOCK)) {
-        switch ((u32)msg) {
+        switch (JAS_MSG_U32(msg)) {
         case 4:
             _0AC = true;
             break;
@@ -602,12 +609,12 @@ s32 JASAramStream::channelProc() {
     }
 
     while (OSReceiveMessage(&_000, &msg, OS_MESSAGE_NOBLOCK)) {
-        switch ((u32)msg & 0xff) {
+        switch (JAS_MSG_U32(msg) & 0xff) {
         case 0:
             channelStart();
             break;
         case 1:
-            channelStop(JSUHiHalf((u32)msg));
+            channelStop(JSUHiHalf(JAS_MSG_U32(msg)));
             break;
         case 2:
             _0AE |= 1;

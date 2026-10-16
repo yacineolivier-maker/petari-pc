@@ -11,7 +11,15 @@
 #include <cstring>
 
 namespace {
+#if TARGET_PC
+    // std::binary_function was removed in C++20; same nested typedefs, needed by binder2nd below.
+    struct IsManagerName {
+        typedef AreaObjMgr* first_argument_type;
+        typedef const char* second_argument_type;
+        typedef bool result_type;
+#else
     struct IsManagerName : std::binary_function< AreaObjMgr*, const char*, bool > {
+#endif
         bool operator()(const AreaObjMgr* pManager, const char* pName) const {
             const char* pMatch = strstr(pName, pManager->mName);
             return pMatch != nullptr && pMatch == pName;
@@ -378,7 +386,13 @@ void AreaObjContainer::init(const JMapInfoIter& rIter) {
 }
 
 AreaObjMgr* AreaObjContainer::getManager(const char* pName) const {
+#if TARGET_PC
+    // std::binder2nd was removed in C++17.
+    return *std::find_if(mManagerArray, mManagerArray + mNumManagers,
+                         [pName](const AreaObjMgr* pManager) { return IsManagerName()(pManager, pName); });
+#else
     return *std::find_if(mManagerArray, mManagerArray + mNumManagers, std::binder2nd< IsManagerName, const char* >(IsManagerName(), pName));
+#endif
 }
 
 AreaObj* AreaObjContainer::getAreaObj(const char* pName, const TVec3f& rVec) const {

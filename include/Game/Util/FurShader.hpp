@@ -6,7 +6,7 @@
 
 class J3DModel;
 class J3DModelData;
-class ResTIMG;
+struct ResTIMG;
 class J3DShape;
 
 class CShader : public J3DVtxShader {

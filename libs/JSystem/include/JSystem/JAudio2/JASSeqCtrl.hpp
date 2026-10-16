@@ -5,7 +5,7 @@
 #include "JSystem/JAudio2/JASSeqParser.hpp"
 #include "JSystem/JAudio2/JASSeqReader.hpp"
 
-class JASTrack;
+struct JASTrack;
 class JASSeqParser;
 
 class JASSeqCtrl {

@@ -330,7 +330,11 @@ JMapInfoIter StageDataHolder::getChildObjInfoFromDataIndex(const JMapInfoIter& r
 }
 
 const StageDataHolder* StageDataHolder::findPlacedStageDataHolder(const JMapInfoIter& rIter) const {
+#if TARGET_PC
+    uintptr_t data = (uintptr_t)rIter.mInfo->mData + rIter.mInfo->mData->mDataOffset + rIter.mInfo->mData->mEntrySize * rIter.mIndex;
+#else
     s32 data = (s32)rIter.mInfo->mData + rIter.mInfo->mData->mDataOffset + rIter.mInfo->mData->mEntrySize * rIter.mIndex;
+#endif
 
     if (_E4 <= data && data < _E8) {
         return this;
@@ -645,11 +649,19 @@ void StageDataHolder::calcDataAddress() {
 
 void StageDataHolder::updateDataAddress(const MR::AssignableArray< JMapInfo >* pInfoArray) {
     for (const JMapInfo* pInfo = pInfoArray->begin(); pInfo != pInfoArray->end(); pInfo++) {
+#if TARGET_PC
+        if ((uintptr_t)pInfo->mData < _E4) {
+            _E4 = (uintptr_t)pInfo->mData;
+        }
+
+        uintptr_t addr = (pInfo->mData->mEntrySize * pInfo->mData->mNumEntries) + ((uintptr_t)pInfo->mData + pInfo->mData->mDataOffset);
+#else
         if ((u32)pInfo->mData < _E4) {
             _E4 = (u32)pInfo->mData;
         }
 
         u32 addr = (pInfo->mData->mEntrySize * pInfo->mData->mNumEntries) + ((s32)pInfo->mData + pInfo->mData->mDataOffset);
+#endif
 
         if (_E8 < addr) {
             _E8 = addr;

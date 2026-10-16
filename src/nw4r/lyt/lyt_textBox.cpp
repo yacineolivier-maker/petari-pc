@@ -7,7 +7,11 @@
 #include "nw4r/ut/WideTextWriter.h"
 #include <cstdio>
 extern "C" {
+#if TARGET_PC
+#include <cwchar>
+#else
 #include <wstring.h>
+#endif
 }
 
 namespace {

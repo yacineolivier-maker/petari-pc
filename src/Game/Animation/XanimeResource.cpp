@@ -220,7 +220,7 @@ const XanimeGroupInfo* XanimeResourceTable::getGroupInfo(const char* pArg) const
     case 0:
         return nullptr;
 
-    case 1:
+    case 1: {
         s32 groupIndex = getGroupIndex(pArg);
         if (groupIndex == -1) {
             s32 simpleIndex = getSimpleIndex(pArg);
@@ -232,6 +232,7 @@ const XanimeGroupInfo* XanimeResourceTable::getGroupInfo(const char* pArg) const
         }
 
         return &mGroupInfos[groupIndex];
+    }
 
     case 2:
         return getGroupInfo(pArg, mDirectories);

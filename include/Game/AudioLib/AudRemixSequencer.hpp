@@ -3,8 +3,8 @@
 #include <revolution/types.h>
 
 class JAISoundID;
-class RemixNoteData;
-class RemixNoteTrackData;
+struct RemixNoteData;
+struct RemixNoteTrackData;
 
 class AudRmxSeqNoteOnTimer {
 public:

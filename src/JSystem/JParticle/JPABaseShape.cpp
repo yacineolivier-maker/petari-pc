@@ -617,7 +617,11 @@ static void basePlaneTypeX(MtxPtr param_0, f32 param_1, f32 param_2) {
 }
 
 typedef void (*dirTypeFunc)(JPAEmitterWorkData const*, JPABaseParticle const*, JGeometry::TVec3< f32 >*);
+#if TARGET_PC
+static dirTypeFunc p_direction[5] = {
+#else
 __declspec(force_export) static dirTypeFunc p_direction[5] = {
+#endif
     dirTypeVel, dirTypePos, dirTypePosInv, dirTypeEmtrDir, dirTypePrevPtcl,
 };
 
@@ -668,6 +672,7 @@ void JPADrawPoint(JPAEmitterWorkData* work, JPABaseParticle* ptcl) {
     GXSetVtxDesc(GX_VA_TEX0, GX_INDEX8);
 }
 
+#if !TARGET_PC  // On PC the game's version in Overwrite*.cpp replaces it.
 void JPADrawLine(JPAEmitterWorkData* param_0, JPABaseParticle* param_1) {
     if (param_1->checkStatus(JPAPtclStts_Invisible)) {
         return;
@@ -694,6 +699,7 @@ void JPADrawLine(JPAEmitterWorkData* param_0, JPABaseParticle* param_1) {
     GXSetVtxDesc(GX_VA_POS, GX_INDEX8);
     GXSetVtxDesc(GX_VA_TEX0, GX_INDEX8);
 }
+#endif
 
 JPANode< JPABaseParticle >* getNext(JPANode< JPABaseParticle >* param_0) {
     return param_0->getNext();
@@ -705,6 +711,7 @@ JPANode< JPABaseParticle >* getPrev(JPANode< JPABaseParticle >* param_0) {
 
 typedef JPANode< JPABaseParticle >* (*getNodeFunc)(JPANode< JPABaseParticle >*);
 
+#if !TARGET_PC  // On PC the game's version in Overwrite*.cpp replaces it.
 void JPADrawStripe(JPAEmitterWorkData* param_0) {
     JPABaseShape* shape = param_0->mpRes->getBsp();
     u32 ptcl_num = param_0->mpAlivePtcl->getNum();
@@ -787,7 +794,9 @@ void JPADrawStripe(JPAEmitterWorkData* param_0) {
     GXSetVtxDesc(GX_VA_POS, GX_INDEX8);
     GXSetVtxDesc(GX_VA_TEX0, GX_INDEX8);
 }
+#endif
 
+#if !TARGET_PC  // On PC the game's version in Overwrite*.cpp replaces it.
 void JPADrawStripeX(JPAEmitterWorkData* param_0) {
     JPABaseShape* shape = param_0->mpRes->getBsp();
     u32 ptcl_num = param_0->mpAlivePtcl->getNum();
@@ -920,6 +929,7 @@ void JPADrawStripeX(JPAEmitterWorkData* param_0) {
     GXSetVtxDesc(GX_VA_POS, GX_INDEX8);
     GXSetVtxDesc(GX_VA_TEX0, GX_INDEX8);
 }
+#endif
 
 void JPADrawEmitterCallBackB(JPAEmitterWorkData* work) {
     if (work->mpEmtr->mpEmtrCallBack == nullptr) {
