@@ -13,6 +13,7 @@
 #include <aurora/gfx.h>
 
 #include <SDL3/SDL_keyboard.h>
+#include <SDL3/SDL_stdinc.h>
 #include <SDL3/SDL_video.h>
 
 #include <revolution/os.h>
@@ -150,6 +151,20 @@ extern "C" int pc_platform_begin_frame(void) {
     }
     sFrameStarted = true;
     pc_watchdog_tick();
+    // SMGPC_WINDOW_TITLE=<title>: rename the window (test scripts find their own instance by it).
+    static bool sTitleSet = false;
+    if (!sTitleSet) {
+        sTitleSet = true;
+        if (const char* title = std::getenv("SMGPC_WINDOW_TITLE")) {
+            int count = 0;
+            if (SDL_Window** windows = SDL_GetWindows(&count)) {
+                for (int i = 0; i < count; i++) {
+                    SDL_SetWindowTitle(windows[i], title);
+                }
+                SDL_free(windows);
+            }
+        }
+    }
     // SMGPC_LOG_FRAMES=1: print the frame number (first 10 frames, then every 60).
     static const bool sLogFrames = std::getenv("SMGPC_LOG_FRAMES") != nullptr;
     static u32 sFrameCount = 0;
