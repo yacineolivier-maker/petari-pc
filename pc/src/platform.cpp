@@ -12,6 +12,9 @@
 #include <aurora/event.h>
 #include <aurora/gfx.h>
 
+#include <SDL3/SDL_keyboard.h>
+#include <SDL3/SDL_video.h>
+
 #include <revolution/os.h>
 #include <revolution/vi.h>
 
@@ -127,6 +130,14 @@ extern "C" int pc_platform_begin_frame(void) {
         while (event != nullptr && event->type != AURORA_NONE) {
             if (event->type == AURORA_EXIT) {
                 pc_platform_exit(0);
+            }
+            // F11 or Alt+Enter: toggle fullscreen.
+            if (event->type == AURORA_SDL_EVENT && event->sdl.type == SDL_EVENT_KEY_DOWN && !event->sdl.key.repeat &&
+                (event->sdl.key.key == SDLK_F11 || (event->sdl.key.key == SDLK_RETURN && (event->sdl.key.mod & SDL_KMOD_ALT)))) {
+                if (SDL_Window* window = SDL_GetWindowFromID(event->sdl.key.windowID)) {
+                    const bool fullscreen = (SDL_GetWindowFlags(window) & SDL_WINDOW_FULLSCREEN) != 0;
+                    SDL_SetWindowFullscreen(window, !fullscreen);
+                }
             }
             event++;
         }
