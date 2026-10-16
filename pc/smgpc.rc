@@ -1,0 +1,4 @@
+// Windows resources: the executable's icon. pc/res/smgpc.ico is generated locally from the
+// game's save banner (tools/pc/make_icon.py) and is not part of the repository; CMake only adds
+// this file when it exists.
+1 ICON "res/smgpc.ico"

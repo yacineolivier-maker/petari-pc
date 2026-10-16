@@ -153,7 +153,8 @@ smg_add_lib(smg_pc
         pc/src/os/wii_system.cpp
         pc/src/input/wiimote.cpp
         pc/src/ui/xbox_glyphs.cpp
-        pc/src/ui/xbox_glyphs_gdi.cpp)
+        pc/src/ui/xbox_glyphs_gdi.cpp
+        pc/src/ui/window_icon.cpp)
 if (WIN32)
     target_link_libraries(smg_pc PUBLIC dbghelp psapi)
 endif ()
@@ -188,5 +189,9 @@ if (MSVC)
     target_link_options(smgpc PRIVATE
             "/INCLUDE:??2@YAPEAX_K@Z" "/INCLUDE:??3@YAXPEAX@Z" "/INCLUDE:??_U@YAPEAX_K@Z"
             "/INCLUDE:??_V@YAXPEAX@Z")
+endif ()
+# Executable icon, when it has been generated locally (tools/pc/make_icon.py; not committed).
+if (WIN32 AND EXISTS ${CMAKE_SOURCE_DIR}/pc/res/smgpc.ico)
+    target_sources(smgpc PRIVATE pc/smgpc.rc)
 endif ()
 aurora_copy_runtime_dlls(smgpc)

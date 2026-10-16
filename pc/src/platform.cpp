@@ -19,6 +19,9 @@
 #include <cstdlib>
 #include <cstring>
 #include <filesystem>
+#include <vector>
+
+bool pc_load_window_icon(std::vector<uint8_t>& rgba, uint32_t& size);
 
 namespace pc {
 bool IsShuttingDown = false;
@@ -95,6 +98,13 @@ extern "C" void pc_platform_init(int argc, char* argv[]) {
     config.startFullscreen = startFullscreen;
     config.mem1Size = 256 * 1024 * 1024;  // Emulated MEM1 (the Wii has 24 MB).
     config.mem2Size = 16 * 1024 * 1024;   // Aurora's ARAM; the Wii's MEM2 is pc/src/os/wii_arena.cpp.
+    static std::vector<uint8_t> sIcon;
+    uint32_t iconSize = 0;
+    if (pc_load_window_icon(sIcon, iconSize)) {
+        config.iconRGBA8 = sIcon.data();
+        config.iconWidth = iconSize;
+        config.iconHeight = iconSize;
+    }
     aurora_initialize(argc, argv, &config);
 
     OSInit();
