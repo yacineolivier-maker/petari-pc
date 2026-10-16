@@ -67,8 +67,33 @@ void ReadPads() {
         return;
     }
     sLastPadReadFrame = sFrame;
-    PADRead(sPads);
-    PADClamp(sPads);
+    PADStatus raw[PAD_MAX_CONTROLLERS];
+    PADRead(raw);
+    PADClamp(raw);
+    // Single player: every connected gamepad (and the keyboard) drives the first Wii Remote, so it
+    // doesn't matter which port SDL gives the Xbox controller. The other remotes stay disconnected
+    // (otherwise the game shows a second player's "co-star" cursor).
+    auto dominant = [](s8 a, s8 b) { return std::abs((int)b) > std::abs((int)a) ? b : a; };
+    PADStatus merged = {};
+    for (const PADStatus& p : raw) {
+        if (p.err != PAD_ERR_NONE) {
+            continue;
+        }
+        merged.button |= p.button;
+        merged.extButton |= p.extButton;
+        merged.stickX = dominant(merged.stickX, p.stickX);
+        merged.stickY = dominant(merged.stickY, p.stickY);
+        merged.substickX = dominant(merged.substickX, p.substickX);
+        merged.substickY = dominant(merged.substickY, p.substickY);
+        merged.triggerLeft = p.triggerLeft > merged.triggerLeft ? p.triggerLeft : merged.triggerLeft;
+        merged.triggerRight = p.triggerRight > merged.triggerRight ? p.triggerRight : merged.triggerRight;
+    }
+    merged.err = PAD_ERR_NONE;
+    sPads[0] = merged;
+    for (int i = 1; i < PAD_MAX_CONTROLLERS; i++) {
+        sPads[i] = {};
+        sPads[i].err = PAD_ERR_NO_CONTROLLER;
+    }
 }
 
 u32 MapButtons(const PADStatus& pad, bool& shakeButton) {
@@ -95,12 +120,14 @@ u32 MapButtons(const PADStatus& pad, bool& shakeButton) {
 // SMGPC_INPUT: scripted input for automated tests, e.g. "A@300,A@420+5,SHAKE@900,STICKUP@1000+60".
 // Each entry presses a button at a frame (KPADRead frames of channel 0) for a number of frames
 // (default 3). Buttons: A B PLUS MINUS HOME 1 2 UP DOWN LEFT RIGHT Z C SHAKE, and STICKUP/DOWN/
-// LEFT/RIGHT (Nunchuk stick).
+// LEFT/RIGHT (Nunchuk stick), and PTR<x>:<y> to put the pointer at x, y (-1..1, e.g. PTR-0.5:0.3@900+30).
 struct ScriptEntry {
     u32 buttons;
     bool shake;
     f32 stickX, stickY;
     u32 start, end;
+    bool hasPointer;
+    f32 pointerX, pointerY;
 };
 std::vector<ScriptEntry> sScript;
 bool sScriptLoaded = false;
@@ -128,7 +155,7 @@ void LoadScript() {
         if (plus != std::string::npos) {
             dur = (u32)std::strtoul(item.c_str() + plus + 1, nullptr, 10);
         }
-        ScriptEntry e{0, false, 0.0f, 0.0f, start, start + dur};
+        ScriptEntry e{0, false, 0.0f, 0.0f, start, start + dur, false, 0.0f, 0.0f};
         static const struct { const char* name; u32 bit; } kButtons[] = {
             {"A", WPAD_BUTTON_A}, {"B", WPAD_BUTTON_B}, {"PLUS", WPAD_BUTTON_PLUS}, {"MINUS", WPAD_BUTTON_MINUS},
             {"HOME", WPAD_BUTTON_HOME}, {"1", WPAD_BUTTON_1}, {"2", WPAD_BUTTON_2}, {"UP", WPAD_BUTTON_UP},
@@ -145,13 +172,19 @@ void LoadScript() {
         if (name == "STICKDOWN") e.stickY = -1.0f;
         if (name == "STICKLEFT") e.stickX = -1.0f;
         if (name == "STICKRIGHT") e.stickX = 1.0f;
+        if (name.rfind("PTR", 0) == 0) {
+            char* end = nullptr;
+            e.hasPointer = true;
+            e.pointerX = std::strtof(name.c_str() + 3, &end);
+            e.pointerY = (end != nullptr && *end == ':') ? std::strtof(end + 1, nullptr) : 0.0f;
+        }
         sScript.push_back(e);
     }
     std::fprintf(stderr, "[pc] scripted input: %zu entries\n", sScript.size());
 }
 
 // Applies the script to the frame's state (on top of the real gamepad).
-void ApplyScript(u32 frame, u32& hold, bool& shake, f32& stickX, f32& stickY) {
+void ApplyScript(u32 frame, u32& hold, bool& shake, f32& stickX, f32& stickY, f32& pointerX, f32& pointerY) {
     if (!sScriptLoaded) {
         LoadScript();
     }
@@ -161,6 +194,10 @@ void ApplyScript(u32 frame, u32& hold, bool& shake, f32& stickX, f32& stickY) {
             shake = shake || e.shake;
             if (e.stickX != 0.0f) stickX = e.stickX;
             if (e.stickY != 0.0f) stickY = e.stickY;
+            if (e.hasPointer) {
+                pointerX = e.pointerX;
+                pointerY = e.pointerY;
+            }
         }
     }
 }
@@ -223,7 +260,7 @@ s32 KPADRead(s32 chan, KPADStatus status[], u32 count) {
     f32 stickX = StickAxis(pad.stickX);
     f32 stickY = StickAxis(pad.stickY);
     if (chan == 0) {
-        ApplyScript(sFrame, hold, shakeButton, stickX, stickY);
+        ApplyScript(sFrame, hold, shakeButton, stickX, stickY, ch.pointerX, ch.pointerY);
     }
     s.hold = hold;
     s.trig = hold & ~ch.prevHold;
@@ -311,8 +348,11 @@ s32 WPADSendStreamData(s32, void*, u16) { return WPAD_ERR_NONE; }
 BOOL WPADCanSendStreamData(s32) { return FALSE; }
 
 void WPADControlMotor(s32 chan, u32 command) {
-    if (chan >= 0 && chan < PAD_MAX_CONTROLLERS) {
-        PADControlMotor(chan, command != 0 ? PAD_MOTOR_RUMBLE : PAD_MOTOR_STOP);
+    // The first remote is all the gamepads (see ReadPads): rumble every port.
+    if (chan == 0) {
+        for (int port = 0; port < PAD_MAX_CONTROLLERS; port++) {
+            PADControlMotor(port, command != 0 ? PAD_MOTOR_RUMBLE : PAD_MOTOR_STOP);
+        }
     }
 }
 
