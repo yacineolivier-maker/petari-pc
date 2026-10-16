@@ -1,0 +1,92 @@
+diff --git a/lib/gfx/recording.cpp b/lib/gfx/recording.cpp
+index 9d1df79..bec74fb 100644
+--- a/lib/gfx/recording.cpp
++++ b/lib/gfx/recording.cpp
+@@ -45,6 +45,7 @@ struct FrameRecorder {
+   uint32_t drawCallCount = 0;
+   uint32_t mergedDrawCallCount = 0;
+   bool inOffscreen = false;
++  bool depthSnapshotInFrame = false;  // a pass already took the GXPeekZ depth snapshot
+   std::optional<RenderPass> suspendedEfbPass;
+   Viewport suspendedEfbViewport;
+   ClipRect suspendedEfbScissor;
+@@ -823,6 +824,45 @@ PipelineRef pipeline_ref(const clear::PipelineConfig& config) {
+   return find_pipeline(config, get_render_target_layout());
+ }
+ 
++// Ends the current EFB pass with a depth snapshot (GXPeekZ reads it) and continues in a new pass
++// on the same targets: the snapshot then holds the depth at the point the game asked for it, not
++// at the end of the frame (after the 2D, which usually clears the depth).
++void split_pass_for_depth_snapshot() {
++  // Once per frame: the peeks of a frame come together (star pointer, talk balloons).
++  if (!g_recorder.active() || g_recorder.currentRenderPass == UINT32_MAX || g_recorder.inOffscreen ||
++      g_recorder.depthSnapshotInFrame) {
++    return;
++  }
++  auto& prevPass = current_render_passes()[g_recorder.currentRenderPass];
++  prevPass.captureDepthSnapshot = true;
++  g_recorder.depthSnapshotInFrame = true;
++  enqueue_pass(current_frame_packet(), g_recorder.currentRenderPass);
++
++  RenderPass newPass{
++      .label = pass_label("EFB"),
++      .colorAttachments = prevPass.colorAttachments,
++      .colorAttachmentCount = prevPass.colorAttachmentCount,
++      .depthStencilView = prevPass.depthStencilView,
++      .depthStencilFormat = prevPass.depthStencilFormat,
++      .copySourceTexture = prevPass.copySourceTexture,
++      .copySourceView = prevPass.copySourceView,
++      .copySourceDepthView = prevPass.copySourceDepthView,
++      .copySourceNormalTexture = prevPass.copySourceNormalTexture,
++      .msaaSamples = prevPass.msaaSamples,
++      .clearDepthValue = prevPass.clearDepthValue,
++      .clearDepth = false,
++      .hasDepth = prevPass.hasDepth,
++      .hasStencil = prevPass.hasStencil,
++  };
++  for (uint32_t i = 0; i < newPass.colorAttachmentCount; ++i) {
++    newPass.colorAttachments[i].loadOp = wgpu::LoadOp::Undefined;  // load
++    newPass.colorAttachments[i].clear = false;
++  }
++  newPass.commands.reserve(2048);
++  current_render_passes().emplace_back(std::move(newPass));
++  ++g_recorder.currentRenderPass;
++}
++
+ void resolve_pass_into(TextureHandle texture, ClipRect rect, bool clearColor, bool clearAlpha, bool clearDepth,
+                        Vec4<float> clearColorValue, float clearDepthValue, GXTexFmt resolveFormat,
+                        GXPixelFmt sourceFormat) {
+@@ -1165,7 +1205,8 @@ void finish() {
+     auto& frame = current_frame_packet();
+     frame.uniforms.append_zeroes(gx::MaxUniformSize);
+     auto& pass = frame.renderPasses[g_recorder.currentRenderPass];
+-    pass.captureDepthSnapshot = true;
++    pass.captureDepthSnapshot = !g_recorder.depthSnapshotInFrame;
++    g_recorder.depthSnapshotInFrame = false;
+     enqueue_pass(frame, g_recorder.currentRenderPass);
+     g_recorder.currentRenderPass = UINT32_MAX;
+   }
+diff --git a/lib/gfx/recording.hpp b/lib/gfx/recording.hpp
+index c1b4a7d..7c4827f 100644
+--- a/lib/gfx/recording.hpp
++++ b/lib/gfx/recording.hpp
+@@ -51,6 +51,7 @@ struct ColorPassDescriptor {
+ };
+ 
+ void finish();
++void split_pass_for_depth_snapshot();
+ void begin_color_pass(const ColorPassDescriptor& desc);
+ void end_color_pass();
+ void queue_texture_copy(wgpu::TexelCopyTextureInfo src, wgpu::TexelCopyTextureInfo dst, wgpu::Extent3D size);
+diff --git a/lib/gx/command_processor.cpp b/lib/gx/command_processor.cpp
+index 9c6ffa1..9782211 100644
+--- a/lib/gx/command_processor.cpp
++++ b/lib/gx/command_processor.cpp
+@@ -693,6 +693,7 @@ void handle_aurora(ByteReader& reader) noexcept {
+     g_gxState.texCopyDest = reinterpret_cast<const void*>(reader.read<u64>());
+   } else if (subCmd == GX_AURORA_REQUEST_DEPTH_SNAPSHOT) {
+     gfx::depth_peek::request_snapshot();
++    gfx::split_pass_for_depth_snapshot();
+   } else if (subCmd == GX_AURORA_BEGIN_OFFSCREEN) {
+     const u32 width = reader.read<u32>();
+     const u32 height = reader.read<u32>();

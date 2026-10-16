@@ -60,7 +60,8 @@ python tools/gen_pc_files.py                            # regenerate files.cmake
   - `GXWGFifo.u8 = x` writes are redirected to Aurora's `GXCmd1u*` (pc_extras/gx.h).
 - Aurora (`extern/aurora`, submodule pinned at the Wind Waker port's commit) + local patches in
   `pc/patches/aurora` (0001 = fixes from the Wind Waker port, 0002 = SDK struct/enum tags, 0003 = debug toggles + Z textures,
-  0004 = strip/fan index reserve underflow that committed 8 GB, 0005 = supersampling VISetFrameBufferSupersample), applied at
+  0004 = strip/fan index reserve underflow that committed 8 GB, 0005 = supersampling VISetFrameBufferSupersample,
+  0006 = GXPeekZ depth snapshot taken where the game peeks, not at the end of the frame), applied at
   configure time. `GXSetArray` on PC takes `(attr, data, size, stride, little_endian)`.
 - `OPNEW_SIZE_T` = size type of operator new/delete (u32 on Wii, size_t on PC).
 
