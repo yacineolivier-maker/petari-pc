@@ -13,6 +13,7 @@
 #include <aurora/gfx.h>
 
 #include <SDL3/SDL_keyboard.h>
+#include <SDL3/SDL_messagebox.h>
 #include <SDL3/SDL_stdinc.h>
 #include <SDL3/SDL_video.h>
 
@@ -120,6 +121,15 @@ extern "C" void pc_platform_init(int argc, char* argv[]) {
         std::fprintf(stderr, "[pc] could not open the disc image '%s'.\n"
                              "Usage: smgpc.exe [--fullscreen] [path/to/Super Mario Galaxy.rvz]\n",
                      disc);
+        char message[1024];
+        std::snprintf(message, sizeof(message),
+                      "Impossible d'ouvrir l'image du disque de Super Mario Galaxy :\n%s\n\n"
+                      "Placez le fichier .rvz / .iso du jeu (version US RMGE01) dans le dossier Rom "
+                      // UTF-8 written out: this file's execution charset is Shift-JIS (game strings).
+                      "\xC3\xA0 c\xC3\xB4t\xC3\xA9 du dossier du jeu, ou passez son chemin en argument :\n"
+                      "smgpc.exe \"chemin\\vers\\Super Mario Galaxy.rvz\"",
+                      disc);
+        SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "Super Mario Galaxy", message, nullptr);
         pc_platform_exit(1);
     }
     std::printf("[pc] disc: %s\n", disc);
