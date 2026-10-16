@@ -3,6 +3,21 @@
 #include <math_types.hpp>
 #include <revolution/types.h>
 
+#if TARGET_PC
+// MSL's std::pair had a1/b1 members; the host <utility> already defines std::pair.
+namespace JMath {
+    template < typename A1, typename B1 >
+    struct TPair {
+        A1 a1;
+        B1 b1;
+        TPair() {
+            a1 = A1();
+            b1 = B1();
+        }
+    };
+}  // namespace JMath
+#define JMA_PAIR JMath::TPair
+#else
 namespace std {
     template < typename A1, typename B1 >
     struct pair {
@@ -14,6 +29,8 @@ namespace std {
         }
     };
 }  // namespace std
+#define JMA_PAIR std::pair
+#endif
 
 namespace JMath {
 
@@ -45,7 +62,7 @@ namespace JMath {
         TSinCosTable();
 
         static const u32 LEN = 1 << Bits;
-        std::pair< T, T > table[LEN];
+        JMA_PAIR< T, T > table[LEN];
 
         T sinShort(s16 v) const {
             return table[static_cast< u16 >(v) >> (16U - Bits)].a1;

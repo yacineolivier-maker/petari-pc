@@ -43,3 +43,6 @@ compile_commands.json
 # Miscellaneous
 /*.txt
 *.exe
+
+# PC port
+!CMakeLists.txt

@@ -1,0 +1,794 @@
+diff --git a/include/dolphin/gx/GXAurora.h b/include/dolphin/gx/GXAurora.h
+index 1a312fb..2cba830 100644
+--- a/include/dolphin/gx/GXAurora.h
++++ b/include/dolphin/gx/GXAurora.h
+@@ -141,6 +141,21 @@ void AuroraGetRenderSize(u32* width, u32* height);
+  */
+ void AuroraGXSync(void);
+ 
++/**
++ * Port addition. Alpha to coverage for alpha-tested draws when the render target is multisampled:
++ * 0 = off (hard alpha test, exact GX behaviour), 1 = on (cut-out edges get antialiased by MSAA),
++ * 2 = on and alpha-tested pixels tinted magenta (debug). Applies to pipelines built afterwards:
++ * call it before rendering starts. Render targets without MSAA always use the hard test.
++ */
++void AuroraSetAlphaToCoverage(int mode);
++
++/**
++ * Port addition. Generate mipmaps for game textures that have none, and use them (trilinear,
++ * anisotropic) when GX minifies a tiling texture linearly, so distant surfaces don't shimmer.
++ * Applies to textures created afterwards: call it before rendering starts.
++ */
++void AuroraSetAutoMipmaps(int enabled);
++
+ /**
+  * Sets the actual render viewport in native framebuffer coordinates.
+  * Overrides the automatically scaled values set by the logical GXSetViewport.
+diff --git a/lib/dolphin/gx/GXAurora.cpp b/lib/dolphin/gx/GXAurora.cpp
+index 85a4285..b5449c8 100644
+--- a/lib/dolphin/gx/GXAurora.cpp
++++ b/lib/dolphin/gx/GXAurora.cpp
+@@ -46,6 +46,17 @@ void AuroraGetRenderSize(u32* width, u32* height) {
+   }
+ }
+ 
++namespace aurora::gx {
++extern int g_alphaToCoverage; // lib/gx/shader.cpp
++} // namespace aurora::gx
++namespace aurora::gfx {
++extern bool g_autoMipmaps; // lib/gfx/texture.cpp
++} // namespace aurora::gfx
++
++void AuroraSetAlphaToCoverage(int mode) { aurora::gx::g_alphaToCoverage = mode; }
++
++void AuroraSetAutoMipmaps(int enabled) { aurora::gfx::g_autoMipmaps = enabled != 0; }
++
+ void AuroraGXSync() {
+   GXFlush();
+   aurora::gx::fifo::drain();
+diff --git a/lib/dolphin/gx/GXLighting.cpp b/lib/dolphin/gx/GXLighting.cpp
+index 4a88255..4315abf 100644
+--- a/lib/dolphin/gx/GXLighting.cpp
++++ b/lib/dolphin/gx/GXLighting.cpp
+@@ -83,7 +83,9 @@ void GXInitLightSpot(GXLightObj* light_, float cutoff, GXSpotFn spotFn) {
+ }
+ 
+ void GXInitLightDistAttn(GXLightObj* light_, float refDistance, float refBrightness, GXDistAttnFn distFunc) {
+-  if (refDistance < 0.f || refBrightness < 0.f || refBrightness >= 1.f) {
++  // As the SDK: a brightness of 0 (or 1) disables the attenuation (it would divide by zero and make
++  // the light black; m_Do_graphic's 2D light passes 0).
++  if (refDistance < 0.f || refBrightness <= 0.f || refBrightness >= 1.f) {
+     distFunc = GX_DA_OFF;
+   }
+   float k0 = 1.f;
+diff --git a/lib/gfx/depth_peek.cpp b/lib/gfx/depth_peek.cpp
+index 08f7743..28fe493 100644
+--- a/lib/gfx/depth_peek.cpp
++++ b/lib/gfx/depth_peek.cpp
+@@ -76,6 +76,9 @@ std::array<Slot, SlotCount> g_slots;
+ size_t g_nextSlot = 0;
+ wgpu::BindGroupLayout g_bindGroupLayout;
+ wgpu::ComputePipeline g_pipeline;
++// Variants for a multisampled EFB (read sample 0).
++wgpu::BindGroupLayout g_bindGroupLayoutMS;
++wgpu::ComputePipeline g_pipelineMS;
+ bool g_snapshotRequested = false;
+ Clock::time_point g_nextSnapshotTime;
+ LatestSnapshot g_latest;
+@@ -126,17 +129,24 @@ fn cs_main(@builtin(global_invocation_id) id: vec3u) {
+ }
+ )"sv;
+ 
+-std::string build_shader_source() {
++std::string build_shader_source(bool multisampled) {
+   std::string source;
+-  source.reserve(ShaderPreamble.size() + ReversedZBody.size() + ShaderMain.size());
++  source.reserve(ShaderPreamble.size() + ReversedZBody.size() + ShaderMain.size() + 16);
+   source += ShaderPreamble;
+   source += gx::UseReversedZ ? ReversedZBody : ForwardZBody;
+-  source += ShaderMain;
++  std::string main{ShaderMain};
++  if (multisampled) {
++    // textureLoad's last argument becomes the sample index.
++    const std::string from = "texture_depth_2d";
++    main.replace(main.find(from), from.size(), "texture_depth_multisampled_2d");
++  }
++  source += main;
+   return source;
+ }
+ 
+-wgpu::ComputePipeline create_pipeline(const wgpu::BindGroupLayout& bindGroupLayout, const char* label) {
+-  const auto shaderSource = build_shader_source();
++wgpu::ComputePipeline create_pipeline(const wgpu::BindGroupLayout& bindGroupLayout, const char* label,
++                                      bool multisampled = false) {
++  const auto shaderSource = build_shader_source(multisampled);
+   const wgpu::ShaderSourceWGSL wgslSource{wgpu::ShaderSourceWGSL::Init{
+       .code = shaderSource.c_str(),
+   }};
+@@ -163,8 +173,8 @@ wgpu::ComputePipeline create_pipeline(const wgpu::BindGroupLayout& bindGroupLayo
+   return g_device.CreateComputePipeline(&pipelineDescriptor);
+ }
+ 
+-wgpu::BindGroupLayout create_bind_group_layout(const char* label) {
+-  constexpr std::array entries{
++wgpu::BindGroupLayout create_bind_group_layout(const char* label, bool multisampled = false) {
++  std::array entries{
+       wgpu::BindGroupLayoutEntry{
+           .binding = 0,
+           .visibility = wgpu::ShaderStage::Compute,
+@@ -172,6 +182,7 @@ wgpu::BindGroupLayout create_bind_group_layout(const char* label) {
+               wgpu::TextureBindingLayout{
+                   .sampleType = wgpu::TextureSampleType::Depth,
+                   .viewDimension = wgpu::TextureViewDimension::e2D,
++                  .multisampled = multisampled,
+               },
+       },
+       wgpu::BindGroupLayoutEntry{
+@@ -311,6 +322,8 @@ void initialize() {
+   }
+   g_bindGroupLayout = create_bind_group_layout("Depth Peek Bind Group Layout");
+   g_pipeline = create_pipeline(g_bindGroupLayout, "Depth Peek Pipeline");
++  g_bindGroupLayoutMS = create_bind_group_layout("Depth Peek MS Bind Group Layout", true);
++  g_pipelineMS = create_pipeline(g_bindGroupLayoutMS, "Depth Peek MS Pipeline", true);
+   g_enabled = true;
+ }
+ 
+@@ -318,6 +331,8 @@ void shutdown() {
+   testing::reset();
+   g_pipeline = {};
+   g_bindGroupLayout = {};
++  g_pipelineMS = {};
++  g_bindGroupLayoutMS = {};
+   for (auto& slot : g_slots) {
+     slot = {};
+   }
+@@ -361,9 +376,7 @@ void encode_frame_snapshot(const wgpu::CommandEncoder& cmd, const wgpu::TextureV
+   if (!depthView || dstSize.x == 0 || dstSize.y == 0 || sourceSize.width == 0 || sourceSize.height == 0) {
+     return;
+   }
+-  if (msaaSamples > 1) {
+-    Log.fatal("Depth Peek from multisampled EFB targets is not supported");
+-  }
++  const bool multisampled = msaaSamples > 1;
+ 
+   const Params params = make_params(sourceSize, dstSize);
+   wgpu::Buffer storageBuffer;
+@@ -404,7 +417,7 @@ void encode_frame_snapshot(const wgpu::CommandEncoder& cmd, const wgpu::TextureV
+   };
+   const wgpu::BindGroupDescriptor bindGroupDescriptor{
+       .label = "Depth Peek Bind Group",
+-      .layout = g_bindGroupLayout,
++      .layout = multisampled ? g_bindGroupLayoutMS : g_bindGroupLayout,
+       .entryCount = bindGroupEntries.size(),
+       .entries = bindGroupEntries.data(),
+   };
+@@ -415,7 +428,7 @@ void encode_frame_snapshot(const wgpu::CommandEncoder& cmd, const wgpu::TextureV
+       .timestampWrites = webgpu::gpu_prof::pass_writes("Depth peek"),
+   };
+   const auto pass = cmd.BeginComputePass(&passDescriptor);
+-  pass.SetPipeline(g_pipeline);
++  pass.SetPipeline(multisampled ? g_pipelineMS : g_pipeline);
+   pass.SetBindGroup(0, bindGroup);
+   pass.DispatchWorkgroups((dstSize.x + WorkgroupSizeX - 1) / WorkgroupSizeX,
+                           (dstSize.y + WorkgroupSizeY - 1) / WorkgroupSizeY);
+diff --git a/lib/gfx/encoding.cpp b/lib/gfx/encoding.cpp
+index 2337784..998cb3b 100644
+--- a/lib/gfx/encoding.cpp
++++ b/lib/gfx/encoding.cpp
+@@ -260,9 +260,6 @@ void render(wgpu::CommandEncoder& cmd, FramePacket& frame, RenderPass& passInfo,
+     const bool needsScaling = dstSize.width != static_cast<uint32_t>(passInfo.resolveRect.width) ||
+                               dstSize.height != static_cast<uint32_t>(passInfo.resolveRect.height);
+     const bool isDepth = gx::is_depth_format(passInfo.resolveFormat);
+-    if (isDepth && passInfo.msaaSamples > 1) {
+-      Log.fatal("Depth tex copies from multisampled EFB targets are not supported");
+-    }
+     const tex_copy_conv::ConvRequest convReq{
+         .fmt = passInfo.resolveFormat,
+         .srcFmt = passInfo.resolveSourceFormat,
+@@ -270,6 +267,7 @@ void render(wgpu::CommandEncoder& cmd, FramePacket& frame, RenderPass& passInfo,
+         .uniformRange = passInfo.resolveUniformRange,
+         .dst = passInfo.resolveTarget,
+         .sampleFilter = needsScaling ? tex_copy_conv::SampleFilter::Linear : tex_copy_conv::SampleFilter::Nearest,
++        .multisampled = isDepth && passInfo.msaaSamples > 1,
+     };
+     const bool needsOpaqueAlpha = !isDepth && !gx::efb_has_alpha(convReq.srcFmt);
+     const bool sameFormat =
+diff --git a/lib/gfx/tex_copy_conv.cpp b/lib/gfx/tex_copy_conv.cpp
+index 305d090..43c957d 100644
+--- a/lib/gfx/tex_copy_conv.cpp
++++ b/lib/gfx/tex_copy_conv.cpp
+@@ -117,6 +117,15 @@ fn gx_z24(uv: vec2f) -> u32 {
+ }
+ )"s);
+ 
++// Same, reading sample 0 of a multisampled depth buffer (textureLoad's last argument is then the
++// sample index instead of the mip level).
++static const std::string DepthShaderPreambleMS = [] {
++  std::string s = DepthShaderPreamble;
++  const std::string from = "texture_depth_2d";
++  s.replace(s.find(from), from.size(), "texture_depth_multisampled_2d");
++  return s;
++}();
++
+ // Passthrough blit (for scaling)
+ static constexpr std::string_view FragPassthrough = R"(
+ @fragment fn fs_main(in: VertexOutput) -> @location(0) vec4f {
+@@ -330,6 +339,8 @@ static constexpr std::array DepthConvPipelines{
+ 
+ static wgpu::BindGroupLayout g_bindGroupLayout;
+ static wgpu::BindGroupLayout g_depthBindGroupLayout;
++static wgpu::BindGroupLayout g_depthBindGroupLayoutMS;
++static absl::flat_hash_map<GXTexFmt, wgpu::RenderPipeline> g_depthPipelinesMS;
+ static wgpu::Sampler g_nearestSampler;
+ static wgpu::Sampler g_linearSampler;
+ static absl::flat_hash_map<GXTexFmt, wgpu::RenderPipeline> g_pipelines;
+@@ -515,6 +526,14 @@ void initialize() {
+       .entries = depthBindGroupLayoutEntries.data(),
+   };
+   g_depthBindGroupLayout = g_device.CreateBindGroupLayout(&depthBindGroupLayoutDescriptor);
++  auto depthBindGroupLayoutEntriesMS = depthBindGroupLayoutEntries;
++  depthBindGroupLayoutEntriesMS[0].texture.multisampled = true;
++  const wgpu::BindGroupLayoutDescriptor depthBindGroupLayoutDescriptorMS{
++      .label = "TexCopyConv Depth MS Bind Group Layout",
++      .entryCount = depthBindGroupLayoutEntriesMS.size(),
++      .entries = depthBindGroupLayoutEntriesMS.data(),
++  };
++  g_depthBindGroupLayoutMS = g_device.CreateBindGroupLayout(&depthBindGroupLayoutDescriptorMS);
+ 
+   g_blitPipeline = create_pipeline(
+       {GX_TF_RGBA8, FragPassthrough, webgpu::g_graphicsConfig.surfaceConfiguration.format, "TexCopyConv Blit"},
+@@ -529,6 +548,7 @@ void initialize() {
+   if (webgpu::g_hasCoreFeatures) {
+     for (const auto& conv : DepthConvPipelines) {
+       g_pipelines[conv.fmt] = create_pipeline(conv, DepthShaderPreamble, g_depthBindGroupLayout);
++      g_depthPipelinesMS[conv.fmt] = create_pipeline(conv, DepthShaderPreambleMS, g_depthBindGroupLayoutMS);
+       if (conv.outputFormat != to_wgpu(conv.fmt)) {
+         Log.fatal("Output format mismatch for {}", conv.fmt);
+       }
+@@ -561,6 +581,8 @@ void shutdown() {
+   g_blitPipeline = {};
+   g_bindGroupLayout = {};
+   g_depthBindGroupLayout = {};
++  g_depthBindGroupLayoutMS = {};
++  g_depthPipelinesMS.clear();
+   g_nearestSampler = {};
+   g_linearSampler = {};
+   g_depthSnapshotBindGroupLayout = {};
+@@ -592,7 +614,7 @@ static void execute(const wgpu::CommandEncoder& cmd, const ConvRequest& req, con
+         },
+     };
+     const wgpu::BindGroupDescriptor bindGroupDescriptor{
+-        .layout = g_depthBindGroupLayout,
++        .layout = req.multisampled ? g_depthBindGroupLayoutMS : g_depthBindGroupLayout,
+         .entryCount = bindGroupEntries.size(),
+         .entries = bindGroupEntries.data(),
+     };
+@@ -645,8 +667,9 @@ static void execute(const wgpu::CommandEncoder& cmd, const ConvRequest& req, con
+ }
+ 
+ void run(const wgpu::CommandEncoder& cmd, const ConvRequest& req) {
+-  const auto it = g_pipelines.find(req.fmt);
+-  if (it == g_pipelines.end()) {
++  const auto& pipelines = req.multisampled ? g_depthPipelinesMS : g_pipelines;
++  const auto it = pipelines.find(req.fmt);
++  if (it == pipelines.end()) {
+     Log.fatal("No copy conversion pipeline for format {}", static_cast<int>(req.fmt));
+   }
+   execute(cmd, req, it->second);
+diff --git a/lib/gfx/tex_copy_conv.hpp b/lib/gfx/tex_copy_conv.hpp
+index 9e6c9d2..b819317 100644
+--- a/lib/gfx/tex_copy_conv.hpp
++++ b/lib/gfx/tex_copy_conv.hpp
+@@ -28,6 +28,7 @@ struct ConvRequest {
+   Range uniformRange;        // Uniforms
+   TextureHandle dst;         // Destination texture
+   SampleFilter sampleFilter = SampleFilter::Nearest;
++  bool multisampled = false; // srcView is a multisampled depth view (depth copies only; reads sample 0)
+ };
+ 
+ bool needs_conversion(GXTexFmt fmt);
+diff --git a/lib/gfx/texture.cpp b/lib/gfx/texture.cpp
+index 029a3d0..bb0b1cb 100644
+--- a/lib/gfx/texture.cpp
++++ b/lib/gfx/texture.cpp
+@@ -10,6 +10,7 @@
+ 
+ #include <algorithm>
+ #include <cstdint>
++#include <cstring>
+ #include <memory>
+ #include <utility>
+ 
+@@ -21,9 +22,63 @@ namespace aurora::gfx {
+ using webgpu::g_device;
+ using webgpu::g_queue;
+ 
++bool g_autoMipmaps = false;
++
+ namespace {
+ constexpr Module Log{"aurora::gfx"};
+ 
++// Port addition (auto mipmaps): appends a full box-filtered mip chain to an RGBA8 level 0. Colors
++// are averaged weighted by alpha, so the color of fully transparent texels doesn't bleed in.
++// Returns the number of levels.
++uint32_t append_rgba8_mips(ByteBuffer& data, uint32_t width, uint32_t height) {
++  uint32_t levels = 1;
++  for (uint32_t w = width, h = height; w > 1 || h > 1; w = std::max(w >> 1, 1u), h = std::max(h >> 1, 1u)) {
++    ++levels;
++  }
++  size_t total = 0;
++  for (uint32_t i = 0; i < levels; ++i) {
++    total += size_t(std::max(width >> i, 1u)) * std::max(height >> i, 1u) * 4;
++  }
++  ByteBuffer out(total);
++  std::memcpy(out.data(), data.data(), size_t(width) * height * 4);
++  size_t srcOff = 0;
++  size_t dstOff = size_t(width) * height * 4;
++  uint32_t sw = width, sh = height;
++  for (uint32_t i = 1; i < levels; ++i) {
++    const uint32_t dw = std::max(sw >> 1, 1u), dh = std::max(sh >> 1, 1u);
++    const u8* src = out.data() + srcOff;
++    u8* dst = out.data() + dstOff;
++    for (uint32_t y = 0; y < dh; ++y) {
++      for (uint32_t x = 0; x < dw; ++x) {
++        uint32_t c[3] = {}, cw[3] = {}, a = 0, n = 0;
++        for (uint32_t dy = 0; dy < 2; ++dy) {
++          for (uint32_t dx = 0; dx < 2; ++dx) {
++            const uint32_t sx = std::min(x * 2 + dx, sw - 1), sy = std::min(y * 2 + dy, sh - 1);
++            const u8* p = src + (size_t(sy) * sw + sx) * 4;
++            for (int k = 0; k < 3; ++k) {
++              c[k] += p[k];
++              cw[k] += p[k] * p[3];
++            }
++            a += p[3];
++            ++n;
++          }
++        }
++        u8* q = dst + (size_t(y) * dw + x) * 4;
++        for (int k = 0; k < 3; ++k) {
++          q[k] = static_cast<u8>(a != 0 ? (cw[k] + a / 2) / a : (c[k] + n / 2) / n);
++        }
++        q[3] = static_cast<u8>((a + n / 2) / n);
++      }
++    }
++    srcOff = dstOff;
++    dstOff += size_t(dw) * dh * 4;
++    sw = dw;
++    sh = dh;
++  }
++  data = std::move(out);
++  return levels;
++}
++
+ wgpu::Extent3D physical_size(wgpu::Extent3D size, TextureFormatInfo info) {
+   const uint32_t width = ((size.width + info.blockWidth - 1) / info.blockWidth) * info.blockWidth;
+   const uint32_t height = ((size.height + info.blockHeight - 1) / info.blockHeight) * info.blockHeight;
+@@ -101,11 +156,29 @@ TextureHandle new_static_texture_2d(uint32_t width, uint32_t height, uint32_t mi
+                                     bool tlut, const char* label) noexcept {
+   ZoneScoped;
+ 
++  // Port addition (auto mipmaps): GC-format textures without mipmaps that decode to RGBA8 get a
++  // generated mip chain (used only by samplers that minify linearly, see get_descriptor).
++  ConvertedTexture autoConverted;
++  bool autoMips = false;
++  if (g_autoMipmaps && !tlut && mips == 1 && format != InvalidTextureFormat && !is_pc_texture_format(format) &&
++      format != GX_TF_C4 && format != GX_TF_C8 && format != GX_TF_C14X2 && width >= 16 && height >= 16 &&
++      to_wgpu(format) == wgpu::TextureFormat::RGBA8Unorm) {
++    autoConverted = convert_texture(format, width, height, 1, data);
++    if (autoConverted.format == wgpu::TextureFormat::RGBA8Unorm &&
++        autoConverted.data.size() >= size_t(width) * height * 4) {
++      mips = append_rgba8_mips(autoConverted.data, width, height);
++      autoMips = true;
++    }
++  }
++
+   auto handle = new_dynamic_texture_2d(width, height, mips, format, label);
+   auto& ref = *handle;
++  ref.autoMips = autoMips;
+ 
+   ConvertedTexture converted;
+-  if (ref.gxFormat != InvalidTextureFormat) {
++  if (autoMips) {
++    data = autoConverted.data;
++  } else if (ref.gxFormat != InvalidTextureFormat) {
+     if (tlut) {
+       CHECK(ref.size.height == 1, "new_static_texture_2d[{}]: expected tlut height 1, got {}", label, ref.size.height);
+       CHECK(ref.mipCount == 1, "new_static_texture_2d[{}]: expected tlut mipCount 1, got {}", label, ref.mipCount);
+@@ -310,17 +383,29 @@ wgpu::SamplerDescriptor TextureBind::get_descriptor() const noexcept {
+   float minLod = texObj.min_lod();
+   float maxLod = texObj.max_lod();
+   u16 maxAnisotropy = wgpu_aniso(texObj.max_aniso());
++  bool autoMipsUsed = false;
+   if (ref && ref->isReplacement) {
+     minLod = 0.f;
+     maxLod = 1000.f;
+     if (!mipsEnabled) {
+       mipFilter = wgpu::MipmapFilterMode::Nearest;
+     }
++  } else if (mipFilter == wgpu::MipmapFilterMode::Undefined && ref && ref->autoMips &&
++             minFilter == wgpu::FilterMode::Linear && magFilter == wgpu::FilterMode::Linear &&
++             !(texObj.wrap_s() == GX_CLAMP && texObj.wrap_t() == GX_CLAMP)) {
++    // Port addition (auto mipmaps): linear minification of a tiling texture without game mipmaps
++    // (sea foam, ground...): use the generated mips, trilinear and anisotropic, so it doesn't
++    // shimmer at a distance. Clamped textures (toon ramps, characters, UI) keep the original.
++    mipFilter = wgpu::MipmapFilterMode::Linear;
++    autoMipsUsed = true;
++    minLod = 0.f;
++    maxLod = 1000.f;
++    maxAnisotropy = std::max<u16>(webgpu::g_graphicsConfig.textureAnisotropy, 1);
+   } else if (mipFilter == wgpu::MipmapFilterMode::Undefined) {
+     minLod = 0.f;
+     maxLod = 0.f;
+   }
+-  if ((ref && ref->hasArbitraryMips) || !mipsEnabled) {
++  if ((ref && ref->hasArbitraryMips) || (!mipsEnabled && !autoMipsUsed)) {
+     maxAnisotropy = 1;
+   } else if (maxAnisotropy > 1) {
+     magFilter = wgpu::FilterMode::Linear;
+diff --git a/lib/gfx/texture.hpp b/lib/gfx/texture.hpp
+index 600a430..af9e0d7 100644
+--- a/lib/gfx/texture.hpp
++++ b/lib/gfx/texture.hpp
+@@ -43,6 +43,9 @@ struct TextureRef {
+   u32 gxFormat;
+   bool hasArbitraryMips = false;
+   bool isReplacement = false;
++  // Port addition: the game's texture had no mipmaps and Aurora generated them (see g_autoMipmaps).
++  // Samplers only use them when GX asks for linear minification on a tiling texture.
++  bool autoMips = false;
+ 
+   TextureRef(wgpu::Texture texture, wgpu::TextureView sampleTextureView, wgpu::TextureView attachmentTextureView,
+              wgpu::Extent3D size, wgpu::TextureFormat format, uint32_t mipCount, u32 gxFormat)
+@@ -57,6 +60,8 @@ struct TextureRef {
+ 
+ TextureHandle new_static_texture_2d(uint32_t width, uint32_t height, uint32_t mips, u32 gxFormat,
+                                     ArrayRef<uint8_t> data, bool tlut, const char* label) noexcept;
++// Port addition: generate mipmaps for game textures that have none (static GC-format textures).
++extern bool g_autoMipmaps;
+ TextureHandle new_dynamic_texture_2d(uint32_t width, uint32_t height, uint32_t mips, u32 gxFormat,
+                                      const char* label) noexcept;
+ TextureHandle new_render_texture(uint32_t width, uint32_t height, u32 gxFormat, const char* label) noexcept;
+diff --git a/lib/gx/fifo.cpp b/lib/gx/fifo.cpp
+index bcaba60..c7edf71 100644
+--- a/lib/gx/fifo.cpp
++++ b/lib/gx/fifo.cpp
+@@ -5,6 +5,7 @@
+ 
+ #include <algorithm>
+ #include <atomic>
++#include <cstdlib>
+ #include <cstring>
+ #include <limits>
+ #include <mutex>
+@@ -24,7 +25,14 @@ uint32_t sDlWritePos = 0;
+ 
+ namespace {
+ constexpr Module Log{"aurora::gx::fifo"};
+-constexpr auto kProcessingMode = ProcessingMode::Thread;
++// AURORA_FIFO_INLINE=1 processes the FIFO on the calling thread, so draw errors show the game's
++// stack (debugging aid; slower).
++ProcessingMode processing_mode_from_env() noexcept {
++  static const ProcessingMode mode =
++      std::getenv("AURORA_FIFO_INLINE") != nullptr ? ProcessingMode::Inline : ProcessingMode::Thread;
++  return mode;
++}
++#define kProcessingMode processing_mode_from_env()
+ constexpr uint32_t kDrawBatchSize = 1;
+ 
+ bool sFrameActive = false;
+diff --git a/lib/gx/gx.hpp b/lib/gx/gx.hpp
+index 9e85609..2a4f1cc 100644
+--- a/lib/gx/gx.hpp
++++ b/lib/gx/gx.hpp
+@@ -542,7 +542,8 @@ wgpu::RenderPipeline build_pipeline(const PipelineConfig& config, const gfx::Ren
+                                     const PipelineOptions& options, ArrayRef<wgpu::VertexBufferLayout> vtxBuffers,
+                                     wgpu::ShaderModule shader, const char* label) noexcept;
+ std::string build_shader_source(const ShaderConfig& config, DstAlphaMode dstAlphaMode,
+-                                uint32_t normalAttachment = UINT32_MAX) noexcept;
++                                uint32_t normalAttachment = UINT32_MAX, uint32_t sampleCount = 1) noexcept;
++extern int g_alphaToCoverage; // port addition: alpha to coverage mode, see shader.cpp
+ wgpu::ShaderModule build_shader(const ShaderConfig& config, const gfx::RenderTargetLayout& layout,
+                                 DstAlphaMode dstAlphaMode) noexcept;
+ GXBindGroups build_bind_groups(const ShaderInfo& info) noexcept;
+diff --git a/lib/gx/shader.cpp b/lib/gx/shader.cpp
+index 9dfbdac..7fa9579 100644
+--- a/lib/gx/shader.cpp
++++ b/lib/gx/shader.cpp
+@@ -412,7 +412,25 @@ std::string tev_color_op(GXTevOp op, std::string_view bias, std::string_view sca
+ 
+ std::string tev_alpha_op(GXTevOp op, std::string_view bias, std::string_view scale, bool clamp, std::string_view a,
+                          std::string_view b, std::string_view c, std::string_view d) {
+-  std::string expr = tev_op(op, bias, scale, a, b, c, d, "0.0"sv);
++  std::string expr;
++  switch (op) {
++  case GX_TEV_COMP_R8_GT:
++  case GX_TEV_COMP_GR16_GT:
++  case GX_TEV_COMP_BGR24_GT:
++    // The alpha arguments are scalars, so the component swizzles of these modes don't apply.
++    // (On hardware these modes compare the color channels of A and B; the alpha values are the
++    // closest thing available here.)
++    expr = fmt::format("select(0.0, {2}, round({0} * 255.0) > round({1} * 255.0)) + {3}", a, b, c, d);
++    break;
++  case GX_TEV_COMP_R8_EQ:
++  case GX_TEV_COMP_GR16_EQ:
++  case GX_TEV_COMP_BGR24_EQ:
++    expr = fmt::format("select(0.0, {2}, round({0} * 255.0) == round({1} * 255.0)) + {3}", a, b, c, d);
++    break;
++  default:
++    expr = tev_op(op, bias, scale, a, b, c, d, "0.0"sv);
++    break;
++  }
+   return clamp ? fmt::format("clamp({}, 0.0, 1.0)", expr) : fmt::format("clamp({}, -4.0, 4.0)", expr);
+ }
+ 
+@@ -541,6 +559,103 @@ AlphaCompareExpr alpha_compare(GXCompare comp, u8 ref) {
+   }
+ }
+ 
++// Alpha to coverage (port addition): the alpha compare as a signed distance from its threshold,
++// in alpha units (>= 0 passes, like the hard test). constant: 1 = always passes, 0 = never;
++// valid = false when the comparison can't be expressed this way (EQUAL/NEQUAL).
++struct AlphaMarginExpr {
++  std::string expr;
++  int constant = -1;
++  bool valid = true;
++};
++
++AlphaMarginExpr alpha_margin_const(bool pass) { return {"", pass ? 1 : 0, true}; }
++AlphaMarginExpr alpha_margin_invalid() { return {"", -1, false}; }
++
++AlphaMarginExpr alpha_margin(GXCompare comp, u8 ref) {
++  // The hard test compares round(a * 255) with ref: thresholds sit half a step from ref.
++  const float lo = (static_cast<float>(ref) - 0.5f) / 255.0f;
++  const float hi = (static_cast<float>(ref) + 0.5f) / 255.0f;
++  switch (comp) {
++  default:
++    return alpha_margin_invalid();
++  case GX_NEVER:
++    return alpha_margin_const(false);
++  case GX_ALWAYS:
++    return alpha_margin_const(true);
++  case GX_LESS:
++    return ref == 0 ? alpha_margin_const(false) : AlphaMarginExpr{fmt::format("({:.8f} - acA)", lo)};
++  case GX_LEQUAL:
++    return ref == 255 ? alpha_margin_const(true) : AlphaMarginExpr{fmt::format("({:.8f} - acA)", hi)};
++  case GX_GEQUAL:
++    return ref == 0 ? alpha_margin_const(true) : AlphaMarginExpr{fmt::format("(acA - {:.8f})", lo)};
++  case GX_GREATER:
++    return ref == 255 ? alpha_margin_const(false) : AlphaMarginExpr{fmt::format("(acA - {:.8f})", hi)};
++  }
++}
++
++AlphaMarginExpr alpha_margin_negate(const AlphaMarginExpr& m) {
++  if (!m.valid) {
++    return m;
++  }
++  if (m.constant != -1) {
++    return alpha_margin_const(m.constant == 0);
++  }
++  return {fmt::format("(-{})", m.expr)};
++}
++
++AlphaMarginExpr alpha_margin_combine(GXAlphaOp op, const AlphaMarginExpr& a, const AlphaMarginExpr& b) {
++  if (!a.valid || !b.valid) {
++    return alpha_margin_invalid();
++  }
++  switch (op) {
++  default:
++    return alpha_margin_invalid();
++  case GX_AOP_AND:
++    if (a.constant == 0 || b.constant == 0) {
++      return alpha_margin_const(false);
++    }
++    if (a.constant == 1) {
++      return b;
++    }
++    if (b.constant == 1) {
++      return a;
++    }
++    return {fmt::format("min({}, {})", a.expr, b.expr)};
++  case GX_AOP_OR:
++    if (a.constant == 1 || b.constant == 1) {
++      return alpha_margin_const(true);
++    }
++    if (a.constant == 0) {
++      return b;
++    }
++    if (b.constant == 0) {
++      return a;
++    }
++    return {fmt::format("max({}, {})", a.expr, b.expr)};
++  case GX_AOP_XOR:
++  case GX_AOP_XNOR: {
++    // Only when one side is constant (then it's the other side or its negation).
++    const bool xnor = op == GX_AOP_XNOR;
++    if (a.constant != -1 && b.constant != -1) {
++      return alpha_margin_const((a.constant != b.constant) != xnor);
++    }
++    const auto& c = a.constant != -1 ? a : b;
++    const auto& v = a.constant != -1 ? b : a;
++    if (c.constant == -1) {
++      return alpha_margin_invalid();
++    }
++    return (c.constant == 1) != xnor ? alpha_margin_negate(v) : v;
++  }
++  }
++}
++} // namespace
++
++// 0 = off, 1 = alpha-tested draws antialiased with MSAA (alpha to coverage), 2 = same and tint
++// alpha-tested pixels magenta (debug). Read when shaders are built: set it before rendering starts.
++int g_alphaToCoverage = 0;
++
++namespace {
++
+ std::string_view tev_scale(GXTevScale scale) {
+   switch (scale) {
+     DEFAULT_FATAL("invalid tev scale {}", underlying(scale));
+@@ -751,7 +866,9 @@ enum class NbtSlice : u8 {
+ auto attr_load_nbt_slice(const ShaderConfig& config, NbtSlice slice, std::string_view vidx) -> std::string {
+   const auto& mapping = config.attrs[GX_VA_NRM];
+   if (mapping.attrType == GX_NONE || mapping.cnt != 9) {
+-    Log.fatal("attr_load_nbt_slice: GX_TG_BINRM/TANGENT requires GX_NRM_NBT or GX_NRM_NBT3");
++    // Emboss/binormal texgens on a vertex format without binormals and tangents: the game's data
++    // does this and the hardware tolerates it. Use zero vectors (no bump offset).
++    return "vec3f(0.0)";
+   }
+   const auto sliceIdx = static_cast<u32>(slice);
+   const auto compsize = comp_type_size(GX_VA_NRM, static_cast<GXCompType>(mapping.compType));
+@@ -871,7 +988,7 @@ absl::flat_hash_set<gfx::ShaderRef> s_seenShaders;
+ } // namespace
+ 
+ std::string build_shader_source(const ShaderConfig& config, DstAlphaMode dstAlphaMode,
+-                                uint32_t normalAttachment) noexcept {
++                                uint32_t normalAttachment, uint32_t sampleCount) noexcept {
+   ZoneScoped;
+   const auto hash = xxh3_hash(dstAlphaMode, xxh3_hash(normalAttachment, xxh3_hash(config)));
+   const auto info = build_shader_info(config);
+@@ -1240,14 +1357,24 @@ std::string build_shader_source(const ShaderConfig& config, DstAlphaMode dstAlph
+       vtxXfrAttrs += fmt::format("\n    var tc{} = vec4f({}, 1.0);", i, vtx_attr(config, GX_VA_POS));
+     } else if (tcg.src == GX_TG_NRM) {
+       vtxXfrAttrs += fmt::format("\n    var tc{} = vec4f({}, 1.0);", i, vtx_attr(config, GX_VA_NRM));
+-    } else if (tcg.src == GX_TG_COLOR0) {
+-      vtxXfrAttrs += fmt::format("\n    var tc{} = {};", i, vtx_attr(config, GX_VA_CLR0));
+-    } else if (tcg.src == GX_TG_COLOR1) {
+-      vtxXfrAttrs += fmt::format("\n    var tc{} = {};", i, vtx_attr(config, GX_VA_CLR1));
++    } else if (tcg.src == GX_TG_COLOR0 || tcg.src == GX_TG_COLOR1) {
++      // The hardware feeds the lit color channel (after lighting) to color texgens, not the raw
++      // vertex color: toon shading relies on it (light intensity in red -> ramp coordinate).
++      const u32 chan = tcg.src == GX_TG_COLOR0 ? 0 : 1;
++      if (UsePerPixelLighting) {
++        vtxXfrAttrs += fmt::format("\n    var tc{} = {};", i,
++                                   vtx_attr(config, static_cast<GXAttr>(GX_VA_CLR0 + chan)));
++      } else {
++        vtxXfrAttrs += fmt::format("\n    var tc{} = out.cc{};", i, chan);
++      }
+     } else if (tcg.src == GX_TG_BINRM) {
+       vtxXfrAttrs += fmt::format("\n    var tc{} = vec4f({}, 1.0);", i, nbt_slice_local(NbtSlice::B));
+     } else if (tcg.src == GX_TG_TANGENT) {
+       vtxXfrAttrs += fmt::format("\n    var tc{} = vec4f({}, 1.0);", i, nbt_slice_local(NbtSlice::T));
++    } else if (tcg.src == GX_MAX_TEXGENSRC) {
++      // A TEV stage samples a texcoord beyond numTexGens. The hardware tolerates it (the game's
++      // data does it); generate zero coordinates like Dolphin does.
++      vtxXfrAttrs += fmt::format("\n    var tc{} = vec4f(0.0, 0.0, 1.0, 1.0);", i);
+     } else
+       UNLIKELY FATAL("unhandled tcg src {}", underlying(tcg.src));
+     if (tcg.type == GX_TG_MTX2x4 || tcg.type == GX_TG_MTX3x4) {
+@@ -1601,6 +1728,7 @@ std::string build_shader_source(const ShaderConfig& config, DstAlphaMode dstAlph
+   } else if (!prevAlphaNormalized) {
+     fragmentFn += "\n    prev.a = tev_overflow_f32(prev.a);";
+   }
++  bool useCoverageMask = false;
+   if (config.alphaCompare) {
+     const auto comp0 = alpha_compare(config.alphaCompare.comp0, config.alphaCompare.ref0);
+     const auto comp1 = alpha_compare(config.alphaCompare.comp1, config.alphaCompare.ref1);
+@@ -1621,7 +1749,31 @@ std::string build_shader_source(const ShaderConfig& config, DstAlphaMode dstAlph
+       break;
+     }
+     const auto discard = alpha_compare_not(pass);
+-    if (discard.constant == 1) {
++    // Port addition: with MSAA, turn the hard alpha test into a coverage mask (alpha to coverage
++    // with sharpening), so cut-out edges (foliage, foam, fences) get antialiased like geometry.
++    // Without MSAA (sampleCount 1) the original hard test is kept bit for bit.
++    const auto margin = alpha_margin_combine(
++        config.alphaCompare.op, alpha_margin(config.alphaCompare.comp0, config.alphaCompare.ref0),
++        alpha_margin(config.alphaCompare.comp1, config.alphaCompare.ref1));
++    if (discard.constant == -1 && g_alphaToCoverage != 0 && sampleCount > 1 && margin.valid &&
++        margin.constant == -1) {
++      useCoverageMask = true;
++      fragmentFn += fmt::format(
++          "\n    // Alpha compare (alpha to coverage)"
++          "\n    let acA = clamp(prev.a, 0.0, 1.0);"
++          "\n    let acMargin = {0};"
++          "\n    let acCov = clamp(acMargin / max(fwidth(acA), 1e-5) + 0.5, 0.0, 1.0);"
++          "\n    let acCount = u32(round(acCov * {1}.0));"
++          "\n    if (acCount == 0u) {{ discard; }}"
++          "\n    let coverageMask = (1u << acCount) - 1u;",
++          margin.expr, sampleCount);
++      if (g_alphaToCoverage == 2) {
++        // Debug: the edge pixels that alpha to coverage antialiases, in magenta.
++        fragmentFn += fmt::format(
++            "\n    if (acCount < {}u) {{ prev = vec4f(mix(prev.rgb, vec3f(1.0, 0.0, 1.0), 0.8), prev.a); }}",
++            sampleCount);
++      }
++    } else if (discard.constant == 1) {
+       fragmentFn += "\n    // Alpha compare\n    discard;";
+     } else if (discard.constant != 0) {
+       fragmentFn +=
+@@ -1672,6 +1824,27 @@ std::string build_shader_source(const ShaderConfig& config, DstAlphaMode dstAlph
+     fragmentReturn = "\n    return FragmentOutput(vec4f(prev.rgb, 1.0), prev);";
+   }
+ 
++  if (useCoverageMask) {
++    // Port addition (alpha to coverage): the coverage computed by the alpha compare goes out as
++    // the fragment's sample mask.
++    if (fragmentOutput.empty()) {
++      fragmentOutput =
++          "\nstruct FragmentOutput {\n"
++          "    @location(0) color: vec4f,\n"
++          "    @builtin(sample_mask) mask: u32,\n"
++          "};\n";
++      fragmentOutputType = "FragmentOutput"sv;
++      fragmentReturn = "\n    return FragmentOutput(prev, coverageMask);";
++    } else {
++      fragmentOutput.insert(fragmentOutput.rfind("};"), "    @builtin(sample_mask) mask: u32,\n");
++      if (dstAlphaMode == DstAlphaMode::DualSource) {
++        fragmentReturn = "\n    return FragmentOutput(vec4f(prev.rgb, 1.0), prev, coverageMask);";
++      } else {
++        fragmentReturn.insert(fragmentReturn.rfind("\n    return out;"), "\n    out.mask = coverageMask;");
++      }
++    }
++  }
++
+   auto shaderSource =
+       fmt::format(R"""(
+ fn bswap32(v: u32, le: bool) -> u32 {{
+@@ -2062,7 +2235,7 @@ wgpu::ShaderModule build_shader(const ShaderConfig& config, const gfx::RenderTar
+       normalAttachment = i;
+     }
+   }
+-  const auto shaderSource = build_shader_source(config, dstAlphaMode, normalAttachment);
++  const auto shaderSource = build_shader_source(config, dstAlphaMode, normalAttachment, layout.sampleCount);
+   const auto hash = xxh3_hash(dstAlphaMode, xxh3_hash(normalAttachment, xxh3_hash(config)));
+   wgpu::ShaderSourceWGSL wgslDescriptor{};
+   wgslDescriptor.code = shaderSource.c_str();
+diff --git a/lib/gx/shader_info.cpp b/lib/gx/shader_info.cpp
+index c74bd6d..fe45dd0 100644
+--- a/lib/gx/shader_info.cpp
++++ b/lib/gx/shader_info.cpp
+@@ -305,6 +305,13 @@ ShaderInfo build_shader_info(const ShaderConfig& config) noexcept {
+       info.sampledTexCoords.set(tcg.embossSrc);
+       info.lightingEnabled = true;
+     }
++    // Color texgens (e.g. SRTG toon ramps) read the lit color channel, so it must be computed
++    // even when no TEV stage samples it.
++    if (tcg.src == GX_TG_COLOR0) {
++      info.sampledColorChannels.set(0);
++    } else if (tcg.src == GX_TG_COLOR1) {
++      info.sampledColorChannels.set(1);
++    }
+   }
+ 
+   info.uniformSize += info.loadsTevReg.count() * sizeof(Vec4<float>);
+diff --git a/lib/imgui.cpp b/lib/imgui.cpp
+index 07a0ec1..986c20a 100644
+--- a/lib/imgui.cpp
++++ b/lib/imgui.cpp
+@@ -75,9 +75,16 @@ void enqueue_texture_upload(wgpu::Buffer buffer, wgpu::TexelCopyTextureInfo dst,
+ }
+ } // namespace
+ 
++// CloneOutput() allocates with IM_NEW (ImGui's allocator), so the copies must be freed with
++// IM_DELETE: a plain delete goes to the application's global operator delete, which may not be
++// the allocator ImGui uses (heap corruption in a game that replaces operator new/delete).
++struct ImDrawListDeleter {
++  void operator()(ImDrawList* list) const noexcept { IM_DELETE(list); }
++};
++
+ struct DrawData::Impl {
+   ImDrawData drawData;
+-  std::vector<std::unique_ptr<ImDrawList>> drawLists;
++  std::vector<std::unique_ptr<ImDrawList, ImDrawListDeleter>> drawLists;
+ };
+ 
+ void create_context() noexcept {

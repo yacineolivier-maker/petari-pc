@@ -26,6 +26,11 @@ typedef volatile f64 vf64;
 
 typedef int BOOL;
 
+// Size parameter type of operator new/delete (u32 on the Wii; the PC shim makes it size_t).
+#ifndef OPNEW_SIZE_T
+#define OPNEW_SIZE_T u32
+#endif
+
 #ifndef NULL
 #ifdef __cplusplus
 #define NULL 0

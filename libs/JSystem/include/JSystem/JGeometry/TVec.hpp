@@ -666,6 +666,8 @@ namespace JGeometry {
             }
 
             return _fp1;
+#else
+            return x * rOther.x + y * rOther.y + z * rOther.z;
 #endif
         }
 

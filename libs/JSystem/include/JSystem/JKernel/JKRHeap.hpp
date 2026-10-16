@@ -227,13 +227,13 @@ public:
     /* 0x69 */ u8 _69;
 };
 
-#ifdef __MWERKS__
-void* operator new(u32, int);
-void* operator new(u32, JKRHeap*);
-void* operator new(u32, JKRHeap*, int);
-void* operator new[](u32, int);
+#if defined(__MWERKS__) || TARGET_PC
+void* operator new(OPNEW_SIZE_T, int);
+void* operator new(OPNEW_SIZE_T, JKRHeap*);
+void* operator new(OPNEW_SIZE_T, JKRHeap*, int);
+void* operator new[](OPNEW_SIZE_T, int);
 
-void* operator new[](u32, JKRHeap*, int);
+void* operator new[](OPNEW_SIZE_T, JKRHeap*, int);
 #endif
 
 inline void* JKRAllocFromHeap(JKRHeap* pHeap, u32 size, int alignment) {

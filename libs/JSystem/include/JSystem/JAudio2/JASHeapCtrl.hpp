@@ -162,7 +162,12 @@ namespace JASKernel {
 };  // namespace JASKernel
 
 template < u32 ChunkSize, template < typename > class T >
+#if TARGET_PC
+// T<X>::ObjectLevelLockable names T<X> itself (injected class name); MSVC reads it as the constructor.
+class JASMemChunkPool : public T< JASMemChunkPool< ChunkSize, T > > {
+#else
 class JASMemChunkPool : public T< JASMemChunkPool< ChunkSize, T > >::ObjectLevelLockable {
+#endif
 public:
     struct MemoryChunk {
         MemoryChunk(MemoryChunk* nextChunk) {
@@ -292,11 +297,11 @@ namespace JASKernel {
 template < typename T >
 class JASPoolAllocObject {
 public:
-    static void* operator new(u32 size) {
+    static void* operator new(OPNEW_SIZE_T size) {
         return memPool_.alloc(size);
     }
 
-    static void operator delete(void* addr, u32 size) {
+    static void operator delete(void* addr, OPNEW_SIZE_T size) {
         memPool_.free(addr, size);
     }
 
@@ -331,11 +336,11 @@ public:
 template < typename T >
 class JASPoolAllocObject_MultiThreaded {
 public:
-    static void* operator new(u32 size) {
+    static void* operator new(OPNEW_SIZE_T size) {
         return memPool_.alloc(size);
     }
 
-    static void operator delete(void* addr, u32 size) {
+    static void operator delete(void* addr, OPNEW_SIZE_T size) {
         memPool_.free(addr, size);
     }
 

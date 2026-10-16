@@ -14,13 +14,15 @@ const f32 PI_180 = 0.017453292f;
 const f32 _180_PI = 57.29578f;
 const f32 DEGREE_TO_S16 = 182.04445f;
 
-const f32 FLOAT_MAX = 3.4028235e38;
+const f32 FLOAT_MAX = 3.4028235e38f;
 const f32 FLOAT_ZERO = 0.0f;
 
 extern const Vec gZeroVec;
 
+#if !TARGET_PC
 namespace std {
     inline f32 atan2(f32 x, f32 y) {
         return ::atan2(x, y);
     }
 };  // namespace std
+#endif
