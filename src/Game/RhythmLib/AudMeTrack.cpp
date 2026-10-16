@@ -822,3 +822,7 @@ AudMeTrack* AudMeTrack::TList::getSameME(AudMeTrack* pTrack, u32 meId) {
 
     return nullptr;
 }
+
+#if TARGET_PC
+static_assert(offsetof(AudMeTrack, mNode) == 552, "update AudMeTrack::TList's node offset");
+#endif

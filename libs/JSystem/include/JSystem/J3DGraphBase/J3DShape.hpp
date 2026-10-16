@@ -111,7 +111,12 @@ public:
         initialize();
     }
 
+#if TARGET_PC
+    // Aurora's array commands (GDSetArraySized: 64-bit pointer + size) are larger than the Wii's.
+    static const int kVcdVatDLSize = 0x180;
+#else
     static const int kVcdVatDLSize = 0xC0;
+#endif
 
     void initialize();
     void addTexMtxIndexInDL(_GXAttr, u32);

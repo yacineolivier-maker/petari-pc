@@ -12,6 +12,7 @@
 #include <aurora/event.h>
 
 #include <revolution/os.h>
+#include <revolution/vi.h>
 
 #include <cstdio>
 #include <cstdlib>
@@ -127,6 +128,16 @@ extern "C" int pc_platform_begin_frame(void) {
     }
     sFrameStarted = true;
     pc_watchdog_tick();
+    // SMGPC_LOG_FRAMES=1: print the frame number (first 10 frames, then every 60).
+    static const bool sLogFrames = std::getenv("SMGPC_LOG_FRAMES") != nullptr;
+    static u32 sFrameCount = 0;
+    sFrameCount++;
+    if (sLogFrames && (sFrameCount <= 10 || sFrameCount % 60 == 0)) {
+        std::fprintf(stderr, "[pc] frame %u\n", sFrameCount);
+    }
+    // Drives the VI retrace callbacks once per frame, like the Wii's VI interrupt: JUTVideo's
+    // post-retrace callback posts the message MainLoopFramework::waitForRetrace waits for.
+    VIWaitForRetrace();
     return 1;
 }
 

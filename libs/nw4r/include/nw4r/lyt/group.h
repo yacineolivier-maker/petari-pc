@@ -14,7 +14,7 @@ namespace nw4r {
             };
         };  // namespace detail
 
-#ifdef __MWERKS__
+#if defined(__MWERKS__) || TARGET_PC  // offset 0 would overwrite the vtable pointer
         typedef ut::LinkList< detail::PaneLink, offsetof(detail::PaneLink, mLink) > PaneLinkList;
 #else
         typedef ut::LinkList< detail::PaneLink, 0 > PaneLinkList;
@@ -49,7 +49,7 @@ namespace nw4r {
             u8 mPadding[2];
         };
 
-#ifdef __MWERKS__
+#if defined(__MWERKS__) || TARGET_PC  // offset 0 would overwrite the vtable pointer
         typedef ut::LinkList< Group, offsetof(Group, mLink) > GroupList;
 #else
         typedef ut::LinkList< Group, 0 > GroupList;

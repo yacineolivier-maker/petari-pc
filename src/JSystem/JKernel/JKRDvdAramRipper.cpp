@@ -28,8 +28,20 @@ JKRAramBlock* JKRDvdAramRipper::loadToAram(s32 entryNumber, u32 address, JKRExpa
 
 JKRAramBlock* JKRDvdAramRipper::loadToAram(JKRDvdFile* dvdFile, u32 address, JKRExpandSwitch expandSwitch, u32 param_3, u32 param_4, u32* param_5) {
     JKRADCommand* command = loadToAram_Async(dvdFile, address, expandSwitch, nullptr, param_3, param_4, param_5);
+#if TARGET_PC
+    if (command == nullptr) {
+        fprintf(stderr, "[pc] JKRDvdAramRipper::loadToAram: async command failed (address %#lx)\n", (unsigned long)address);
+        return nullptr;
+    }
+#endif
     syncAram(command, 0);
 
+#if TARGET_PC
+    if (command->field_0x48 < 0 && getenv("SMGPC_DEBUG_ARAM") != nullptr) {
+        fprintf(stderr, "[pc] JKRDvdAramRipper::loadToAram: failed with %ld (address %#lx, size %#lx)\n",
+                (long)command->field_0x48, (unsigned long)address, (unsigned long)dvdFile->getFileSize());
+    }
+#endif
     if (command->field_0x48 < 0) {
         delete command;
         return nullptr;

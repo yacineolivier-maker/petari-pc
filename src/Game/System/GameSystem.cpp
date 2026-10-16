@@ -35,6 +35,7 @@
 
 #if TARGET_PC
 #include "pc/platform.h"
+#include <typeinfo>
 // Renames main to aurora_main: Aurora provides the real process entry point.
 #include <aurora/main.h>
 #endif
@@ -212,6 +213,20 @@ bool GameSystem::isPreparedReset() const {
 }
 
 void GameSystem::frameLoop() {
+#if TARGET_PC
+    // SMGPC_LOG_STATE=1: print the game system's current state every second.
+    static const bool sLogState = getenv("SMGPC_LOG_STATE") != nullptr;
+    static u32 sFrame = 0;
+    if (sLogState && sFrame++ % 60 == 0) {
+        const Nerve* pNerve = mSpine->getCurrentNerve();
+        fprintf(stderr, "[pc] GameSystem state: %s\n", pNerve != nullptr ? typeid(*pNerve).name() : "(none)");
+        if (sFrame > 1 && isNerve(GET_NERVE(GameSystem, GameSystemInitializeAudio))) {
+            fprintf(stderr, "[pc]   audio init: async done %d, wave data loaded %d\n",
+                    (int)MR::isEndFunctionAsyncExecute(INIT_AUDIO_KEY),
+                    mObjHolder->mAudioSystem != nullptr ? (int)mObjHolder->mAudioSystem->isLoadDoneWaveDataAtSystemInit() : -1);
+        }
+    }
+#endif
     MainLoopFramework::sManager->beginRender();
     draw();
     MainLoopFramework::sManager->endRender();

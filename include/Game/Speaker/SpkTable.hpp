@@ -1,13 +1,15 @@
 #pragma once
 
+#include "helpers/endian.h"
+
 #include <revolution/types.h>
 
 struct SpkParameters {
-    /* 0x00 */ u16 mWaveID;
+    /* 0x00 */ BE(u16) mWaveID;
     /* 0x02 */ u8 _2;
     /* 0x03 */ u8 mVolume;
-    /* 0x04 */ u16 mReleaseTime;
-    /* 0x06 */ u16 _padding;  // (?)
+    /* 0x04 */ BE(u16) mReleaseTime;
+    /* 0x06 */ BE(u16) _padding;  // (?)
 };
 
 struct SpkFile {

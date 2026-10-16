@@ -110,6 +110,11 @@ u32 const ATTRIBUTE_ALIGN(32) JASDsp::DSPRES_FILTER[320] = {
 void JASDsp::initBuffer() {
     CH_BUF = new (JASDram, 0x20) TChannel[64];
     FX_BUF = new (JASDram, 0x20) FxBuf[4];
+#if TARGET_PC
+    if (getenv("SMGPC_DEBUG_AUDIO") != nullptr) {
+        fprintf(stderr, "[pc] JASDsp::initBuffer: CH_BUF %p FX_BUF %p (heap %p)\n", (void*)CH_BUF, (void*)FX_BUF, (void*)JASDram);
+    }
+#endif
     JASCalc::bzero(CH_BUF, 0x6000);
     JASCalc::bzero(FX_BUF, sizeof(FxBuf) * 4);
     for (u8 i = 0; i < 4; i++) {

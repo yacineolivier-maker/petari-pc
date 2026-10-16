@@ -24,7 +24,7 @@ namespace nw4r {
         };
 
         namespace detail {
-            #ifdef __MWERKS__
+            #if defined(__MWERKS__) || TARGET_PC  // offset 0 would overwrite the vtable pointer
             typedef ut::LinkList<FontRefLink, offsetof(FontRefLink, mLink)>  FontRefList;
             #else
             typedef ut::LinkList<FontRefLink, 0> FontRefList;

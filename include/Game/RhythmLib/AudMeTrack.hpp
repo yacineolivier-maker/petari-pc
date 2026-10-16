@@ -65,7 +65,12 @@ public:
         /* 0x12 */ u8 mNoteRangeStart;
     };
 
+#if TARGET_PC
+    // offsetof(AudMeTrack, mNode) on x64 (checked in AudMeTrack.cpp).
+    struct TList : JGadget::TLinkList< AudMeTrack, -552 > {
+#else
     struct TList : JGadget::TLinkList< AudMeTrack, -384 > {
+#endif
         TList() : mCallbackRegistered(false) {
         }
 

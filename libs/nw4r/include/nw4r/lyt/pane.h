@@ -31,7 +31,7 @@ namespace nw4r {
         class DrawInfo;
         class Pane;
 
-#ifdef __MWERKS__
+#if defined(__MWERKS__) || TARGET_PC  // offset 0 would overwrite the vtable pointer
         typedef ut::LinkList< Pane, offsetof(detail::PaneBase, mLink) > PaneList;
 #else
         typedef ut::LinkList< Pane, 0 > PaneList;

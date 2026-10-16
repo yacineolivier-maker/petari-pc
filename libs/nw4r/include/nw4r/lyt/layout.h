@@ -35,7 +35,7 @@ namespace nw4r {
             ORIGINTYPE_MAX
         };
 
-#ifdef __MWERKS__
+#if defined(__MWERKS__) || TARGET_PC  // offset 0 would overwrite the vtable pointer
         typedef ut::LinkList< AnimTransform, offsetof(AnimTransform, mLink) > AnimTransformList;
 #else
         typedef ut::LinkList< AnimTransform, 0 > AnimTransformList;

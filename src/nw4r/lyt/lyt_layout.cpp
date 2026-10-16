@@ -190,6 +190,13 @@ namespace nw4r {
             }
 
             AnimTransform* const pAnimTrans = CreateAnimTransform();
+#if TARGET_PC
+            if (getenv("SMGPC_DEBUG_LYT") != nullptr) {
+                void** vptr = pAnimTrans ? *reinterpret_cast< void*** >(pAnimTrans) : nullptr;
+                fprintf(stderr, "[pc] CreateAnimTransform: obj %p vptr %p [0]=%p [1]=%p allocator %p\n", (void*)pAnimTrans,
+                        (void*)vptr, vptr ? vptr[0] : nullptr, vptr ? vptr[1] : nullptr, (void*)mspAllocator);
+            }
+#endif
             if (pAnimTrans != nullptr) {
                 pAnimTrans->SetResource(pAnimBlock, pResAcsr);
             }

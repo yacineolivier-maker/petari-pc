@@ -112,6 +112,13 @@ void FunctionAsyncExecutor::waitForEnd(const char* pName) {
         cur++;
     }
 
+#if TARGET_PC
+    // Not found (see isEnd): nothing to wait for.
+    if (cur == lst) {
+        OSUnlockMutex(&MR::MutexHolder< 2 >::sMutex);
+        return;
+    }
+#endif
     FunctionAsyncExecInfo* info = *cur;
     OSUnlockMutex(&MR::MutexHolder< 2 >::sMutex);
     OSReceiveMessage(&info->mQueue, &info->mMessage, OS_MESSAGE_BLOCK);
@@ -145,6 +152,14 @@ bool FunctionAsyncExecutor::isEnd(const char* pName) const {
         cur++;
     }
 
+#if TARGET_PC
+    // Not found: the Wii read the stale slot past the end (usually a finished, already deleted
+    // task). Treat an unknown task as finished.
+    if (cur == lst) {
+        OSUnlockMutex(&MR::MutexHolder< 2 >::sMutex);
+        return true;
+    }
+#endif
     FunctionAsyncExecInfo* info = *cur;
     OSUnlockMutex(&MR::MutexHolder< 2 >::sMutex);
     return info->mIsEnd;

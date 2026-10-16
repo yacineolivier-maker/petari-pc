@@ -7,6 +7,7 @@
 #define NOMINMAX
 #include <windows.h>
 #include <dbghelp.h>
+#include <tlhelp32.h>
 
 #include <cstdio>
 #include <csignal>
@@ -142,7 +143,52 @@ static DWORD WINAPI pc_watchdog_main(void* param) {
     }
 }
 
+// SMGPC_DUMP_THREADS=N: N seconds after start, print the stack of every thread (to find which
+// thread is stuck where), then keep running.
+static DWORD WINAPI pc_dump_threads_main(void* param) {
+    Sleep((DWORD)(uintptr_t)param * 1000);
+    HANDLE process = GetCurrentProcess();
+    SymSetOptions(SYMOPT_LOAD_LINES | SYMOPT_UNDNAME | SYMOPT_DEFERRED_LOADS);
+    SymInitialize(process, pc_symbol_path(), TRUE);
+    DWORD self = GetCurrentThreadId();
+    HANDLE snap = CreateToolhelp32Snapshot(TH32CS_SNAPTHREAD, 0);
+    THREADENTRY32 entry{};
+    entry.dwSize = sizeof(entry);
+    std::fflush(stdout);
+    for (BOOL ok = Thread32First(snap, &entry); ok; ok = Thread32Next(snap, &entry)) {
+        if (entry.th32OwnerProcessID != GetCurrentProcessId() || entry.th32ThreadID == self) {
+            continue;
+        }
+        HANDLE thread = OpenThread(THREAD_ALL_ACCESS, FALSE, entry.th32ThreadID);
+        if (thread == nullptr) {
+            continue;
+        }
+        SuspendThread(thread);
+        CONTEXT ctx{};
+        ctx.ContextFlags = CONTEXT_FULL;
+        GetThreadContext(thread, &ctx);
+        std::fprintf(stderr, "\n=== Thread %lu ===\n", entry.th32ThreadID);
+        pc_print_stack(process, thread, ctx);
+        ResumeThread(thread);
+        CloseHandle(thread);
+    }
+    CloseHandle(snap);
+    std::fflush(stderr);
+    return 0;
+}
+
+static void pc_start_thread_dump() {
+    static bool started = false;
+    const char* env = std::getenv("SMGPC_DUMP_THREADS");
+    if (started || env == nullptr) {
+        return;
+    }
+    started = true;
+    CreateThread(nullptr, 0, pc_dump_threads_main, (void*)(uintptr_t)std::strtoul(env, nullptr, 10), 0, nullptr);
+}
+
 void pc_watchdog_tick() {
+    pc_start_thread_dump();
     if (s_watchThread == nullptr) {
         const char* env = std::getenv("SMGPC_WATCHDOG");
         DWORD seconds = env != nullptr ? (DWORD)std::strtoul(env, nullptr, 10) : 0;

@@ -13,6 +13,10 @@ typedef uintptr_t JKRExpAddr;
 typedef u32 JKRExpAddr;
 #endif
 
+#if TARGET_PC
+static void pcHeapCheck(JKRExpHeap* heap, const char* what, const void* ptr);
+#endif
+
 static u32 DBfoundSize;
 static u32 DBfoundOffset;
 static JKRExpHeap::CMemBlock* DBfoundBlock;
@@ -168,6 +172,11 @@ void* JKRExpHeap::do_alloc(u32 size, int align) {
     }
 #endif
     if (ptr == nullptr) {
+#if TARGET_PC
+        fprintf(stderr, "[pc] JKRExpHeap %p: cannot alloc %#lx bytes (align %d), free %#lx total %#lx, heap size %#lx\n",
+                (void*)this, (unsigned long)size, align, (unsigned long)do_getFreeSize(), (unsigned long)do_getTotalFreeSize(),
+                (unsigned long)mSize);
+#endif
         JUTWarningConsole_f(":::cannot alloc memory (0x%x byte).\n", size);
 
         if (JKRHeap::mErrorFlag == true) {
@@ -177,6 +186,9 @@ void* JKRExpHeap::do_alloc(u32 size, int align) {
         }
     }
 
+#if TARGET_PC
+    pcHeapCheck(this, "alloc", ptr);
+#endif
     OSUnlockMutex(&mMutex);
     return ptr;
 }
@@ -390,6 +402,18 @@ void* JKRExpHeap::allocFromTail(u32 size) {
     return nullptr;
 }
 
+#if TARGET_PC
+// SMGPC_HEAP_CHECK=1: verify the heap's block lists after every alloc/free and panic (with a stack
+// trace from the crash handler) at the first operation that leaves them corrupted.
+static void pcHeapCheck(JKRExpHeap* heap, const char* what, const void* ptr) {
+    static const bool sEnabled = getenv("SMGPC_HEAP_CHECK") != nullptr;
+    if (sEnabled && !heap->check()) {
+        fprintf(stderr, "[pc] JKRExpHeap %p corrupted after %s %p\n", (void*)heap, what, ptr);
+        OSPanic(__FILE__, __LINE__, "heap corrupted");
+    }
+}
+#endif
+
 void JKRExpHeap::do_free(void* ptr) {
     lock();
     if (mStart <= ptr && ptr <= mEnd) {
@@ -398,6 +422,9 @@ void JKRExpHeap::do_free(void* ptr) {
             block->free(this);
         }
     }
+#if TARGET_PC
+    pcHeapCheck(this, "free", ptr);
+#endif
     unlock();
 }
 

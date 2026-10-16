@@ -7,6 +7,15 @@
 
 JKRExpHeap* HeapMemoryWatcher::sRootHeapGDDR3;
 
+// Fixed heap sizes are tuned for the Wii (24 MB MEM1 + 64 MB MEM2). On PC objects are larger
+// (64-bit pointers) and the emulated arenas are 256 MB each, so the fixed heaps get 4x the room;
+// the game heaps still take whatever is left.
+#if TARGET_PC
+#define SMG_HEAP_SIZE(size) ((size) * 4)
+#else
+#define SMG_HEAP_SIZE(size) (size)
+#endif
+
 namespace {
     JKRExpHeap* createExpHeap(u32 size, JKRHeap* pHeap, bool a3) NO_INLINE {
         JKRExpHeap* heap;
@@ -161,16 +170,16 @@ void HeapMemoryWatcher::createRootHeap() {
 void HeapMemoryWatcher::createHeaps() {
     MR::CurrentHeapRestorer heapRestorer = MR::CurrentHeapRestorer(JKRHeap::sRootHeap);
     SMG_TRACE_ROOT("start");
-    ::createExpHeap(0x40000, JKRHeap::sRootHeap, false)->becomeSystemHeap();
+    ::createExpHeap(SMG_HEAP_SIZE(0x40000), JKRHeap::sRootHeap, false)->becomeSystemHeap();
     SMG_TRACE_ROOT("system heap");
-    mAudSystemHeap = ::createSolidHeap(0x1E0000, JKRHeap::sRootHeap);
+    mAudSystemHeap = ::createSolidHeap(SMG_HEAP_SIZE(0x1E0000), JKRHeap::sRootHeap);
     SMG_TRACE_ROOT("audio heap");
-    mStationedHeapNapa = ::createExpHeap(0x900000, JKRHeap::sRootHeap, false);
+    mStationedHeapNapa = ::createExpHeap(SMG_HEAP_SIZE(0x900000), JKRHeap::sRootHeap, false);
     JKRHeap* pRootHeapGDDR = HeapMemoryWatcher::sRootHeapGDDR3;
     u32 wpadHeapSize = OSRoundUp32B(WPADGetWorkMemorySize()) + 0xD0;
     mWPadHeap = ::createExpHeap(wpadHeapSize, pRootHeapGDDR, false);
-    mHomeButtonLayoutHeap = ::createExpHeap(0x80000, HeapMemoryWatcher::sRootHeapGDDR3, false);
-    mStationedHeapGDDR = ::createExpHeap(0x1400000, HeapMemoryWatcher::sRootHeapGDDR3, false);
+    mHomeButtonLayoutHeap = ::createExpHeap(SMG_HEAP_SIZE(0x80000), HeapMemoryWatcher::sRootHeapGDDR3, false);
+    mStationedHeapGDDR = ::createExpHeap(SMG_HEAP_SIZE(0x1400000), HeapMemoryWatcher::sRootHeapGDDR3, false);
     createGameHeap();
 }
 

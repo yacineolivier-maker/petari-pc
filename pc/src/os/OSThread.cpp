@@ -40,6 +40,12 @@ struct PCThreadData {
     std::condition_variable cv;
     void* (*func)(void*);
     void* param;
+    void* inheritedHeap = nullptr;  // creator's JKRHeap::sCurrentHeap
+    // Set when the thread blocks (waits for a message, a mutex, a condition, sleeps) or exits.
+    // See OSResumeThread: emulates the Wii scheduler running a higher-priority thread first.
+    std::mutex blockMtx;
+    std::condition_variable blockCv;
+    bool reachedBlock = false;
     bool started   = false;
     bool suspended = false;
 
@@ -128,9 +134,29 @@ static OSSwitchThreadCallback sSwitchThreadCallback = nullptr;
 // ============================================================================
 
 // Thread entry wrapper - runs on the new std::thread
+extern "C" void* pc_jkr_get_current_heap(void);
+extern "C" void pc_jkr_set_current_heap(void* pHeap);
+
+static thread_local PCThreadData* tls_threadData = nullptr;
+
+// Called by every blocking OS primitive (and at thread exit).
+extern "C" void PCThreadBlockingPoint(void) {
+    PCThreadData* data = tls_threadData;
+    if (data == nullptr) {
+        return;
+    }
+    std::lock_guard<std::mutex> lock(data->blockMtx);
+    if (!data->reachedBlock) {
+        data->reachedBlock = true;
+        data->blockCv.notify_all();
+    }
+}
+
 static void ThreadEntryWrapper(OSThread* thread, PCThreadData* data) {
     // Set thread-local pointer
     tls_currentThread = thread;
+    tls_threadData = data;
+    pc_jkr_set_current_heap(data->inheritedHeap);
 
     // Set context pointers for this thread
     OSClearContext(&thread->context);
@@ -140,6 +166,7 @@ static void ThreadEntryWrapper(OSThread* thread, PCThreadData* data) {
 
     // Call the actual thread function
     void* result = data->func(data->param);
+    PCThreadBlockingPoint();
 
     // Thread returned - equivalent to OSExitThread
     thread->val   = result;
@@ -254,6 +281,7 @@ int OSCreateThread(OSThread* thread, void* (*func)(void*), void* param,
         auto data = std::make_unique<PCThreadData>();
         data->func  = func;
         data->param = param;
+        data->inheritedHeap = pc_jkr_get_current_heap();
 
         std::lock_guard<std::mutex> lock(GetThreadDataMutex());
         GetThreadDataMap()[thread] = std::move(data);
@@ -342,6 +370,10 @@ s32 OSResumeThread(OSThread* thread) {
         PCThreadData* data = GetThreadData(thread);
 
         if (data) {
+            {
+                std::lock_guard<std::mutex> blockLock(data->blockMtx);
+                data->reachedBlock = false;
+            }
             // Lock the specific thread mutex to safely modify state and notify
             std::unique_lock<std::mutex> threadLock(data->mtx);
 
@@ -360,6 +392,19 @@ s32 OSResumeThread(OSThread* thread) {
                 // IMPORTANT: Set suspended to false BEFORE notifying to pass the wait predicate
                 data->suspended = false;
                 data->cv.notify_all();
+            }
+
+            // On the Wii, resuming a higher-priority thread switches to it at once, and it runs until
+            // it blocks. Game code relies on that (e.g. the audio thread sets up its buffers before
+            // its creator uses them). Approximate it: wait until the new thread blocks or exits.
+            OSThread* current = tls_currentThread;
+            if (current != nullptr && current != thread && thread->priority < current->priority) {
+                std::unique_lock<std::mutex> blockLock(data->blockMtx);
+                if (!data->blockCv.wait_for(blockLock, std::chrono::seconds(2),
+                                            [data] { return data->reachedBlock || pc::IsShuttingDown; })) {
+                    OSReport("[PC-OSThread] thread %p (priority %d) didn't block within 2 s of its resume\n",
+                             thread, (int)thread->priority);
+                }
             }
         }
     }
@@ -407,6 +452,7 @@ s32 OSSuspendThread(OSThread* thread) {
 
 void OSSleepThread(OSThreadQueue* queue) {
     if (!queue) return;
+    PCThreadBlockingPoint();
 
     OSThread* currentThread = OSGetCurrentThread();
     if (!currentThread) return;
@@ -460,6 +506,7 @@ void OSWakeupThread(OSThreadQueue* queue) {
 void OSExitThread(void* val) {
     OSThread* currentThread = OSGetCurrentThread();
     if (!currentThread) return;
+    PCThreadBlockingPoint();
 
     currentThread->val = val;
 

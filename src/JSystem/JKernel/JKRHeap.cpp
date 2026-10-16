@@ -3,7 +3,19 @@
 #include <revolution/os/OSBootInfo.h>
 
 JKRHeap* JKRHeap::sSystemHeap;
+#if TARGET_PC
+thread_local JKRHeap* JKRHeap::sCurrentHeap;
+
+// Used by the PC OS layer: a new thread starts with its creator's current heap.
+extern "C" void* pc_jkr_get_current_heap(void) {
+    return JKRHeap::sCurrentHeap;
+}
+extern "C" void pc_jkr_set_current_heap(void* pHeap) {
+    JKRHeap::sCurrentHeap = static_cast< JKRHeap* >(pHeap);
+}
+#else
 JKRHeap* JKRHeap::sCurrentHeap;
+#endif
 JKRHeap* JKRHeap::sRootHeap;
 JKRErrorHandler JKRHeap::mErrorHandler;
 

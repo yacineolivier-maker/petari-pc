@@ -197,7 +197,13 @@ public:
     static u32 getAltAramStartAdr();
 
     /* 0x806B70A8 */ static JKRHeap* sGameHeap;
+#if TARGET_PC
+    // The Wii runs one thread at a time; on PC game threads really run in parallel, so each thread
+    // has its own current heap (inherited from the creating thread, see pc/src/os/OSThread.cpp).
+    /* 0x806B70AC */ static thread_local JKRHeap* sCurrentHeap;
+#else
     /* 0x806B70AC */ static JKRHeap* sCurrentHeap;
+#endif
     /* 0x806B70B0 */ static JKRHeap* sRootHeap;
     static JKRHeap* sSystemHeap;
 

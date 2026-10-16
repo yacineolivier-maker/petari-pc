@@ -1,5 +1,6 @@
 
 #include "pc/main.h"
+#include "pc/os.h"
 
 #include <dolphin/dolphin.h>
 #include "pc/logging.h"
@@ -134,6 +135,7 @@ BOOL OSReceiveMessage(OSMessageQueue* mq, OSMessage* msg, s32 flags) {
 
     if (mq->usedCount == 0) {
         if (flags == OS_MESSAGE_NOBLOCK) return 0;
+        PCThreadBlockingPoint();
         // BLOCK: wait until a message arrives
         data.cvReceive.wait(lock, [mq] { return mq->usedCount > 0 || pc::IsShuttingDown; });
     }

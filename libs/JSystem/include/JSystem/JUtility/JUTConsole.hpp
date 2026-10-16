@@ -120,7 +120,7 @@ public:
 
     static JUTConsoleManager* createManager(JKRHeap*);
 
-#ifdef __MWERKS__
+#if defined(__MWERKS__) || TARGET_PC  // offset 0 would overwrite the vtable pointer
     typedef JGadget::TLinkList< JUTConsole, -offsetof(JUTConsole, mListNode) > ConsoleList;
 #else
     typedef JGadget::TLinkList< JUTConsole, 0 > ConsoleList;

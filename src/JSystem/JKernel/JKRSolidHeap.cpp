@@ -72,6 +72,10 @@ void* JKRSolidHeap::allocFromHead(u32 size, int alignment) {
         mSolidHead += totalSize;
         mFreeSize -= totalSize;
     } else {
+#if TARGET_PC
+        fprintf(stderr, "[pc] JKRSolidHeap %p: cannot alloc %#lx bytes from head, free %#lx, heap size %#lx\n", (void*)this,
+                (unsigned long)totalSize, (unsigned long)mFreeSize, (unsigned long)mSize);
+#endif
         JUTWarningConsole_f("allocFromHead: cannot alloc memory (0x%x byte).\n", totalSize);
         if (getErrorFlag() == true) {
             callErrorHandler(this, size, alignment);

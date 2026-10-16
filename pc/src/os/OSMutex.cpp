@@ -11,6 +11,7 @@
 #include <unordered_map>
 #include <memory>
 #include <cstdlib>
+#include "pc/os.h"
 
 
 // ============================================================================
@@ -100,6 +101,8 @@ void OSLockMutex(OSMutex* mutex) {
     if (!mutex) return;
 
     PCMutexData& data = GetMutexData(mutex);
+    // (Mutex contention is not a blocking point for OSResumeThread's priority emulation: on the
+    // Wii the higher-priority thread would get the CPU back as soon as the mutex is released.)
     data.nativeMutex.lock();
 
     // Update GC-visible fields
@@ -170,6 +173,7 @@ void OSInitCond(OSCond* cond) {
 
 void OSWaitCond(OSCond* cond, OSMutex* mutex) {
     if (!cond || !mutex) return;
+    PCThreadBlockingPoint();
 
     PCCondData& condData = GetCondData(cond);
     PCMutexData& mutexData = GetMutexData(mutex);

@@ -273,6 +273,16 @@ int DSPSendCommands2(u32* pMessages, u32 param_2, void (*pCallback)(u16)) {
     BOOL interruptFlag;
     s32 startWorkStatus;
 
+#if TARGET_PC
+    // TODO(pc): there is no DSP. Commands complete at once (callers busy-wait on their completion
+    // callback); the HLE software mixer will replace the DSP side.
+    (void)pMessages;
+    (void)param_2;
+    if (pCallback != NULL) {
+        pCallback(0);
+    }
+    return 0;
+#endif
     BOOL firstWarning = TRUE;
     while (Dsp_Running_Check() == 0) {
         if (firstWarning) {

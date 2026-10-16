@@ -855,3 +855,7 @@ void JASTrack::TChannelMgr::setPauseFlag(bool flag) {
         }
     }
 }
+
+#if TARGET_PC
+static_assert(offsetof(JASTrack, mNode) == 792, "update JASTrack::TList::TrackList's node offset");
+#endif

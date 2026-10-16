@@ -42,7 +42,12 @@ namespace MR {
             pChild++;
         }
 
+#if TARGET_PC
+        // MSL prints a null %s as an empty string (the MSVC CRT prints "(null)").
+        snprintf(pDst, size, "%s/%s", pParent != nullptr ? pParent : "", pChild);
+#else
         snprintf(pDst, size, "%s/%s", pParent, pChild);
+#endif
     }
 
     void makeDateString(wchar_t* pDst, s32 size, s32 year, s32 month, s32 day) {

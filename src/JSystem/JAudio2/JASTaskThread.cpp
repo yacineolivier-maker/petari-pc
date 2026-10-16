@@ -22,7 +22,12 @@ JASTaskThread::~JASTaskThread() {
 
 void* JASTaskThread::allocCallStack(JASThreadCallback callback, const void* msg, u32 msgSize) {
     ThreadMemPool* heap;
+#if TARGET_PC
+    // The header (callback + type) is 16 bytes with 64-bit pointers, not 8.
+    u32 size = msgSize + offsetof(JASThreadCallStack, msg);
+#else
     u32 size = msgSize + 8;
+#endif
     JASThreadCallStack* callStack = (JASThreadCallStack*)JASKernel::getCommandHeap()->alloc(size);
     if (callStack == NULL) {
         return NULL;
@@ -36,7 +41,11 @@ void* JASTaskThread::allocCallStack(JASThreadCallback callback, const void* msg,
 
 void* JASTaskThread::allocCallStack(JASThreadCallback callback, void* msg) {
     JASThreadCallStack* callStack;
+#if TARGET_PC
+    callStack = (JASThreadCallStack*)JASKernel::getCommandHeap()->alloc(offsetof(JASThreadCallStack, msg) + sizeof(void*));
+#else
     callStack = (JASThreadCallStack*)JASKernel::getCommandHeap()->alloc(12);
+#endif
     if (callStack == NULL) {
         return NULL;
     }

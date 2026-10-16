@@ -46,14 +46,16 @@
 #endif
 
 #ifndef ROUND_UP
-#define ROUND_UP(x, align) (((x) + (align) - 1) & (-(align)))
+// The masks are pointer-wide: with a u32 alignment, ~(N - 1) is a 32-bit mask that would clear the
+// upper half of a 64-bit address.
+#define ROUND_UP(x, align) (((x) + (align) - 1) & ~(uintptr_t)((align) - 1))
 #endif
 #ifndef ROUND_UP_PTR
 #define ROUND_UP_PTR(x, align) ((void*)((((uintptr_t)(x)) + (align) - 1) & (~(uintptr_t)((align) - 1))))
 #endif
 
 #ifndef ALIGN_PREV
-#define ALIGN_PREV(X, N) ((X) & ~((N) - 1))
+#define ALIGN_PREV(X, N) ((X) & ~(uintptr_t)((N) - 1))
 #define ALIGN_NEXT(X, N) ALIGN_PREV(((X) + (N) - 1), N)
 #endif
 

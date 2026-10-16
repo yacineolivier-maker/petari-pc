@@ -48,7 +48,12 @@ struct JASTrack : public JASPoolAllocObject_MultiThreaded< JASTrack > {
     };
 
     struct TList {
+#if TARGET_PC
+        // offsetof(JASTrack, mNode) on x64 (checked in JASTrack.cpp).
+        typedef JGadget::TLinkList< JASTrack, -792 > TrackList;
+#else
         typedef JGadget::TLinkList< JASTrack, -0x248 > TrackList;
+#endif
         typedef TrackList::iterator iterator;
         TList() : mCallbackRegistered() {
         }

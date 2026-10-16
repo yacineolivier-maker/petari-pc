@@ -637,7 +637,7 @@ namespace nw4r {
             bool mbDisable;
         };
 
-#ifdef __MWERKS__
+#if defined(__MWERKS__) || TARGET_PC  // offset 0 would overwrite the vtable pointer
         typedef ut::LinkList< AnimationLink, offsetof(AnimationLink, mLink) > AnimationList;
 #else
         typedef ut::LinkList< AnimationLink, 0 > AnimationList;
