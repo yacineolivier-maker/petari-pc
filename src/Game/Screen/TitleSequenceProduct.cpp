@@ -131,7 +131,12 @@ void TitleSequenceProduct::exeLogoDisplay() {
     mAButtonChecker->update(MR::testCorePadButtonA(WPAD_CHAN0));
     mBButtonChecker->update(MR::testCorePadButtonB(WPAD_CHAN0));
 
+#if TARGET_PC
+    // On a gamepad A alone starts (the Wii's A+B is awkward there: B is on a shoulder button).
+    if (mAButtonChecker->getLevel()) {
+#else
     if (mAButtonChecker->getLevel() && mBButtonChecker->getLevel()) {
+#endif
         MR::stopStageBGM(75);
         MR::startSystemSE("SE_SY_GAME_START");
         MR::startCSSound("CS_CLICK_CLOSE", nullptr, 0);
