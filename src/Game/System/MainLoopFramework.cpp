@@ -332,7 +332,13 @@ void MainLoopFramework::clearEfb(int param1, int param2, int param3, int param4,
     GXClearVtxDesc();
     GXSetVtxDesc(GX_VA_POS, GX_DIRECT);
     GXSetVtxDesc(GX_VA_TEX0, GX_DIRECT);
+#if TARGET_PC
+    // Aurora has no Z textures (GX_ZT_REPLACE with the all-0xFFFFFF texture writes the far depth):
+    // put the quad on the far plane instead (z = -far with this 0..1 ortho projection).
+    GXSetVtxAttrFmt(GX_VTXFMT0, GX_VA_POS, GX_POS_XYZ, GX_S16, 0);
+#else
     GXSetVtxAttrFmt(GX_VTXFMT0, GX_VA_POS, GX_POS_XY, GX_U16, 0);
+#endif
     GXSetVtxAttrFmt(GX_VTXFMT0, GX_VA_TEX0, GX_POS_XYZ, GX_U8, 0);
     GXSetNumChans(0);
     GXSetChanCtrl(GX_COLOR0A0, GX_FALSE, GX_SRC_REG, GX_SRC_REG, GX_LIGHT_NULL, GX_DF_NONE, GX_AF_NONE);
@@ -362,6 +368,19 @@ void MainLoopFramework::clearEfb(int param1, int param2, int param3, int param4,
 
     GXBegin(GX_QUADS, GX_VTXFMT0, 4);
     {
+#if TARGET_PC
+        GXPosition3s16(param1, param2, -1);
+        GXTexCoord2u8(0, 0);
+
+        GXPosition3s16(param1 + param3, param2, -1);
+        GXTexCoord2u8(1, 0);
+
+        GXPosition3s16(param1 + param3, param2 + param4, -1);
+        GXTexCoord2u8(1, 1);
+
+        GXPosition3s16(param1, param2 + param4, -1);
+        GXTexCoord2u8(0, 1);
+#else
         GXPosition2u16(param1, param2);
         GXTexCoord2u8(0, 0);
 
@@ -373,6 +392,7 @@ void MainLoopFramework::clearEfb(int param1, int param2, int param3, int param4,
 
         GXPosition2u16(param1, param2 + param4);
         GXTexCoord2u8(0, 1);
+#endif
     }
     GXEnd();
 

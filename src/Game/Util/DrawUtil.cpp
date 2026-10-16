@@ -139,7 +139,12 @@ namespace MR {
         GXClearVtxDesc();
         GXSetVtxDesc(GX_VA_POS, GX_DIRECT);
         GXSetVtxDesc(GX_VA_TEX0, GX_DIRECT);
+#if TARGET_PC
+        // Aurora has no Z textures (see MainLoopFramework::clearEfb): far-plane quad instead.
+        GXSetVtxAttrFmt(GX_VTXFMT0, GX_VA_POS, GX_POS_XYZ, GX_S16, 0);
+#else
         GXSetVtxAttrFmt(GX_VTXFMT0, GX_VA_POS, GX_POS_XY, GX_U16, 0);
+#endif
         GXSetVtxAttrFmt(GX_VTXFMT0, GX_VA_TEX0, GX_POS_XYZ, GX_U8, 0);
         GXSetNumChans(0);
         GXSetChanCtrl(GX_COLOR0A0, GX_FALSE, GX_SRC_REG, GX_SRC_REG, GX_LIGHT_NULL, GX_DF_NONE, GX_AF_NONE);
@@ -172,6 +177,19 @@ namespace MR {
 
         GXBegin(GX_QUADS, GX_VTXFMT0, 4);
         {
+#if TARGET_PC
+            GXPosition3s16(0, 0, -1);
+            GXTexCoord2u8(0, 0);
+
+            GXPosition3s16(width, 0, -1);
+            GXTexCoord2u8(1, 0);
+
+            GXPosition3s16(width, height, -1);
+            GXTexCoord2u8(1, 1);
+
+            GXPosition3s16(0, height, -1);
+            GXTexCoord2u8(0, 1);
+#else
             GXPosition2u16(0, 0);
             GXTexCoord2u8(0, 0);
 
@@ -183,6 +201,7 @@ namespace MR {
 
             GXPosition2u16(0, height);
             GXTexCoord2u8(0, 1);
+#endif
         }
         GXEnd();
 

@@ -71,6 +71,11 @@ BloomEffect::BloomEffect(const char* pName) : ImageEffectBase(pName), _14(255), 
 }
 
 void BloomEffect::preDraw() const {
+#if TARGET_PC
+    if (getenv("SMGPC_NO_BLOOM") != nullptr) {
+        return;
+    }
+#endif
     if (!isSomething()) {
         return;
     }
@@ -87,6 +92,11 @@ void BloomEffect::preDraw() const {
 }
 
 void BloomEffect::postDraw() const {
+#if TARGET_PC
+    if (getenv("SMGPC_NO_BLOOM") != nullptr) {
+        return;
+    }
+#endif
     if (!isSomething()) {
         return;
     }
