@@ -46,3 +46,4 @@ compile_commands.json
 
 # PC port
 !CMakeLists.txt
+pc/res/
