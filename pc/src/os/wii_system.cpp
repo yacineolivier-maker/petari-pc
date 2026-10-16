@@ -25,13 +25,45 @@ constexpr int kMaxFiles = 16;
 std::mutex sNandMutex;
 FILE* sFiles[kMaxFiles];
 
+constexpr const char* kHomeDir = "/title/00010000/524d4745/data";
+
+void MigrateRootSaves();
+
+// Relative NAND paths start from the current directory, which is the title's home directory when
+// a Wii game starts (the game never changes it).
 fs::path HostPath(const char* nandPath) {
+    MigrateRootSaves();
     std::string rel = nandPath != nullptr ? nandPath : "";
+    if (rel.empty() || rel[0] != '/') {
+        rel = std::string(kHomeDir) + "/" + rel;
+    }
     while (!rel.empty() && rel[0] == '/') {
         rel.erase(0, 1);
     }
     return fs::path(pc_user_dir()) / "nand" / fs::u8path(rel);
 }
+
+// Saves made before relative paths were fixed went to the NAND root: move them home once.
+void MigrateRootSaves() {
+    static bool sDone = false;
+    if (sDone) {
+        return;
+    }
+    sDone = true;
+    std::error_code ec;
+    const fs::path root = fs::path(pc_user_dir()) / "nand";
+    const fs::path home = HostPath("");
+    for (const char* name : {"GameData.bin"}) {
+        const fs::path oldPath = root / name;
+        if (fs::exists(oldPath, ec) && !fs::exists(home / name, ec)) {
+            fs::create_directories(home, ec);
+            fs::rename(oldPath, home / name, ec);
+        }
+    }
+}
+
+u16 Swap16(u16 v) { return u16((v >> 8) | (v << 8)); }
+u32 Swap32(u32 v) { return (v >> 24) | ((v >> 8) & 0xFF00) | ((v << 8) & 0xFF0000) | (v << 24); }
 
 FILE* FileOf(const NANDFileInfo* info) {
     if (info == nullptr || info->fileDescriptor < 0 || info->fileDescriptor >= kMaxFiles) {
@@ -56,7 +88,7 @@ s32 NANDInit(void) { return NAND_RESULT_OK; }
 
 s32 NANDGetHomeDir(char path[NAND_MAX_PATH]) {
     // RMGE01's title data directory.
-    std::snprintf(path, NAND_MAX_PATH, "/title/00010000/524d4745/data");
+    std::snprintf(path, NAND_MAX_PATH, "%s", kHomeDir);
     return NAND_RESULT_OK;
 }
 
@@ -135,6 +167,20 @@ s32 NANDWrite(NANDFileInfo* info, const void* buf, u32 length) {
     if (f == nullptr) {
         return NAND_RESULT_INVALID;
     }
+    // The banner's icon speeds are set by the game in host order (NANDSetIconSpeed): store them
+    // big-endian like the rest of the header (see NANDInitBanner) so the file is a real Wii banner.
+    const size_t pathLen = std::strlen(info->origPath);
+    if (length >= 0x20 && pathLen >= 10 && std::strcmp(info->origPath + pathLen - 10, "banner.bin") == 0 &&
+        std::ftell(f) == 0) {
+        std::string copy(static_cast< const char* >(buf), length);
+        u16 speed;
+        std::memcpy(&speed, &copy[8], 2);
+        speed = Swap16(speed);
+        std::memcpy(&copy[8], &speed, 2);
+        s32 n = (s32)std::fwrite(copy.data(), 1, length, f);
+        std::fflush(f);
+        return n;
+    }
     s32 n = (s32)std::fwrite(buf, 1, length, f);
     std::fflush(f);
     return n;
@@ -200,9 +246,20 @@ s32 NANDCheck(u32, u32, u32* answer) {
     return NAND_RESULT_OK;
 }
 
-void NANDInitBanner(NANDBanner* banner, u32, const u16*, const u16*) {
-    if (banner != nullptr) {
-        std::memset(banner, 0, sizeof(*banner));
+// Wii save banner header, big-endian like on the console: signature, flags, titles (UTF-16BE; the
+// game's messages are host-order UTF-16 on PC).
+void NANDInitBanner(NANDBanner* banner, u32 flag, const u16* title, const u16* comment) {
+    if (banner == nullptr) {
+        return;
+    }
+    std::memset(banner, 0, sizeof(*banner));
+    banner->signature = Swap32(NAND_BANNER_SIGNATURE);
+    banner->flag = Swap32(flag);
+    const u16* texts[2] = {title, comment};
+    for (int t = 0; t < 2; t++) {
+        for (int i = 0; texts[t] != nullptr && i < NAND_BANNER_COMMENT_SIZE - 1 && texts[t][i] != 0; i++) {
+            banner->comment[t][i] = Swap16(texts[t][i]);
+        }
     }
 }
 
