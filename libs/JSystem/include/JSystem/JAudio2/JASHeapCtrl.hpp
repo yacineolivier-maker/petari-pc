@@ -87,6 +87,13 @@ namespace JASThreadingModel {
     template < typename T >
     class InterruptsDisable {
     public:
+#if TARGET_PC
+        // No interrupts to disable: take the audio lock shared with the mixer callback.
+        struct Lock {
+            Lock(const T&) {}
+            JASCriticalSection mSection;
+        };
+#else
         struct Lock {
             Lock(const T&) {
                 mInterruptState = OSDisableInterrupts();
@@ -97,6 +104,7 @@ namespace JASThreadingModel {
 
             /* 0x00 */ u32 mInterruptState;
         };
+#endif
     };
 
     template < typename T >

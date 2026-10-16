@@ -93,7 +93,9 @@ void JASDriver::setOutputRate(JASOutputRate param_0) {
         sSubFrames = 10;
         sDacRate = 48000.0f;
     }
+#if !TARGET_PC  // The PC mixer (pc/src/audio) outputs exactly 48 kHz, not the Wii DAC's rate.
     sDacRate *= 1.0008897f;
+#endif
 }
 
 const JASDriver::MixFunc JASDriver::sMixFuncs[4] = {
@@ -140,6 +142,9 @@ void JASDriver::updateDSP() {
 
     JASPortCmd::execAllCommand();
     DSPSyncCallback();
+#if !TARGET_PC
+    // Watchdog for a late DSP: on PC the subframes are rendered in bursts by the audio callback,
+    // which would trip it (Dusklight disables it too).
     static u32 old_time = 0;
     static u32 history[10] = {0x000F4240};
     u32 r28 = OSGetTick();
@@ -152,6 +157,7 @@ void JASDriver::updateDSP() {
         JASReport("kill DSP channel");
         JASDSPChannel::killActiveChannel();
     }
+#endif
     JASChannel::receiveBankDisposeMsg();
     JASDSPChannel::updateAll();
 
@@ -201,9 +207,7 @@ void JASDriver::finishDSPFrame() {
     JASProbe::start(7, "DSP-MAIN");
     u32 r27 = getFrameSamples();
 #if TARGET_PC
-    // TODO(pc): no DSP to send the (32-bit) output buffer addresses to; the future HLE mixer must render
-    // the frame into sDspDacBuffer[sDspDacWriteBuffer] (left half, right half at +r27) here. Until then
-    // the DSP output stays silent.
+    // Not reached on PC: pc/src/audio renders the frames itself (no audio thread, no DSP sync).
 #else
     JASDsp::syncFrame(getSubFrames(), u32(sDspDacBuffer[sDspDacWriteBuffer]), u32(sDspDacBuffer[sDspDacWriteBuffer] + r27));
 #endif

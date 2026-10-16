@@ -29,8 +29,9 @@ DSPTaskInfo* __DSP_curr_task = nullptr;
 extern "C" {
 
 // --- Audio interface / DSP -------------------------------------------------------------------
-// TODO(pc): the DSP is replaced by an HLE software mixer (not written yet): no sound for now.
-// DSPCheckMailToDSP must report "mailbox empty" or osdsp_task's busy-wait loops never end.
+// The DSP and the AI DMA are replaced by the HLE mixer + SDL3 output in pc/src/audio, which drives
+// JASDriver::updateDSP() itself; these are never used for sound. DSPCheckMailToDSP must report
+// "mailbox empty" or osdsp_task's busy-wait loops never end.
 void AIInit(u8*) {}
 void AIInitDMA(uintptr_t, u32) {}
 static AIDCallback sAIDMACallback = nullptr;

@@ -29,6 +29,9 @@
 
 #include <JSystem/JAudio2/JASAramStream.hpp>
 #include <JSystem/JAudio2/JASAudioThread.hpp>
+#if TARGET_PC
+#include "pc/audio.h"
+#endif
 #include <JSystem/JAudio2/JASDriverIF.hpp>
 #include <JSystem/JAudio2/JASDvdThread.hpp>
 #include <JSystem/JAudio2/JASHeapCtrl.hpp>
@@ -1126,7 +1129,12 @@ void JAU_JASInitializer::initJASystem(JKRSolidHeap* pHeap) {
         }
 
         JASDvd::createThread(dvdThreadPriority_, 0x100, 0x8000);
+#if TARGET_PC
+        // No audio thread: the SDL3 audio callback drives JAudio2 and the HLE DSP mixer.
+        smgpc::audio::Initialize();
+#else
         JASAudioThread::create(audioThreadPriority_);
+#endif
         JKRThreadSwitch* pThreadSwitch = JKRThreadSwitch::getManager();
         if (pThreadSwitch != nullptr) {
             if (dvdThreadId_ >= 0) {

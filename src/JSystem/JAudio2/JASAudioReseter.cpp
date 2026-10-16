@@ -46,9 +46,13 @@ s32 JASAudioReseter::calc() {
                 handle->drop();
             }
         }
+#if TARGET_PC
+        // No audio thread on PC (pc/src/audio): nothing to stop.
+#else
         if (mThreadStopFlag != false) {
             JASAudioThread::getInstance()->stop();
         }
+#endif
         mDoneFlag = 1;
         return -1;
     }

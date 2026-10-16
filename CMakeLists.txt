@@ -140,6 +140,8 @@ smg_add_lib(smg_pc
         pc/src/crash_handler.cpp
         pc/src/game_missing.cpp
         pc/src/rfl_stubs.cpp
+        pc/src/audio/pc_audio.cpp
+        pc/src/audio/pc_dsp.cpp
         pc/src/os/OSAlarm.cpp
         pc/src/os/OSContext.cpp
         pc/src/os/OSMutex.cpp
