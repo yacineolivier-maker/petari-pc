@@ -23,7 +23,7 @@ struct Settings {
     bool textureMipmaps = true;
     bool vsync = true;
     std::string backend = "auto";
-    int supersampling = 1;
+    int supersampling = 2;
     std::string language = "fr";
 };
 
