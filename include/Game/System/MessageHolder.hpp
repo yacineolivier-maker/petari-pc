@@ -1,5 +1,7 @@
 #pragma once
 
+#include "helpers/endian.h"
+
 #include <revolution/types.h>
 
 class JMapInfo;
@@ -7,29 +9,29 @@ class TalkMessageInfo;
 class TalkNode;
 
 struct MessageInfoBlock {
-    /* 0x0 */ u32 mMagic;
-    /* 0x4 */ u32 mBlockSize;
-    /* 0x8 */ u16 mItemCount;
-    /* 0xA */ u16 mItemSize;
-    /* 0xC */ u32 _C;
+    /* 0x0 */ BE(u32) mMagic;
+    /* 0x4 */ BE(u32) mBlockSize;
+    /* 0x8 */ BE(u16) mItemCount;
+    /* 0xA */ BE(u16) mItemSize;
+    /* 0xC */ BE(u32) _C;
 };
 
 struct MessageDataBlock {
-    /* 0x0 */ u32 mMagic;
-    /* 0x4 */ u32 mBlockSize;
+    /* 0x0 */ BE(u32) mMagic;
+    /* 0x4 */ BE(u32) mBlockSize;
 };
 
 struct MessageFlowBlock {
-    /* 0x0 */ u32 mMagic;
-    /* 0x4 */ u32 mBlockSize;
-    /* 0x8 */ u16 mNodeCount;
-    /* 0xA */ u16 _A;
-    /* 0xC */ u32 _C;
+    /* 0x0 */ BE(u32) mMagic;
+    /* 0x4 */ BE(u32) mBlockSize;
+    /* 0x8 */ BE(u16) mNodeCount;
+    /* 0xA */ BE(u16) _A;
+    /* 0xC */ BE(u32) _C;
 };
 
 struct MessageFLI1Block {
-    /* 0x0 */ u32 mMagic;
-    /* 0x4 */ u32 mBlockSize;
+    /* 0x0 */ BE(u32) mMagic;
+    /* 0x4 */ BE(u32) mBlockSize;
 };
 
 class MessageData {
@@ -78,8 +80,8 @@ public:
     struct FlowNodeEvent {
         /* 0x00 */ u8 mFlowType;
         /* 0x01 */ u8 mEventType;
-        /* 0x02 */ u16 mBranchID;
-        /* 0x04 */ u32 mArg;
+        /* 0x02 */ BE(u16) mBranchID;
+        /* 0x04 */ BE(u32) mArg;
     };
 
     static bool getSystemMessageDirect(TalkMessageInfo*, const char*);

@@ -1,3 +1,4 @@
+#include "helpers/endian.h"
 #include "Game/RhythmLib/AudChordInfo.hpp"
 #include <JSystem/JAudio2/JASCriticalSection.hpp>
 #include <JSystem/JKernel/JKRArchive.hpp>
@@ -48,15 +49,14 @@ bool AudChordTable::setChordTableResource(void* pRes) {
 
     u8* base = (u8*)cursor;
 #if TARGET_PC
-    // TODO(pc): the resource is big-endian; counts and offsets are read natively here, like the
-    // original, until the endian layer exists.
+    // The resource is big-endian and never modified: counts and offsets are read through BE().
     (void)alreadyRelocated;
     (void)initialized;
-    mChordCount = *(u16*)(base + 0);
-    mScaleCount = *(u16*)(base + 2);
+    mChordCount = *(const BE(u16)*)(base + 0);
+    mScaleCount = *(const BE(u16)*)(base + 2);
 
-    const u32* chordOffsets = (const u32*)(base + 4);
-    const u32* scaleOffsets = (const u32*)(base + 4 + mChordCount * 4);
+    const BE(u32)* chordOffsets = (const BE(u32)*)(base + 4);
+    const BE(u32)* scaleOffsets = (const BE(u32)*)(base + 4 + mChordCount * 4);
 
     delete[] mChordPtr;
     delete[] mScalePtr;
@@ -71,7 +71,7 @@ bool AudChordTable::setChordTableResource(void* pRes) {
 
     for (s32 i = 0; i < mScaleCount; i++) {
         // File layout of a scale entry: two u32 offsets (up, down) from the start of the resource.
-        const u32* scaleFile = (const u32*)((u8*)pRes + scaleOffsets[i]);
+        const BE(u32)* scaleFile = (const BE(u32)*)((u8*)pRes + scaleOffsets[i]);
         mScaleStorage[i].up = (u8*)pRes + scaleFile[0];
         mScaleStorage[i].down = (u8*)pRes + scaleFile[1];
         mScalePtr[i] = &mScaleStorage[i];

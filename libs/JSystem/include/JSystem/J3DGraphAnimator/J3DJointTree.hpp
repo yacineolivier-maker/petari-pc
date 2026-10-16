@@ -6,9 +6,10 @@
 class J3DMtxBuffer;
 class JUTNameTab;
 
+// INF1 scene graph entry (file data).
 struct J3DModelHierarchy {
-    /* 0x0 */ u16 mType;
-    /* 0x2 */ u16 mValue;
+    /* 0x0 */ BE(u16) mType;
+    /* 0x2 */ BE(u16) mValue;
 };
 
 class J3DJoint;
@@ -42,7 +43,7 @@ public:
     u16 getDrawMtxNum() const {
         return mDrawMtxData.mEntryNum;
     }
-    Mtx& getInvJointMtx(int idx) {
+    BE(Mtx)& getInvJointMtx(int idx) {
         return mInvJointMtx[idx];
     }
 
@@ -59,10 +60,10 @@ public:
     u16* getWEvlpImportantMtxIndex() const {
         return mWEvlpImportantMtxIdx;
     }
-    u16* getWEvlpMixMtxIndex() const {
+    BE(u16)* getWEvlpMixMtxIndex() const {
         return mWEvlpMixMtxIndex;
     }
-    f32* getWEvlpMixWeight() const {
+    BE(f32)* getWEvlpMixWeight() const {
         return mWEvlpMixWeight;
     }
     u16 getDrawFullWgtMtxNum() const {
@@ -108,9 +109,10 @@ public:
     /* 0x1C */ u16 mJointNum;
     /* 0x1E */ u16 mWEvlpMtxNum;
     /* 0x20 */ u8* mWEvlpMixMtxNum;
-    /* 0x24 */ u16* mWEvlpMixMtxIndex;
-    /* 0x28 */ f32* mWEvlpMixWeight;
-    /* 0x2C */ Mtx* mInvJointMtx;
+    // EVP1 file data, read in place.
+    /* 0x24 */ BE(u16)* mWEvlpMixMtxIndex;
+    /* 0x28 */ BE(f32)* mWEvlpMixWeight;
+    /* 0x2C */ BE(Mtx)* mInvJointMtx;
     /* 0x30 */ u16* mWEvlpImportantMtxIdx;
     /* 0x34 */ J3DDrawMtxData mDrawMtxData;
     /* 0x40 */ u32 field_0x40;

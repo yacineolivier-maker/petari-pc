@@ -180,15 +180,19 @@ static f32 J3DUnit01[] = {0.0f, 1.0f};
 void J3DMtxBuffer::calcWeightEnvelopeMtx() {
     __REGISTER MtxPtr weightAnmMtx;
     __REGISTER MtxPtr worldMtx;
+#if TARGET_PC
+    Mtx invMtx;  // EVP1 inverse bind matrices are big-endian file data
+#else
     __REGISTER MtxPtr invMtx;
+#endif
     __REGISTER f32 weight;
     int idx;
     int j;
     int mixNum;
     int i;
     int max;
-    u16* indices;
-    __REGISTER f32* weights;
+    BE(u16)* indices;
+    __REGISTER BE(f32)* weights;
     u8* pScale;
 
     __REGISTER f32 var_f1;
@@ -253,7 +257,11 @@ void J3DMtxBuffer::calcWeightEnvelopeMtx() {
         mixNum = mJointTree->getWEvlpMixMtxNum(i);
         do {
             idx = *++indices;
+#if TARGET_PC
+            mJointTree->getInvJointMtx((u16)idx).to_host(invMtx);
+#else
             invMtx = mJointTree->getInvJointMtx((u16)idx);
+#endif
             worldMtx = mpAnmMtx[idx];
 
 #if TARGET_PC

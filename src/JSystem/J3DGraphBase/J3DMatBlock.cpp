@@ -6,6 +6,25 @@
 #include "JSystem/J3DGraphBase/J3DTransform.hpp"
 #include <cstdio>
 
+#if TARGET_PC
+// GXColor is {r, g, b, a} in memory; the XF register wants 0xRRGGBBAA, which a raw u32 load only
+// gives on a big-endian host.
+static inline u32 J3DGXColorToU32(const GXColor& color) {
+    return ((u32)color.r << 24) | ((u32)color.g << 16) | ((u32)color.b << 8) | (u32)color.a;
+}
+
+inline void loadMatColors(const J3DGXColor* color) {
+    J3DGDWriteXFCmdHdr(0x100C, 2);
+    J3DGDWrite_u32(J3DGXColorToU32(color[0]));
+    J3DGDWrite_u32(J3DGXColorToU32(color[1]));
+}
+
+inline void loadAmbColors(const J3DGXColor* color) {
+    J3DGDWriteXFCmdHdr(0x100A, 2);
+    J3DGDWrite_u32(J3DGXColorToU32(color[0]));
+    J3DGDWrite_u32(J3DGXColorToU32(color[1]));
+}
+#else
 inline void loadMatColors(const J3DGXColor* color) {
     J3DGDWriteXFCmdHdr(0x100C, 2);
     J3DGDWrite_u32(*(u32*)color);
@@ -17,6 +36,7 @@ inline void loadAmbColors(const J3DGXColor* color) {
     J3DGDWrite_u32(*(u32*)color);
     J3DGDWrite_u32(*(u32*)(color + 1));
 }
+#endif
 
 inline void loadTevColor(u32 reg, const J3DGXColorS10& color) {
     J3DGDSetTevColorS10(GXTevRegID(reg + 1), color);

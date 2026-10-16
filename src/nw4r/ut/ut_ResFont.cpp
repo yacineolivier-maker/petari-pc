@@ -3,19 +3,15 @@
 
 namespace nw4r {
     namespace ut {
+#if !TARGET_PC
         namespace {
             template < typename T >
             inline void ResolveOffset(T*& rpPtr, void* pBase) {
-#if TARGET_PC
-                // TODO(pc): the pointer field holds a 32-bit file offset; BRFNT blocks are big-endian
-                // with 4-byte pointer slots, to be handled by the asset endian/layout pass.
-                rpPtr = reinterpret_cast< T* >(static_cast< char* >(pBase) + static_cast< s32 >(reinterpret_cast< intptr_t >(rpPtr)));
-#else
                 rpPtr = reinterpret_cast< T* >(static_cast< char* >(pBase) + reinterpret_cast< s32 >(rpPtr));
-#endif
             }
 
         }  // namespace
+#endif
 
         ResFont::ResFont() {
         }
@@ -83,6 +79,12 @@ namespace nw4r {
                 switch (blockHeader->kind) {
                 case 'FINF': {
                     info = reinterpret_cast< FontInformation* >(reinterpret_cast< u8* >(blockHeader) + sizeof(*blockHeader));
+#if TARGET_PC
+                    // The offsets (FINF pGlyph/pWidth/pMap, TGLP sheetImage, CWDH/CMAP pNext) stay
+                    // in the file and are resolved on access (FontResPtr::Get), see
+                    // fontResourceFormat.h. Nothing is written into the file data apart from the
+                    // signature below.
+#else
                     ResolveOffset(info->pGlyph, fileHeader);
 
                     if (info->pWidth != nullptr) {
@@ -91,27 +93,34 @@ namespace nw4r {
                     if (info->pMap != nullptr) {
                         ResolveOffset(info->pMap, fileHeader);
                     }
+#endif
                 } break;
 
                 case 'TGLP': {
+#if !TARGET_PC
                     FontTextureGlyph* glyph = reinterpret_cast< FontTextureGlyph* >(reinterpret_cast< u8* >(blockHeader) + sizeof(*blockHeader));
                     ResolveOffset(glyph->sheetImage, fileHeader);
+#endif
                 } break;
 
                 case 'CWDH': {
+#if !TARGET_PC
                     FontWidth* width = reinterpret_cast< FontWidth* >(reinterpret_cast< u8* >(blockHeader) + sizeof(*blockHeader));
 
                     if (width->pNext != nullptr) {
                         ResolveOffset(width->pNext, fileHeader);
                     }
+#endif
                 } break;
 
                 case 'CMAP': {
+#if !TARGET_PC
                     FontCodeMap* map = reinterpret_cast< FontCodeMap* >(reinterpret_cast< u8* >(blockHeader) + sizeof(*blockHeader));
 
                     if (map->pNext != nullptr) {
                         ResolveOffset(map->pNext, fileHeader);
                     }
+#endif
                 } break;
 
                 case 'GLGR': {

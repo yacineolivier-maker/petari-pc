@@ -52,7 +52,15 @@ void* LayoutHolder::GetResource(u32 resourceKind, const char* pName, u32* pResou
 
     if (pResourceInfo != nullptr) {
         if (pResource != nullptr) {
+#if TARGET_PC
+            {
+                // Big-endian word in the resource header.
+                const u8* p = static_cast< const u8* >(pResource) + 4;
+                *pResourceInfo = ((u32)p[0] << 24) | ((u32)p[1] << 16) | ((u32)p[2] << 8) | p[3];
+            }
+#else
             *pResourceInfo = static_cast< u32* >(pResource)[1];
+#endif
         } else {
             *pResourceInfo = 0;
         }

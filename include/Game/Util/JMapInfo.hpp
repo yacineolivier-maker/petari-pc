@@ -2,6 +2,7 @@
 
 #include <cstring>
 #include <revolution.h>
+#include "helpers/endian.h"
 
 #define JMAP_VALUE_TYPE_LONG 0
 #define JMAP_VALUE_TYPE_STRING 1
@@ -14,21 +15,45 @@
 
 class JMapInfoIter;
 
+// BCSV file structures (big-endian in the file).
 struct JMapItem {
-    /* 0x00 */ u32 mHash;
-    /* 0x04 */ u32 mMask;
-    /* 0x08 */ u16 mOffsData;
+    /* 0x00 */ BE(u32) mHash;
+    /* 0x04 */ BE(u32) mMask;
+    /* 0x08 */ BE(u16) mOffsData;
     /* 0x0A */ u8 mShift;
     /* 0x0B */ u8 mType;
 };
 
 struct JMapData {
-    /* 0x00 */ s32 mNumEntries;
-    /* 0x04 */ s32 mNumFields;
-    /* 0x08 */ s32 mDataOffset;
-    /* 0x0C */ u32 mEntrySize;
+    /* 0x00 */ BE(s32) mNumEntries;
+    /* 0x04 */ BE(s32) mNumFields;
+    /* 0x08 */ BE(s32) mDataOffset;
+    /* 0x0C */ BE(u32) mEntrySize;
     /* 0x10 */ const JMapItem mItems[];
 };
+
+#if TARGET_PC
+static_assert(sizeof(JMapItem) == 0xC, "JMapItem must match the BCSV field entry");
+static_assert(sizeof(JMapData) == 0x10, "JMapData must match the BCSV header");
+
+// BCSV cells are big-endian and may be unaligned.
+inline u32 JMapReadU32(const char* p) {
+    u32 v;
+    memcpy(&v, p, sizeof(v));
+    return be32(v);
+}
+inline u16 JMapReadU16(const char* p) {
+    u16 v;
+    memcpy(&v, p, sizeof(v));
+    return be16(v);
+}
+inline f32 JMapReadF32(const char* p) {
+    u32 v = JMapReadU32(p);
+    f32 f;
+    memcpy(&f, &v, sizeof(f));
+    return f;
+}
+#endif
 
 template < typename T >
 inline bool compareValues(const T a, const T b) {
@@ -76,13 +101,21 @@ public:
     bool getValueFast(int entryIndex, int itemIndex, f32* pValueOut) const {
         const JMapItem* pItem = &mData->mItems[itemIndex];
         const char* pValue = getEntryAddress(mData, mData->mDataOffset, entryIndex) + pItem->mOffsData;
+#if TARGET_PC
+        *pValueOut = JMapReadF32(pValue);
+#else
         *pValueOut = *reinterpret_cast< const f32* >(pValue);
+#endif
         return true;
     }
     bool getValueFast(int entryIndex, int itemIndex, bool* pValueOut) const {
         const JMapItem* pItem = &mData->mItems[itemIndex];
         const char* pValue = getEntryAddress(mData, mData->mDataOffset, entryIndex) + pItem->mOffsData;
+#if TARGET_PC
+        *pValueOut = (JMapReadU32(pValue) & pItem->mMask) != 0;
+#else
         *pValueOut = (*reinterpret_cast< const u32* >(pValue) & pItem->mMask) != 0;
+#endif
         return true;
     }
 

@@ -63,7 +63,11 @@ namespace nw4r {
 
             void TexCoordAry::Copy(const void* pResTex, u8 texCoordNum) {
                 mNum = ut::Max(mNum, texCoordNum);
+#if TARGET_PC
+                const res::ResVec2(*src)[4] = reinterpret_cast< const res::ResVec2(*)[4] >(pResTex);
+#else
                 const math::VEC2(*src)[4] = reinterpret_cast< ConstTexCoordQuad >(pResTex);
+#endif
                 for (int j = 0; j < texCoordNum; j++) {
                     for (int i = 0; i < 4; i++) {
                         mData[j][i] = src[j][i];

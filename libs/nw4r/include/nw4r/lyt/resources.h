@@ -2,6 +2,7 @@
 
 #include "nw4r/lyt/types.h"
 #include "nw4r/math/types.h"
+#include "nw4r/ut/resEndian.h"
 #include <revolution.h>
 
 namespace nw4r {
@@ -45,48 +46,141 @@ namespace nw4r {
             const u32 RESOURCETYPE_FONT = 'font';
             const u32 RESOURCETYPE_ARCHIVEFONT = 'fnta';
 
+            // BRLYT/BRLAN data is big-endian. Runtime types (Size, VEC2, TexSRT, ...) cannot carry
+            // BE fields, so the file structs embed these resource variants on PC; they convert to
+            // the runtime type on read. On the Wii they are the runtime types themselves.
+#if TARGET_PC
+            struct ResVec2 {
+                BE(f32) x;
+                BE(f32) y;
+
+                operator math::VEC2() const {
+                    return math::VEC2(x, y);
+                }
+            };
+
+            struct ResVec3 {
+                BE(f32) x;
+                BE(f32) y;
+                BE(f32) z;
+
+                operator math::VEC3() const {
+                    return math::VEC3(x, y, z);
+                }
+            };
+
+            struct ResSize {
+                BE(f32) width;
+                BE(f32) height;
+
+                operator Size() const {
+                    return Size(width, height);
+                }
+            };
+
+            struct ResInflationLRTB {
+                BE(f32) l;
+                BE(f32) r;
+                BE(f32) t;
+                BE(f32) b;
+
+                operator InflationLRTB() const {
+                    InflationLRTB ret;
+                    ret.l = l;
+                    ret.r = r;
+                    ret.t = t;
+                    ret.b = b;
+                    return ret;
+                }
+            };
+
+            struct ResTexSRT {
+                ResVec2 translate;
+                BE(f32) rotate;
+                ResVec2 scale;
+
+                operator TexSRT() const {
+                    TexSRT ret;
+                    ret.translate = translate;
+                    ret.rotate = rotate;
+                    ret.scale = scale;
+                    return ret;
+                }
+            };
+
+            struct ResColorS10 {
+                BE(s16) r;
+                BE(s16) g;
+                BE(s16) b;
+                BE(s16) a;
+
+                operator GXColorS10() const {
+                    GXColorS10 ret;
+                    ret.r = r;
+                    ret.g = g;
+                    ret.b = b;
+                    ret.a = a;
+                    return ret;
+                }
+            };
+
+            static_assert(sizeof(ResVec2) == 0x8);
+            static_assert(sizeof(ResVec3) == 0xC);
+            static_assert(sizeof(ResSize) == 0x8);
+            static_assert(sizeof(ResInflationLRTB) == 0x10);
+            static_assert(sizeof(ResTexSRT) == 0x14);
+            static_assert(sizeof(ResColorS10) == 0x8);
+#else
+            typedef math::VEC2 ResVec2;
+            typedef math::VEC3 ResVec3;
+            typedef Size ResSize;
+            typedef InflationLRTB ResInflationLRTB;
+            typedef TexSRT ResTexSRT;
+            typedef GXColorS10 ResColorS10;
+#endif
+
             struct BinaryFileHeader {
                 char signature[4];
-                u16 byteOrder;
-                u16 version;
-                u32 fileSize;
-                u16 headerSize;
-                u16 dataBlocks;
+                BE(u16) byteOrder;
+                BE(u16) version;
+                BE(u32) fileSize;
+                BE(u16) headerSize;
+                BE(u16) dataBlocks;
             };
 
             struct DataBlockHeader {
                 char kind[4];
-                u32 size;
+                BE(u32) size;
             };
 
             struct Layout {
                 DataBlockHeader blockHeader;
                 u8 originType;
                 u8 padding[3];
-                Size layoutSize;
+                ResSize layoutSize;
             };
 
             struct Font {
-                u32 nameStrOffset;
+                BE(u32) nameStrOffset;
                 u8 type;
                 u8 padding[3];
             };
 
             struct FontList {
                 DataBlockHeader blockHeader;
-                u16 fontNum;
+                BE(u16) fontNum;
                 u8 padding[2];
             };
 
             struct Texture {
-                u32 nameStrOffset;
+                BE(u32) nameStrOffset;
                 u8 type;
                 u8 padding[3];
             };
 
             struct TextureList {
                 DataBlockHeader blockHeader;
-                u16 texNum;
+                BE(u16) texNum;
                 u8 padding[2];
             };
 
@@ -134,14 +228,14 @@ namespace nw4r {
                     detail::SetBits(&wrapTflt, 2, bitLen, bitData);
                 }
 
-                u16 texIdx;
+                BE(u16) texIdx;
                 u8 wrapSflt;
                 u8 wrapTflt;
             };
 
             struct MaterialList {
                 DataBlockHeader blockHeader;
-                u16 materialNum;
+                BE(u16) materialNum;
                 u8 padding[2];
             };
 
@@ -153,55 +247,55 @@ namespace nw4r {
                 u8 padding;
                 char name[16];
                 char userData[8];
-                math::VEC3 translate;
-                math::VEC3 rotate;
-                math::VEC2 scale;
-                Size size;
+                ResVec3 translate;
+                ResVec3 rotate;
+                ResVec2 scale;
+                ResSize size;
             };
 
             struct Picture : Pane {
-                u32 vtxCols[4];
-                u16 materialIdx;
+                BE(u32) vtxCols[4];
+                BE(u16) materialIdx;
                 u8 texCoordNum;
                 u8 padding[1];
             };
 
             struct TextBox : Pane {
-                u16 textBufBytes;
-                u16 textStrBytes;
-                u16 materialIdx;
-                u16 fontIdx;
+                BE(u16) textBufBytes;
+                BE(u16) textStrBytes;
+                BE(u16) materialIdx;
+                BE(u16) fontIdx;
                 u8 textPosition;
                 u8 textAlignment;
                 u8 padding[2];
-                u32 textStrOffset;
-                u32 textCols[2];
-                Size fontSize;
-                f32 charSpace;
-                f32 lineSpace;
+                BE(u32) textStrOffset;
+                BE(u32) textCols[2];
+                ResSize fontSize;
+                BE(f32) charSpace;
+                BE(f32) lineSpace;
             };
 
             struct WindowFrame {
-                u16 materialIdx;
+                BE(u16) materialIdx;
                 u8 textureFlip;
                 u8 padding1;
             };
 
             struct WindowContent {
-                u32 vtxCols[4];
-                u16 materialIdx;
+                BE(u32) vtxCols[4];
+                BE(u16) materialIdx;
                 u8 texCoordNum;
                 u8 padding[1];
             };
 
             struct Window : Pane {
-                InflationLRTB inflation;
+                ResInflationLRTB inflation;
                 u8 frameNum;
                 u8 padding1;
                 u8 padding2;
                 u8 padding3;
-                u32 contentOffset;
-                u32 frameOffsetTableOffset;
+                BE(u32) contentOffset;
+                BE(u32) frameOffsetTableOffset;
             };
 
             struct Bounding : Pane {};
@@ -215,7 +309,7 @@ namespace nw4r {
             struct Group {
                 DataBlockHeader blockHeader;
                 char name[16];
-                u16 paneNum;
+                BE(u16) paneNum;
                 u8 padding[2];
             };
 
@@ -264,12 +358,12 @@ namespace nw4r {
                     return u8(detail::GetBits(bits, 27, 1));
                 }
 
-                u32 bits;
+                BE(u32) bits;
             };
 
             struct Material {
                 char name[20];
-                GXColorS10 tevCols[3];
+                ResColorS10 tevCols[3];
                 GXColor tevKCols[4];
                 MaterialResourceNum resNum;
             };
@@ -295,12 +389,12 @@ namespace nw4r {
 
             struct AnimationBlock {
                 DataBlockHeader blockHeader;
-                u16 frameSize;
+                BE(u16) frameSize;
                 u8 loop;
                 u8 padding1;
-                u16 fileNum;
-                u16 animContNum;
-                u32 animContOffsetsOffset;
+                BE(u16) fileNum;
+                BE(u16) animContNum;
+                BE(u32) animContOffsetsOffset;
             };
 
             struct AnimationContent {
@@ -312,7 +406,7 @@ namespace nw4r {
             };
 
             struct AnimationInfo {
-                u32 kind;
+                BE(u32) kind;
 
                 u8 num;
                 u8 padding[3];
@@ -324,23 +418,55 @@ namespace nw4r {
                 u8 curveType;
                 u8 padding1;
 
-                u16 keyNum;
+                BE(u16) keyNum;
                 u8 padding2[2];
 
-                u32 keysOffset;
+                BE(u32) keysOffset;
             };
 
             struct HermiteKey {
-                f32 frame;
-                f32 value;
-                f32 slope;
+                BE(f32) frame;
+                BE(f32) value;
+                BE(f32) slope;
             };
 
             struct StepKey {
-                f32 frame;
-                u16 value;
-                u16 pad;
+                BE(f32) frame;
+                BE(u16) value;
+                BE(u16) pad;
             };
+
+#if TARGET_PC
+            // File layout sizes (the Wii build defines the same structs with plain fields).
+            static_assert(sizeof(BinaryFileHeader) == 0x10);
+            static_assert(sizeof(DataBlockHeader) == 0x8);
+            static_assert(sizeof(Layout) == 0x14);
+            static_assert(sizeof(Font) == 0x8);
+            static_assert(sizeof(FontList) == 0xC);
+            static_assert(sizeof(Texture) == 0x8);
+            static_assert(sizeof(TextureList) == 0xC);
+            static_assert(sizeof(TexMap) == 0x4);
+            static_assert(sizeof(MaterialList) == 0xC);
+            static_assert(sizeof(Pane) == 0x4C);
+            static_assert(sizeof(Picture) == 0x60);
+            static_assert(sizeof(TextBox) == 0x74);
+            static_assert(sizeof(WindowFrame) == 0x4);
+            static_assert(sizeof(WindowContent) == 0x14);
+            static_assert(sizeof(Window) == 0x68);
+            static_assert(sizeof(Bounding) == 0x4C);
+            static_assert(sizeof(ExtUserDataList) == 0xC);
+            static_assert(sizeof(Group) == 0x1C);
+            static_assert(sizeof(MaterialResourceNum) == 0x4);
+            static_assert(sizeof(Material) == 0x40);
+            static_assert(sizeof(AnimationTagBlock) == 0x1C);
+            static_assert(sizeof(AnimationShareBlock) == 0x10);
+            static_assert(sizeof(AnimationBlock) == 0x14);
+            static_assert(sizeof(AnimationContent) == 0x18);
+            static_assert(sizeof(AnimationInfo) == 0x8);
+            static_assert(sizeof(AnimationTarget) == 0xC);
+            static_assert(sizeof(HermiteKey) == 0xC);
+            static_assert(sizeof(StepKey) == 0x8);
+#endif
         };  // namespace res
     };  // namespace lyt
 };  // namespace nw4r

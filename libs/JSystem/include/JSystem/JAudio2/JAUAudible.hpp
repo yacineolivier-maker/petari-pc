@@ -53,7 +53,11 @@ struct JAUAudibleParam {
     }
 
     u32 getDoppler() const {
+#if TARGET_PC
+        return (u32)((mAudibleSw >> 12) & 0xf);
+#else
         return (u32)((*(u16*)&raw >> 12) & 0xf);
+#endif
         // return raw >> 28 & 0xF;
     }
 
@@ -68,14 +72,26 @@ struct JAUAudibleParam {
     }
 
     u32 getVolDistBit() const {
+#if TARGET_PC
+        return 1 << ((mAudibleSw >> 4) & 3);
+#else
         return 1 << ((*(u16*)&raw >> 4) & 3);
+#endif
     }
 
     union {
+#if TARGET_PC
+        // Runtime value: raw = mAudibleSw << 16 | _f1 in host order (little-endian halves swapped).
+        struct {
+            u16 _f1;
+            u16 mAudibleSw;
+        };
+#else
         /* 0x0 */ struct {
             /* 0x0 */ u16 mAudibleSw;
             /* 0x2 */ u16 _f1;
         };
+#endif
         /* 0x0 */ struct {
             /* 0x0 */ u8 b0_0 : 4;
             /* 0x0 */ u8 b0_4 : 1;

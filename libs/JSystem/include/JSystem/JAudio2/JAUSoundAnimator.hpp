@@ -1,6 +1,7 @@
 #pragma once
 
 #include "JSystem/JAudio2/JAISound.hpp"
+#include "helpers/endian.h"
 #include "JSystem/JAudio2/JAISoundHandles.hpp"
 #include "JSystem/JGeometry.hpp"
 #include <revolution.h>
@@ -90,13 +91,21 @@ public:
     }
 
     JAISoundID getSoundID() const {
+#if TARGET_PC
+        return JAISoundID((u32)mSoundID);
+#else
         return mSoundID;
+#endif
     }
 
+#if TARGET_PC
+    /* 0x00 */ BE(u32) mSoundID;  // file data (.bas): big-endian sound ID
+#else
     /* 0x00 */ JAISoundID mSoundID;
-    /* 0x04 */ f32 mNoteOnTime;
-    /* 0x08 */ f32 mNoteOffTime;
-    /* 0x0C */ f32 mBasePitch;
+#endif
+    /* 0x04 */ BE(f32) mNoteOnTime;
+    /* 0x08 */ BE(f32) mNoteOffTime;
+    /* 0x0C */ BE(f32) mBasePitch;
     /* 0x10 */  // u32 mFlags;
     union {
         /* 0x10 */ struct {
@@ -109,7 +118,7 @@ public:
             bool mPlaysOnlyReverse : 1;
             bool mPlaysOnlyForward : 1;
         };
-        /* 0x10 */ u32 mFlags;
+        /* 0x10 */ BE(u32) mFlags;
     };
     /* 0x14 */ u8 mBaseVolume;
     /* 0x15 */ s8 mPitchDelta;
@@ -118,8 +127,12 @@ public:
     /* 0x18 */ s8 mVolumeDelta;
     /* 0x19 */ u8 mRepeatInterval;
     /* 0x1A */ s8 _1A;
-    /* 0x1C */ u32 _1C;
+    /* 0x1C */ BE(u32) _1C;
 };
+
+#if TARGET_PC
+static_assert(sizeof(JAUSoundAnimationSound) == 0x20, "JAUSoundAnimationSound must match the .bas layout");
+#endif
 
 class JAUSoundAnimation;
 
@@ -134,6 +147,21 @@ class JAUSoundAnimation {
 public:
     u32 getStartSoundIndex(f32) const;
     u32 getEndSoundIndex(f32) const;
+#if TARGET_PC
+    // .bas file data: the control slot is a 32-bit field (always 0 in files, no control
+    // object exists in SMG), so the sounds stay at offset 8.
+    u16 getNumSounds() const {
+        return mNumSounds;
+    }
+
+    const JAUSoundAnimationSound* getSound(int i_index) const {
+        return &mSounds + i_index;
+    }
+
+    /* 0x0 */ BE(u16) mNumSounds;
+    /* 0x4 */ BE(u32) mControl;
+    /* 0x8 */ JAUSoundAnimationSound mSounds;
+#else
     u16 getNumSounds() const {
         if (mControl != nullptr) {
             return mControl->getNumSounds(this);
@@ -153,6 +181,7 @@ public:
     /* 0x0 */ u16 mNumSounds;
     /* 0x4 */ JAUSoundAnimationControl* mControl;
     /* 0x8 */ JAUSoundAnimationSound mSounds;
+#endif
 };
 
 class JAUSoundAnimator {

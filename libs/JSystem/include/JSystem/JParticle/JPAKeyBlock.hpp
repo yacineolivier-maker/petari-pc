@@ -1,5 +1,6 @@
 #pragma once
 
+#include "helpers/endian.h"
 #include <revolution/types.h>
 
 struct JPAKeyBlock {
@@ -11,5 +12,5 @@ struct JPAKeyBlock {
     }
 
     const u8* mDataStart;
-    const f32* field_0x4;
+    const BE(f32)* field_0x4;
 };

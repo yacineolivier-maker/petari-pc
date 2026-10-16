@@ -5,6 +5,24 @@
 #include "JSystem/JKernel/JKRHeap.hpp"
 #include "JSystem/JSupport/JSupport.hpp"
 #include <stdint.h>
+#if TARGET_PC
+#include "helpers/endian_gx.hpp"
+
+// J3DShape and GX read the vertex descriptor list as host structs; the file copy stays big-endian.
+static GXVtxDescList* J3DCopyVtxDescList(const GXVtxDescList* i_fileList) {
+    const BE(GXVtxDescList)* src = (const BE(GXVtxDescList)*)i_fileList;
+    u32 num = 0;
+    while (src[num].attr != GX_VA_NULL) {
+        num++;
+    }
+    GXVtxDescList* dst = new GXVtxDescList[num + 1];
+    for (u32 i = 0; i <= num; i++) {
+        dst[i].attr = src[i].attr;
+        dst[i].type = src[i].type;
+    }
+    return dst;
+}
+#endif
 
 enum {
     J3DMdlDataFlag_ConcatView = 0x10,
@@ -19,9 +37,9 @@ enum {
 
 J3DShapeFactory::J3DShapeFactory(J3DShapeBlock const& block) {
     mShapeInitData = JSUConvertOffsetToPtr< J3DShapeInitData >(&block, (uintptr_t)block.mpShapeInitData);
-    mIndexTable = JSUConvertOffsetToPtr< u16 >(&block, (uintptr_t)block.mpIndexTable);
+    mIndexTable = JSUConvertOffsetToPtr< BE(u16) >(&block, (uintptr_t)block.mpIndexTable);
     mVtxDescList = JSUConvertOffsetToPtr< GXVtxDescList >(&block, (uintptr_t)block.mpVtxDescList),
-    mMtxTable = JSUConvertOffsetToPtr< u16 >(&block, (uintptr_t)block.mpMtxTable);
+    mMtxTable = JSUConvertOffsetToPtr< BE(u16) >(&block, (uintptr_t)block.mpMtxTable);
     mDisplayListData = JSUConvertOffsetToPtr< u8 >(&block, (uintptr_t)block.mpDisplayListData),
     mMtxInitData = JSUConvertOffsetToPtr< J3DShapeMtxInitData >(&block, (uintptr_t)block.mpMtxInitData),
     mDrawInitData = JSUConvertOffsetToPtr< J3DShapeDrawInitData >(&block, (uintptr_t)block.mpDrawInitData), mVcdVatCmdBuffer = NULL;
@@ -31,7 +49,11 @@ J3DShape* J3DShapeFactory::create(int no, u32 flag, GXVtxDescList* vtxDesc) {
     J3DShape* shape = new J3DShape;
     shape->mMtxGroupNum = getMtxGroupNum(no);
     shape->mRadius = mShapeInitData[mIndexTable[no]].mRadius;
+#if TARGET_PC
+    shape->mVtxDesc = J3DCopyVtxDescList(getVtxDescList(no));
+#else
     shape->mVtxDesc = getVtxDescList(no);
+#endif
     shape->mShapeMtx = new J3DShapeMtx*[shape->mMtxGroupNum];
     shape->mShapeDraw = new J3DShapeDraw*[shape->mMtxGroupNum];
     shape->mMin = getMin(no);

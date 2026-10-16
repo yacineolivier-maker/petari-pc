@@ -1,15 +1,17 @@
 #pragma once
 
 #include "Game/AudioLib/AudRemixSequencer.hpp"
+#include "helpers/endian.h"
 #include "Game/AudioLib/AudSoundObject.hpp"
 
 class JKRHeap;
 
+// File data (remix sequence resource), big-endian.
 struct RemixNoteData {
-    s32 _0;
-    s32 _4;
-    s32 _8;
-    s32 _C;
+    BE(s32) _0;
+    BE(s32) _4;
+    BE(s32) _8;
+    BE(s32) _C;
 };
 
 struct RemixNoteTrackData {
@@ -21,7 +23,7 @@ struct RemixNoteGroupData {
     /* 0x0  */ s32 mIndex;
     /* 0x4  */ s32 mTrackCount;
     /* 0x8  */ s32 mNoteCount;
-    u32* _C;
+    BE(u32)* _C;  // points into the resource
     /* 0x10 */ RemixNoteTrackData* mRemixTracks;
 };
 

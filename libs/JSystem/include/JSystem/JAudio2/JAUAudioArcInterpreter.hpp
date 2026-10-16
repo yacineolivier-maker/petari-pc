@@ -1,5 +1,6 @@
 #pragma once
 
+#include "helpers/endian.h"
 #include <revolution/types.h>
 
 class JAUAudioArcInterpreter {
@@ -28,7 +29,7 @@ public:
     }
 
     u32 readU32_() {
-        u32 temp = *(u32*)mReadPtr;
+        u32 temp = *(BE(u32)*)mReadPtr;
         mReadPtr += 4;
         return temp;
     }

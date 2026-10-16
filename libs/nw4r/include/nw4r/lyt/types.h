@@ -2,6 +2,7 @@
 
 #include "nw4r/math/types.h"
 #include "nw4r/ut/LinkList.h"
+#include "nw4r/ut/resEndian.h"
 #include <cstddef>
 #include <mem.h>
 #include <revolution.h>
@@ -22,10 +23,12 @@ namespace nw4r {
                 *pBits |= (val ? 1 : 0) << pos;
             }
 
-            typedef s16 ResS16;
-            typedef u16 ResU16;
-            typedef s32 ResS32;
-            typedef u32 ResU32;
+            // Big-endian resource fields (plain types on the Wii).
+            typedef BE(s16) ResS16;
+            typedef BE(u16) ResU16;
+            typedef BE(s32) ResS32;
+            typedef BE(u32) ResU32;
+            typedef BE(f32) ResF32;
 
             template < typename T >
             inline const T* ConvertOffsToPtr(const void* baseAddr, unsigned int offs) {

@@ -24,11 +24,17 @@ public:
         return reinterpret_cast< const u8* >(mMessage)[1];
     }
     int getTag() const {
+#if TARGET_PC
+        // Big-endian tag id (tag payloads are not converted with the text).
+        const u8* p = reinterpret_cast< const u8* >(mMessage);
+        return (p[2] << 8) | p[3];
+#else
         return mMessage[1];
+#endif
     }
 
     bool isGroupTagId(int group, int tag) const NO_INLINE {
-        return reinterpret_cast< const u8* >(mMessage)[1] == group && mMessage[1] == tag;
+        return reinterpret_cast< const u8* >(mMessage)[1] == group && getTag() == tag;
     }
 
     u32 getTagLength() const;

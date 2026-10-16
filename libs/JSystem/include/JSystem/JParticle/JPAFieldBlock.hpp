@@ -1,5 +1,6 @@
 #pragma once
 
+#include "helpers/endian.h"
 #include "JSystem/JGeometry/TVec.hpp"
 #include <revolution/types.h>
 
@@ -123,19 +124,23 @@ public:
 class JPAFieldBlockData {
 public:
     /* 0x00 */ u8 mMagic[4];
-    /* 0x04 */ u32 mSize;
-    /* 0x08 */ u32 mFlags;
-    /* 0x0C */ JGeometry::TVec3< f32 > mPos;
-    /* 0x18 */ JGeometry::TVec3< f32 > mDir;
-    /* 0x24 */ f32 mMag;
-    /* 0x28 */ f32 mMagRndm;
-    /* 0x2C */ f32 mVal1;
-    /* 0x30 */ f32 mFadeInTime;
-    /* 0x34 */ f32 mFadeOutTime;
-    /* 0x38 */ f32 mEnTime;
-    /* 0x3C */ f32 mDisTime;
+    /* 0x04 */ BE(u32) mSize;
+    /* 0x08 */ BE(u32) mFlags;
+    /* 0x0C */ JGeometry::TVec3< BE(f32) > mPos;
+    /* 0x18 */ JGeometry::TVec3< BE(f32) > mDir;
+    /* 0x24 */ BE(f32) mMag;
+    /* 0x28 */ BE(f32) mMagRndm;
+    /* 0x2C */ BE(f32) mVal1;
+    /* 0x30 */ BE(f32) mFadeInTime;
+    /* 0x34 */ BE(f32) mFadeOutTime;
+    /* 0x38 */ BE(f32) mEnTime;
+    /* 0x3C */ BE(f32) mDisTime;
     /* 0x40 */ u8 mCycle;
 };
+
+#if TARGET_PC
+static_assert(sizeof(JPAFieldBlockData) == 0x44, "JPAFieldBlockData must match the file layout");
+#endif
 
 class JPAFieldBlock {
 public:
@@ -191,10 +196,10 @@ public:
         return mMag;
     }
     void getPosOrig(JGeometry::TVec3< f32 >* pos) {
-        pos->set(mpData->mPos);
+        pos->set(mpData->mPos.x, mpData->mPos.y, mpData->mPos.z);
     }
     void getDirOrig(JGeometry::TVec3< f32 >* dir) {
-        dir->set(mpData->mDir);
+        dir->set(mpData->mDir.x, mpData->mDir.y, mpData->mDir.z);
     }
     f32 getMagOrig() {
         return mpData->mMag;

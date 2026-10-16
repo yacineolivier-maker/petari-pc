@@ -6,6 +6,10 @@
 #include "JSystem/J3DGraphBase/J3DVertex.hpp"
 #include <revolution/gd.h>
 #include <stdint.h>
+#if TARGET_PC
+#include <dolphin/gx/GXAurora.h>
+#include <dolphin/gx/GXCommandList.h>
+#endif
 
 void J3DShape::initialize() {
     mMaterial = nullptr;
@@ -121,6 +125,46 @@ void J3DLoadCPCmd(u8 addr, u32 val) {
     GXCmd1u32(val);
 }
 
+#if TARGET_PC
+// A 64-bit pointer does not fit in the CP array base register: tell Aurora about the array with its
+// byte size and endianness instead.
+static void J3DLoadArrayBasePtr(GXAttr attr, void* data, u32 size, bool le) {
+    u32 idx = (attr == GX_VA_NBT) ? 1 : (attr - GX_VA_POS);
+    GXCmd1u8(GX_AURORA);
+    GXCmd1u16(GX_AURORA_LOAD_ARRAYBASE | idx);
+    GXCmd1u64((u64)(uintptr_t)data);
+    GXCmd1u32(size);
+    GXCmd1u8(le ? 1 : 0);
+}
+
+void J3DShape::loadVtxArray() const {
+    // Arrays straight from the model file are big-endian (sizes recorded by the loader). Anything
+    // else (a buffer built at runtime by the CPU) is assumed to be host-endian, sized like the
+    // file array it replaces.
+    void* pos = j3dSys.getVtxPos();
+    if (pos == mVertexData->getVtxPosArray()) {
+        J3DLoadArrayBasePtr(GX_VA_POS, pos, mVertexData->getVtxArrSize(GX_VA_POS), false);
+    } else {
+        J3DLoadArrayBasePtr(GX_VA_POS, pos, mVertexData->getVtxNum() * sizeof(Vec), true);
+    }
+
+    if (!mHasNBT) {
+        void* nrm = j3dSys.getVtxNrm();
+        if (nrm == mVertexData->getVtxNrmArray()) {
+            J3DLoadArrayBasePtr(GX_VA_NRM, nrm, mVertexData->getVtxArrSize(GX_VA_NRM), false);
+        } else {
+            J3DLoadArrayBasePtr(GX_VA_NRM, nrm, mVertexData->getNrmNum() * sizeof(Vec), true);
+        }
+    }
+
+    void* col = j3dSys.getVtxCol();
+    if (col == mVertexData->getVtxColorArray(0)) {
+        J3DLoadArrayBasePtr(GX_VA_CLR0, col, mVertexData->getVtxArrSize(GX_VA_CLR0), false);
+    } else {
+        J3DLoadArrayBasePtr(GX_VA_CLR0, col, mVertexData->mColNum * sizeof(GXColor), true);
+    }
+}
+#else
 static void J3DLoadArrayBasePtr(GXAttr attr, void* data) {
     u32 idx = (attr == GX_VA_NBT) ? 1 : (attr - GX_VA_POS);
     J3DLoadCPCmd(0xA0 + idx, ((uintptr_t)data & 0x7FFFFFFF));
@@ -135,6 +179,7 @@ void J3DShape::loadVtxArray() const {
 
     J3DLoadArrayBasePtr(GX_VA_CLR0, j3dSys.getVtxCol());
 }
+#endif
 
 bool J3DShape::isSameVcdVatCmd(J3DShape* other) {
     u8* a = (u8*)other->getVcdVatCmd();
@@ -216,37 +261,17 @@ void J3DShape::makeVtxArrayCmd() {
     }
 
 #if TARGET_PC
-    // Aurora needs the byte size of each array. J3DVertexData doesn't keep per-array sizes:
-    // use the element counts computed by J3DModelLoader::readVertex, capped by the start of the
-    // next array of the VTX1 block (the arrays are laid out back to back).
-    // TODO(pc): pass little_endian = true once the J3D vertex data is byte-swapped at load time.
-    const void* allArrays[13] = {
-        mVertexData->getVtxPosArray(), mVertexData->getVtxNrmArray(), mVertexData->getVtxNBTArray(),
-        mVertexData->getVtxColorArray(0), mVertexData->getVtxColorArray(1),
-    };
-    for (u32 i = 0; i < 8; i++) {
-        allArrays[5 + i] = mVertexData->getVtxTexCoordArray(i);
-    }
+    // Aurora needs the byte size of each array: J3DModelLoader::readVertex records them. The VTX1
+    // arrays stay big-endian (little_endian = false).
     for (u32 i = 0; i < 12; i++) {
         GXAttr attr = (GXAttr)(i + GX_VA_POS);
         if (array[i] != 0) {
-            u32 count;
-            if (attr == GX_VA_POS)
-                count = mVertexData->mVtxNum;
-            else if (attr == GX_VA_NRM)
-                count = mVertexData->mNrmNum;
-            else if (attr == GX_VA_CLR0 || attr == GX_VA_CLR1)
-                count = mVertexData->mColNum;
+            u32 size;
+            if (attr == GX_VA_NRM && array[i] == mVertexData->getVtxNBTArray())
+                size = mVertexData->getVtxArrSize(GX_VA_NBT);
             else
-                count = mVertexData->mTexCoordNum;
-            uintptr_t start = (uintptr_t)array[i];
-            uintptr_t size = (uintptr_t)count * stride[i];
-            for (u32 j = 0; j < 13; j++) {
-                uintptr_t other = (uintptr_t)allArrays[j];
-                if (other > start && other - start < size)
-                    size = other - start;
-            }
-            GDSetArraySized(attr, array[i], (u32)size, stride[i], false);
+                size = mVertexData->getVtxArrSize(attr);
+            GDSetArraySized(attr, array[i], size, stride[i], false);
         } else {
             GDSetArraySized(attr, NULL, 0, stride[i], false);
         }

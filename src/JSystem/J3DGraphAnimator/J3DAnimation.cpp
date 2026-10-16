@@ -219,7 +219,7 @@ void J3DFrameCtrl::update() {
     }
 }
 
-J3DAnmTransform::J3DAnmTransform(s16 frameMax, f32* pScaleData, s16* pRotData, f32* pTransData) : J3DAnmBase(frameMax) {
+J3DAnmTransform::J3DAnmTransform(s16 frameMax, BE(f32)* pScaleData, BE(s16)* pRotData, BE(f32)* pTransData) : J3DAnmBase(frameMax) {
     mScaleData = pScaleData;
     mRotData = pRotData;
     mTransData = pTransData;
@@ -576,6 +576,20 @@ inline f32 J3DHermiteInterpolation(__REGISTER f32 pp1, __REGISTER s16 const* pp2
     return out;
 #endif
 }
+
+#if TARGET_PC
+// Key data stays big-endian in the animation file: read the six key values into host order.
+inline f32 J3DHermiteInterpolation(f32 p1, BE(f32) const* p2, BE(f32) const* p3, BE(f32) const* p4, BE(f32) const* p5, BE(f32) const* p6,
+                                   BE(f32) const* p7) {
+    return JMAHermiteInterpolation(p1, *p2, *p3, *p4, *p5, *p6, *p7);
+}
+
+inline f32 J3DHermiteInterpolation(f32 p1, BE(s16) const* p2, BE(s16) const* p3, BE(s16) const* p4, BE(s16) const* p5, BE(s16) const* p6,
+                                   BE(s16) const* p7) {
+    const s16 v[6] = {*p2, *p3, *p4, *p5, *p6, *p7};
+    return J3DHermiteInterpolation(p1, &v[0], &v[1], &v[2], &v[3], &v[4], &v[5]);
+}
+#endif
 
 template < typename T >
 f32 J3DGetKeyFrameInterpolation(f32 frame, J3DAnmKeyTableBase* pKeyTable, T* pData) {
@@ -1391,6 +1405,6 @@ void J3DAnmTevRegKey::searchUpdateMaterialID(J3DModelData* pModelData) {
     searchUpdateMaterialID(&pModelData->getMaterialTable());
 }
 
-void J3DAnimation_FORCE_EMIT(s16 frameMax, f32* pWeight) {
+void J3DAnimation_FORCE_EMIT(s16 frameMax, BE(f32)* pWeight) {
     J3DAnmCluster cluster(frameMax, pWeight);
 }

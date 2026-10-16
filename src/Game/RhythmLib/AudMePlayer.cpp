@@ -1,3 +1,4 @@
+#include "helpers/endian.h"
 #include "Game/RhythmLib/AudMeTrack.hpp"
 
 #include "Game/AudioLib/AudSystem.hpp"
@@ -341,7 +342,7 @@ s32 AudMeMgr::getSeqStartPos(u32 meId) {
         return -1;
     }
 
-    s32* pStartPos = mMeSeq->mSeqStartPos;
+    BE(s32)* pStartPos = mMeSeq->mSeqStartPos;
     if (meId >= mMeSeq->mNumEntries) {
         return -1;
     }
@@ -377,7 +378,11 @@ void AudMeMgr::setOuterPlayingParam(s32 meId, AudMe* pMe) {
 }
 
 void AudMePlayingParamsHolder::setResource(void* pRes) {
+#if TARGET_PC
+    BE(s32)* cursor = (BE(s32)*)pRes;
+#else
     s32* cursor = (s32*)pRes;
+#endif
 
     s32 numEntries = *cursor++;
     s32 entryOff = *cursor++;
@@ -388,10 +393,10 @@ void AudMePlayingParamsHolder::setResource(void* pRes) {
 #if TARGET_PC
     // The name table holds 32-bit offsets that can't be relocated in place into 64-bit pointers:
     // build a side table instead (owned by this holder, mNames is always PC-allocated).
-    // TODO(pc): the resource is big-endian; values are read natively here until the endian layer exists.
+    // The resource is big-endian: offsets are read through BE(), AudMePlayingParams has BE fields.
     mParams = (AudMePlayingParams*)((u8*)pRes + entryOff);
 
-    const u32* nameOffsets = (const u32*)((u8*)pRes + namesOff);
+    const BE(u32)* nameOffsets = (const BE(u32)*)((u8*)pRes + namesOff);
     const char** names = new const char*[numEntries];
     for (u32 i = 0; i < numEntries; i++) {
         names[i] = (const char*)pRes + nameOffsets[i];

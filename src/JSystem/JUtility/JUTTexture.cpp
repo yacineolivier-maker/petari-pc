@@ -2,6 +2,13 @@
 #include "JSystem/JUtility/JUTPalette.hpp"
 #include "JSystem/JUtility/JUTTexture.hpp"
 
+#if TARGET_PC
+// ResTIMG offsets are signed (J3DTexture::setResTIMG can make them negative).
+#define J3D_TIMG_OFFSET(x) ((s32)(x))
+#else
+#define J3D_TIMG_OFFSET(x) (x)
+#endif
+
 JUTTexture::JUTTexture(int width, int height, GXTexFmt format) {
     mFlag = mFlag & 2 | 1;
     u32 bufSize = GXGetTexBufferSize(width, height, format, GX_FALSE, 1);
@@ -47,7 +54,11 @@ JUTTexture::~JUTTexture() {
 void JUTTexture::storeTIMG(const ResTIMG* pTIMG, u8 a1) {
     if (pTIMG != nullptr && a1 < 0x10) {
         mTIMG = pTIMG;
+#if TARGET_PC
+        mImage = reinterpret_cast< u8* >(const_cast< ResTIMG* >(pTIMG)) + (s32)pTIMG->mImageDataOffset;
+#else
         mImage = reinterpret_cast< u8* >(const_cast< ResTIMG* >(pTIMG)) + pTIMG->mImageDataOffset;
+#endif
         if (pTIMG->mImageDataOffset == 0)
             mImage = reinterpret_cast< u8* >(const_cast< ResTIMG* >(pTIMG)) + sizeof(ResTIMG);
 
@@ -76,12 +87,12 @@ void JUTTexture::storeTIMG(const ResTIMG* pTIMG, u8 a1) {
         if (mEmbPalette == nullptr || (mFlag & 2) == 0) {
             mEmbPalette = new JUTPalette(static_cast< GXTlut >(lut), static_cast< GXTlutFmt >(getTexInfo()->mPaletteFormat),
                                          static_cast< JUTTransparency >(getTexInfo()->mTransparency), getTexInfo()->mPaletteNum,
-                                         reinterpret_cast< u8* >(const_cast< ResTIMG* >(getTexInfo())) + getTexInfo()->mPaletteDataOffset);
+                                         reinterpret_cast< u8* >(const_cast< ResTIMG* >(getTexInfo())) + J3D_TIMG_OFFSET(getTexInfo()->mPaletteDataOffset));
             setEmbPaletteDelFlag(true);
         } else {
             mEmbPalette->storeTLUT(static_cast< GXTlut >(lut), static_cast< GXTlutFmt >(getTexInfo()->mPaletteFormat),
                                    static_cast< JUTTransparency >(getTexInfo()->mTransparency), getTexInfo()->mPaletteNum,
-                                   reinterpret_cast< u8* >(const_cast< ResTIMG* >(getTexInfo())) + getTexInfo()->mPaletteDataOffset);
+                                   reinterpret_cast< u8* >(const_cast< ResTIMG* >(getTexInfo())) + J3D_TIMG_OFFSET(getTexInfo()->mPaletteDataOffset));
         }
         attachPalette(mEmbPalette);
     }
@@ -102,7 +113,11 @@ void JUTTexture::storeTIMG(const ResTIMG* pTIMG, JUTPalette* pPalette) {
 void JUTTexture::storeTIMG(ResTIMG const* pTIMG, JUTPalette* pPalette, GXTlut a1) {
     if (pTIMG != nullptr) {
         mTIMG = pTIMG;
+#if TARGET_PC
+        mImage = reinterpret_cast< u8* >(const_cast< ResTIMG* >(pTIMG)) + (s32)pTIMG->mImageDataOffset;
+#else
         mImage = reinterpret_cast< u8* >(const_cast< ResTIMG* >(pTIMG)) + pTIMG->mImageDataOffset;
+#endif
         if (pTIMG->mImageDataOffset == 0)
             mImage = reinterpret_cast< u8* >(const_cast< ResTIMG* >(pTIMG)) + sizeof(ResTIMG);
 
@@ -163,7 +178,11 @@ void JUTTexture::initTexObj() {
         mipmapEnabled = 0;
     }
     u8* image = reinterpret_cast< u8* >(const_cast< ResTIMG* >(mTIMG));
+#if TARGET_PC
+    image += (mTIMG->mImageDataOffset ? (s32)mTIMG->mImageDataOffset : 0x20);
+#else
     image += (mTIMG->mImageDataOffset ? mTIMG->mImageDataOffset : 0x20);
+#endif
     GXInitTexObj(&mObj, image, mTIMG->mWidth, mTIMG->mHeight, static_cast< GXTexFmt >(mTIMG->mFormat), static_cast< GXTexWrapMode >(mWrapS),
                  static_cast< GXTexWrapMode >(mWrapT), mipmapEnabled);
 
@@ -180,7 +199,11 @@ void JUTTexture::initTexObj(GXTlut lut) {
     }
     mTlutName = lut;
     u8* image = reinterpret_cast< u8* >(const_cast< ResTIMG* >(mTIMG));
+#if TARGET_PC
+    image += (mTIMG->mImageDataOffset ? (s32)mTIMG->mImageDataOffset : 0x20);
+#else
     image += (mTIMG->mImageDataOffset ? mTIMG->mImageDataOffset : 0x20);
+#endif
     GXInitTexObjCI(&mObj, image, mTIMG->mWidth, mTIMG->mHeight, static_cast< GXCITexFmt >(mTIMG->mFormat), static_cast< GXTexWrapMode >(mWrapS),
                    static_cast< GXTexWrapMode >(mWrapT), mipmapEnabled, lut);
 

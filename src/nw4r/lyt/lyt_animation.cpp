@@ -89,7 +89,7 @@ namespace nw4r {
                        s0 * (t1t1t1t2t2 - 2.0F * t1t1t2 + t1) + s1 * (t1t1t1t2t2 - t1t1t2);
             }
 
-            void AnimatePaneSRT(Pane* pPane, const res::AnimationInfo* pAnimInfo, const u32* animTargetOffsets, f32 frame) {
+            void AnimatePaneSRT(Pane* pPane, const res::AnimationInfo* pAnimInfo, const detail::ResU32* animTargetOffsets, f32 frame) {
                 for (int i = 0; i < pAnimInfo->num; ++i) {
                     const res::AnimationTarget* pAnimTarget = detail::ConvertOffsToPtr< res::AnimationTarget >(pAnimInfo, animTargetOffsets[i]);
 
@@ -98,7 +98,7 @@ namespace nw4r {
                 }
             }
 
-            void AnimateVisibility(Pane* pPane, const res::AnimationInfo* pAnimInfo, const u32* animTargetOffsets, f32 frame) {
+            void AnimateVisibility(Pane* pPane, const res::AnimationInfo* pAnimInfo, const detail::ResU32* animTargetOffsets, f32 frame) {
                 for (int i = 0; i < pAnimInfo->num; ++i) {
                     const res::AnimationTarget* pAnimTarget = detail::ConvertOffsToPtr< res::AnimationTarget >(pAnimInfo, animTargetOffsets[i]);
 
@@ -107,7 +107,7 @@ namespace nw4r {
                 }
             }
 
-            void AnimateVertexColor(Pane* pPane, const res::AnimationInfo* pAnimInfo, const u32* animTargetOffsets, f32 frame) {
+            void AnimateVertexColor(Pane* pPane, const res::AnimationInfo* pAnimInfo, const detail::ResU32* animTargetOffsets, f32 frame) {
                 for (int i = 0; i < pAnimInfo->num; ++i) {
                     const res::AnimationTarget* pAnimTarget = detail::ConvertOffsToPtr< res::AnimationTarget >(pAnimInfo, animTargetOffsets[i]);
 
@@ -120,7 +120,7 @@ namespace nw4r {
                 }
             }
 
-            void AnimateMaterialColor(Material* pMaterial, const res::AnimationInfo* pAnimInfo, const u32* animTargetOffsets, f32 frame) {
+            void AnimateMaterialColor(Material* pMaterial, const res::AnimationInfo* pAnimInfo, const detail::ResU32* animTargetOffsets, f32 frame) {
                 using namespace nw4r;
 
                 for (int i = 0; i < pAnimInfo->num; ++i) {
@@ -137,7 +137,7 @@ namespace nw4r {
                 }
             }
 
-            void AnimateTextureSRT(Material* pMaterial, const res::AnimationInfo* pAnimInfo, const u32* animTargetOffsets, f32 frame) {
+            void AnimateTextureSRT(Material* pMaterial, const res::AnimationInfo* pAnimInfo, const detail::ResU32* animTargetOffsets, f32 frame) {
                 for (int i = 0; i < pAnimInfo->num; ++i) {
                     const res::AnimationTarget* pAnimTarget = detail::ConvertOffsToPtr< res::AnimationTarget >(pAnimInfo, animTargetOffsets[i]);
 
@@ -148,7 +148,7 @@ namespace nw4r {
                 }
             }
 
-            void AnimateTexturePattern(Material* pMaterial, const res::AnimationInfo* pAnimInfo, const u32* animTargetOffsets, f32 frame,
+            void AnimateTexturePattern(Material* pMaterial, const res::AnimationInfo* pAnimInfo, const detail::ResU32* animTargetOffsets, f32 frame,
                                        void** tpls) {
                 for (int j = 0; j < pAnimInfo->num; ++j) {
                     const res::AnimationTarget* pAnimTarget = detail::ConvertOffsToPtr< res::AnimationTarget >(pAnimInfo, animTargetOffsets[j]);
@@ -164,7 +164,7 @@ namespace nw4r {
                 }
             }
 
-            void AnimateIndTexSRT(Material* pMaterial, const res::AnimationInfo* pAnimInfo, const u32* animTargetOffsets, f32 frame) {
+            void AnimateIndTexSRT(Material* pMaterial, const res::AnimationInfo* pAnimInfo, const detail::ResU32* animTargetOffsets, f32 frame) {
                 for (int i = 0; i < pAnimInfo->num; ++i) {
                     const res::AnimationTarget* pAnimTarget = detail::ConvertOffsToPtr< res::AnimationTarget >(pAnimInfo, animTargetOffsets[i]);
 
@@ -244,7 +244,7 @@ namespace nw4r {
             if (pBlock->fileNum > 0) {
                 mpFileResAry = static_cast< void** >(Layout::AllocMemory(sizeof(void*) * pBlock->fileNum));
                 if (mpFileResAry != nullptr) {
-                    const u32* fileNameOffs = detail::ConvertOffsToPtr< u32 >(mpRes, sizeof(*mpRes));
+                    const detail::ResU32* fileNameOffs = detail::ConvertOffsToPtr< detail::ResU32 >(mpRes, sizeof(*mpRes));
                     for (int i = 0; i < mpRes->fileNum; i++) {
                         const char* const name = detail::GetStrTableStr(fileNameOffs, i);
                         mpFileResAry[i] = pResAccessor->GetResource('timg', name, 0);
@@ -266,7 +266,7 @@ namespace nw4r {
         void AnimTransformBasic::Bind(Pane* pPane, bool bRecursive) {
             AnimationLink* pCrAnimLink = 0;
 
-            const u32* const animContOffsets = detail::ConvertOffsToPtr< u32 >(mpRes, mpRes->animContOffsetsOffset);
+            const detail::ResU32* const animContOffsets = detail::ConvertOffsToPtr< detail::ResU32 >(mpRes, mpRes->animContOffsetsOffset);
             for (u16 i = 0; i < mpRes->animContNum; ++i) {
                 const res::AnimationContent& animCont = *detail::ConvertOffsToPtr< res::AnimationContent >(mpRes, animContOffsets[i]);
                 if (animCont.type == ANIMCONTENTTYPE_PANE) {
@@ -294,7 +294,7 @@ namespace nw4r {
         void AnimTransformBasic::Bind(Material* pMaterial) {
             AnimationLink* pCrAnimLink = 0;
 
-            const u32* const animContOffsets = detail::ConvertOffsToPtr< u32 >(mpRes, mpRes->animContOffsetsOffset);
+            const detail::ResU32* const animContOffsets = detail::ConvertOffsToPtr< detail::ResU32 >(mpRes, mpRes->animContOffsetsOffset);
             for (u16 i = 0; i < mpRes->animContNum; ++i) {
                 const res::AnimationContent& animCont = *detail::ConvertOffsToPtr< res::AnimationContent >(mpRes, animContOffsets[i]);
                 if (animCont.type == ANIMCONTENTTYPE_MATERIAL) {
@@ -324,13 +324,13 @@ namespace nw4r {
         }
 
         void AnimTransformBasic::Animate(u32 idx, Pane* pPane) {
-            u32 animContOffsets = detail::ConvertOffsToPtr< u32 >(mpRes, mpRes->animContOffsetsOffset)[idx];
+            u32 animContOffsets = detail::ConvertOffsToPtr< detail::ResU32 >(mpRes, mpRes->animContOffsetsOffset)[idx];
             const res::AnimationContent* pAnimCont = detail::ConvertOffsToPtr< res::AnimationContent >(mpRes, animContOffsets);
 
-            const u32* animInfoOffsets = detail::ConvertOffsToPtr< u32 >(pAnimCont, sizeof(*pAnimCont));
+            const detail::ResU32* animInfoOffsets = detail::ConvertOffsToPtr< detail::ResU32 >(pAnimCont, sizeof(*pAnimCont));
             for (int i = 0; i < pAnimCont->num; ++i) {
                 const res::AnimationInfo* pAnimInfo = detail::ConvertOffsToPtr< res::AnimationInfo >(pAnimCont, animInfoOffsets[i]);
-                const u32* animTargetOffsets = detail::ConvertOffsToPtr< u32 >(pAnimInfo, sizeof(*pAnimInfo));
+                const detail::ResU32* animTargetOffsets = detail::ConvertOffsToPtr< detail::ResU32 >(pAnimInfo, sizeof(*pAnimInfo));
 
                 switch (pAnimInfo->kind) {
                 case res::ANIMATIONTYPE_RLPA:
@@ -347,13 +347,13 @@ namespace nw4r {
         }
 
         void AnimTransformBasic::Animate(u32 idx, Material* pMaterial) {
-            u32 animContOffsets = detail::ConvertOffsToPtr< u32 >(mpRes, mpRes->animContOffsetsOffset)[idx];
+            u32 animContOffsets = detail::ConvertOffsToPtr< detail::ResU32 >(mpRes, mpRes->animContOffsetsOffset)[idx];
             const res::AnimationContent* pAnimCont = detail::ConvertOffsToPtr< res::AnimationContent >(mpRes, animContOffsets);
 
-            const u32* animInfoOffsets = detail::ConvertOffsToPtr< u32 >(pAnimCont, sizeof(*pAnimCont));
+            const detail::ResU32* animInfoOffsets = detail::ConvertOffsToPtr< detail::ResU32 >(pAnimCont, sizeof(*pAnimCont));
             for (int i = 0; i < pAnimCont->num; ++i) {
                 const res::AnimationInfo* pAnimInfo = detail::ConvertOffsToPtr< res::AnimationInfo >(pAnimCont, animInfoOffsets[i]);
-                const u32* animTargetOffsets = detail::ConvertOffsToPtr< u32 >(pAnimInfo, sizeof(*pAnimInfo));
+                const detail::ResU32* animTargetOffsets = detail::ConvertOffsToPtr< detail::ResU32 >(pAnimInfo, sizeof(*pAnimInfo));
 
                 switch (pAnimInfo->kind) {
                 case res::ANIMATIONTYPE_RLMC:

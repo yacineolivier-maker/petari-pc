@@ -1,5 +1,6 @@
 #pragma once
 
+#include "helpers/endian.h"
 #include <JSystem/JAudio2/JASGlobal.hpp>
 #include <JSystem/JAudio2/JASHeapCtrl.hpp>
 #include <JSystem/JGeometry/TVec.hpp>
@@ -13,7 +14,7 @@ struct AudMePlayingParams {
     /* 0x1 */ u8 mChordVolume;
     /* 0x2 */ u8 _2;
     /* 0x3 */ u8 _3;
-    /* 0x4 */ u16 _4;
+    /* 0x4 */ BE(u16) _4;
     /* 0x6 */ u8 _6;
     /* 0x7 */ u8 _7;
 };
@@ -97,8 +98,8 @@ public:
 };
 
 struct AudMeTable {
-    /* 0x0 */ s32 mNumEntries;
-    /* 0x4 */ s32 mSeqStartPos[1];
+    /* 0x0 */ BE(s32) mNumEntries;
+    /* 0x4 */ BE(s32) mSeqStartPos[1];
 };
 
 class AudMeMgr : public JASGlobalInstance< AudMeMgr > {

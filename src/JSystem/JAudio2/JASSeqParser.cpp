@@ -560,7 +560,17 @@ s32 JASSeqParser::cmdNop(JASTrack* track, u32* args) {
 }
 
 s32 JASSeqParser::cmdFIRSet(JASTrack* track, u32* args) {
+#if TARGET_PC
+    // FIR coefficients are big-endian s16 in the sequence data.
+    const BE(s16)* src = (const BE(s16)*)track->getSeqCtrl()->getAddr(args[0]);
+    s16 fir[8];
+    for (u32 i = 0; i < 8; i++) {
+        fir[i] = src[i];
+    }
+    track->setFIR(fir);
+#else
     track->setFIR((s16*)track->getSeqCtrl()->getAddr(args[0]));
+#endif
     return 0;
 }
 

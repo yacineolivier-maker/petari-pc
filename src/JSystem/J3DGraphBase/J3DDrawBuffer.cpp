@@ -48,7 +48,11 @@ int J3DDrawBuffer::entryMatSort(J3DMatPacket* pMatPacket) {
     if (texNo == 0xFFFF) {
         hash = 0;
     } else {
+#if TARGET_PC
+        hash = (u32)((reinterpret_cast< uintptr_t >(pTexture->getResTIMG(texNo)) + (s32)pTexture->getResTIMG(texNo)->mImageDataOffset) >> 5);
+#else
         hash = (reinterpret_cast< uintptr_t >(pTexture->getResTIMG(texNo)) + pTexture->getResTIMG(texNo)->mImageDataOffset) >> 5;
+#endif
     }
     u32 slot = hash & (mEntryTableSize - 1);
 

@@ -25,12 +25,23 @@ u8 MessageEditorMessageTag::getParam8(int index) const {
 
 u16 MessageEditorMessageTag::getParam16(int index) const {
     const u16* pParam = reinterpret_cast< const u16* >(mMessage) + index;
+#if TARGET_PC
+    // Tag payloads stay big-endian (see MessageData::MessageData).
+    const u8* p = reinterpret_cast< const u8* >(&pParam[2]);
+    return (u16)((p[0] << 8) | p[1]);
+#else
     return pParam[2];
+#endif
 }
 
 u32 MessageEditorMessageTag::getParam32(int index) const {
     const u32* pParam = reinterpret_cast< const u32* >(mMessage) + index;
+#if TARGET_PC
+    const u8* p = reinterpret_cast< const u8* >(&pParam[1]);
+    return ((u32)p[0] << 24) | ((u32)p[1] << 16) | ((u32)p[2] << 8) | p[3];
+#else
     return pParam[1];
+#endif
 }
 
 wchar_t* MessageEditorMessageTag::getParamPtr(int index) const {

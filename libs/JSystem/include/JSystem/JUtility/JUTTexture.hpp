@@ -1,20 +1,21 @@
 #pragma once
 
 #include <revolution.h>
+#include "helpers/endian.h"
 
 class JUTPalette;
 
 struct ResTIMG {
     /* 0x00 */ u8 mFormat;
     /* 0x01 */ u8 mTransparency;
-    /* 0x02 */ u16 mWidth;
-    /* 0x04 */ u16 mHeight;
+    /* 0x02 */ BE(u16) mWidth;
+    /* 0x04 */ BE(u16) mHeight;
     /* 0x06 */ u8 mWrapS;
     /* 0x07 */ u8 mWrapT;
     /* 0x08 */ u8 mPaletteName;
     /* 0x09 */ u8 mPaletteFormat;
-    /* 0x0A */ u16 mPaletteNum;
-    /* 0x0C */ u32 mPaletteDataOffset;
+    /* 0x0A */ BE(u16) mPaletteNum;
+    /* 0x0C */ BE(u32) mPaletteDataOffset;
     /* 0x10 */ bool mMipmap;
     /* 0x11 */ bool mDoEdgeLod;
     /* 0x12 */ bool mBiasClamp;
@@ -25,9 +26,14 @@ struct ResTIMG {
     /* 0x17 */ u8 mMaxLod;
     /* 0x18 */ u8 mImageNum;
     /* 0x19 */ u8 _19;
-    /* 0x1A */ s16 mLodBias;
-    /* 0x1C */ u32 mImageDataOffset;
+    /* 0x1A */ BE(s16) mLodBias;
+    /* 0x1C */ BE(u32) mImageDataOffset;
 };
+
+#if TARGET_PC
+// BTI header (file data, big-endian). Image and palette data are passed to GX as-is.
+static_assert(sizeof(ResTIMG) == 0x20);
+#endif
 
 class JUTTexture {
 public:

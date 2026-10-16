@@ -1,14 +1,15 @@
 #pragma once
 
 #include <revolution.h>
+#include "helpers/endian.h"
 
 enum JUTTransparency { UNK0, UNK1 };
 
 struct ResTLUT {
     /* 0x0 */ u8 mFormat;
     /* 0x1 */ u8 mTransparency;
-    /* 0x2 */ u16 mLutNum;
-};
+    /* 0x2 */ BE(u16) mLutNum;
+};  // file data (big-endian)
 
 class JUTPalette {
 public:

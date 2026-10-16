@@ -82,7 +82,7 @@ public:
     JUTNameTab* getJointName() const {
         return mJointTree.getJointName();
     }
-    Mtx& getInvJointMtx(int idx) {
+    BE(Mtx)& getInvJointMtx(int idx) {
         return mJointTree.getInvJointMtx(idx);
     }
     J3DTexture* getTexture() const {
@@ -94,10 +94,10 @@ public:
     u16 getWEvlpMtxNum() const {
         return mJointTree.getWEvlpMtxNum();
     }
-    u16* getWEvlpMixMtxIndex() const {
+    BE(u16)* getWEvlpMixMtxIndex() const {
         return mJointTree.getWEvlpMixMtxIndex();
     }
-    f32* getWEvlpMixWeight() const {
+    BE(f32)* getWEvlpMixWeight() const {
         return mJointTree.getWEvlpMixWeight();
     }
     u8 getWEvlpMixMtxNum(u16 idx) const {

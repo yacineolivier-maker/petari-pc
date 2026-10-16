@@ -46,6 +46,12 @@ namespace nw4r {
                 const wchar_t* const pBlockText = detail::ConvertOffsToPtr< wchar_t >(pBlock, pBlock->textStrOffset);
                 const u16 resStrLen = static_cast< u16 >(pBlock->textStrBytes / sizeof(wchar_t) - 1);
                 SetString(pBlockText, 0, resStrLen);
+#if TARGET_PC
+                // wchar_t is 16-bit on Windows like on the Wii; the copy is still big-endian.
+                for (u16 i = 0; i < mTextLen; i++) {
+                    mTextBuf[i] = static_cast< wchar_t >(be16(static_cast< u16 >(mTextBuf[i])));
+                }
+#endif
             }
 
             for (int i = 0; i < 2; ++i) {
@@ -79,7 +85,7 @@ namespace nw4r {
 
             void* pMem = Layout::AllocMemory(sizeof(Material));
             if (pMem != nullptr) {
-                const u32* const matOffsTbl = detail::ConvertOffsToPtr< u32 >(resBlockSet.pMaterialList, sizeof(*resBlockSet.pMaterialList));
+                const detail::ResU32* const matOffsTbl = detail::ConvertOffsToPtr< detail::ResU32 >(resBlockSet.pMaterialList, sizeof(*resBlockSet.pMaterialList));
                 const res::Material* const pResMaterial =
                     detail::ConvertOffsToPtr< res::Material >(resBlockSet.pMaterialList, matOffsTbl[pBlock->materialIdx]);
                 mpMaterial = new (pMem) Material(pResMaterial, resBlockSet);

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <JSystem/JAudio2/JASSeqReader.hpp>
+#include "helpers/endian.h"
 
 class AudMeSeqReader {
 public:
@@ -39,15 +40,15 @@ public:
     }
 
     u16 get16(u32 addr) const {
-        return *(u16*)(mSeqBuff + addr);
+        return *(BE(u16)*)(mSeqBuff + addr);
     }
 
     u32 get24(u32 addr) const {
-        return (*(u32*)(mSeqBuff + addr - 1)) & 0xffffff;
+        return (*(BE(u32)*)(mSeqBuff + addr - 1)) & 0xffffff;
     }
 
     u32 get32(u32 addr) const {
-        return *(u32*)(mSeqBuff + addr);
+        return *(BE(u32)*)(mSeqBuff + addr);
     }
 
     u8* getCur() {

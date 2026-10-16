@@ -124,8 +124,9 @@ void GXGetTexObjLODAll(const GXTexObj*, GXTexFilter* minFilt, GXTexFilter* magFi
 }
 
 // --- TPL texture palettes ----------------------------------------------------------------------
-// TODO(pc): TPLBind relocates 32-bit offsets into pointers in place, impossible with 64-bit
-// pointers. SMG's layouts use BTI textures, so this path should be unused.
+// TPLBind relocates 32-bit offsets into pointers in place, impossible with 64-bit pointers.
+// nw4r layouts read their .tpl textures directly (TexMap::ReplaceImage in lyt_texMap.cpp), so
+// these are only reached by other TPL users (none known).
 void TPLBind(TPLPalettePtr) {
     std::fprintf(stderr, "[pc] TPLBind called (not supported)\n");
 }

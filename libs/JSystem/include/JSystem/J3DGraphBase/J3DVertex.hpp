@@ -1,6 +1,7 @@
 #pragma once
 
 #include <revolution.h>
+#include "helpers/endian.h"
 
 class J3DModel;
 class J3DAnmVtxColor;
@@ -24,7 +25,7 @@ public:
     /* 0x0 */ u16 mEntryNum;
     /* 0x2 */ u16 mDrawFullWgtMtxNum;
     /* 0x4 */ u8* mDrawMtxFlag;
-    /* 0x8 */ u16* mDrawMtxIndex;
+    /* 0x8 */ BE(u16)* mDrawMtxIndex;  // file data (DRW1)
 };
 
 class J3DVertexData {
@@ -97,6 +98,27 @@ public:
         mVtxNrmType = type;
     }
 
+#if TARGET_PC
+    // Byte size of each VTX1 array (big-endian file data), filled by J3DModelLoader::readVertex.
+    // Indexed by attr - GX_VA_POS for POS..TEX7; GX_VA_NBT has its own slot.
+    void setVtxArrSize(GXAttr attr, u32 size) {
+        if (attr == GX_VA_NBT) {
+            mVtxNBTArrSize = size;
+        } else if (attr >= GX_VA_POS && attr <= GX_VA_TEX7) {
+            mVtxArrSize[attr - GX_VA_POS] = size;
+        }
+    }
+
+    u32 getVtxArrSize(GXAttr attr) const {
+        if (attr == GX_VA_NBT) {
+            return mVtxNBTArrSize;
+        } else if (attr >= GX_VA_POS && attr <= GX_VA_TEX7) {
+            return mVtxArrSize[attr - GX_VA_POS];
+        }
+        return 0;
+    }
+#endif
+
     friend class J3DModelLoader;
 
     /* 0x00 */ u32 mVtxNum;
@@ -114,6 +136,10 @@ public:
     /* 0x50 */ GXCompType mVtxPosType;
     /* 0x54 */ u8 mVtxNrmFrac;
     /* 0x58 */ GXCompType mVtxNrmType;
+#if TARGET_PC
+    u32 mVtxArrSize[GX_VA_TEX7 - GX_VA_POS + 1];
+    u32 mVtxNBTArrSize;
+#endif
 };
 
 class J3DVertexBuffer {

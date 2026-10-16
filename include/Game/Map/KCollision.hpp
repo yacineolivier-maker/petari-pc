@@ -3,6 +3,7 @@
 #include "Game/Util/JMapInfo.hpp"
 #include <JSystem/JGeometry/TVec.hpp>
 #include <revolution.h>
+#include "helpers/endian.h"
 
 class JMapInfo;
 
@@ -24,6 +25,48 @@ public:
     f32 x, y, z;
 };
 
+#if TARGET_PC
+// PC: KCLFile is a host-side, runtime-only view of a KCL file (64-bit pointers cannot be relocated
+// into the file's 32-bit offset slots). KCollisionServer::setData fills one from the big-endian
+// file header (KCLFileHeader below); DynamicCollisionObj builds one directly with `new KCLFile()`.
+// mHostMagic tells setData that it was handed a host KCLFile and not raw file data.
+#define KCL_HOST_MAGIC 0xC011D1E5
+struct KCLFile {
+    u32 mHostMagic = KCL_HOST_MAGIC;
+    TVec3f* mPos;
+    TVec3f* mNorms;
+    KC_PrismData* mPrisms;
+    void* mOctree;
+    f32 mThickness;
+    TVec3f mMin;
+    s32 mXMask;
+    s32 mYMask;
+    s32 mZMask;
+    s32 mBlockWidthShift;
+    s32 mBlockXShift;
+    s32 mBlockXYShift;
+};
+
+// Raw KCL file header (big-endian). The header itself is never byte-swapped; bit 31 of
+// mPosOffset is set once the data that follows (positions, normals, prisms, octree) has been
+// swapped to host order in place (see KCollisionServer::setData).
+struct KCLFileHeader {
+    /* 0x00 */ BE(u32) mPosOffset;
+    /* 0x04 */ BE(u32) mNormOffset;
+    /* 0x08 */ BE(u32) mPrismOffset;
+    /* 0x0C */ BE(u32) mOctreeOffset;
+    /* 0x10 */ BE(f32) mThickness;
+    /* 0x14 */ BE(f32) mMin[3];
+    /* 0x20 */ BE(s32) mXMask;
+    /* 0x24 */ BE(s32) mYMask;
+    /* 0x28 */ BE(s32) mZMask;
+    /* 0x2C */ BE(s32) mBlockWidthShift;
+    /* 0x30 */ BE(s32) mBlockXShift;
+    /* 0x34 */ BE(s32) mBlockXYShift;
+};
+static_assert(sizeof(KCLFileHeader) == 0x38, "KCLFileHeader must match the KCL header");
+static_assert(sizeof(KC_PrismData) == 0x10, "KC_PrismData must match the KCL prism layout");
+#else
 struct KCLFile {
     union {
         /* 0x00 */ TVec3f* mPos;
@@ -50,6 +93,8 @@ struct KCLFile {
     /* 0x30 */ s32 mBlockXShift;
     /* 0x34 */ s32 mBlockXYShift;
 };
+
+#endif
 
 class KCollisionServer {
 public:
@@ -99,4 +144,7 @@ public:
     /* 0x00 */ KCLFile* mFile;
     /* 0x04 */ JMapInfo* mapInfo;
     /* 0x08 */ f32 mMaxVertexDistance;
+#if TARGET_PC
+    KCLFile mPcFile;  // host view of the raw file passed to setData
+#endif
 };

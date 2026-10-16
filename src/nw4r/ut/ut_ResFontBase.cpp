@@ -1,5 +1,13 @@
 #include "nw4r/ut/ResFontBase.h"
 
+// BRFNT pointer fields: relocated pointers on the Wii, file offsets resolved against the font
+// resource on PC (see fontResourceFormat.h).
+#if TARGET_PC
+#define NW4R_FONT_PTR(field) ((field).Get(mResource))
+#else
+#define NW4R_FONT_PTR(field) (field)
+#endif
+
 namespace nw4r {
     namespace ut {
         namespace detail {
@@ -38,19 +46,19 @@ namespace nw4r {
             }
 
             int ResFontBase::GetBaselinePos() const {
-                return mFontInfo->pGlyph->baselinePos;
+                return NW4R_FONT_PTR(mFontInfo->pGlyph)->baselinePos;
             }
 
             int ResFontBase::GetCellHeight() const {
-                return mFontInfo->pGlyph->cellHeight;
+                return NW4R_FONT_PTR(mFontInfo->pGlyph)->cellHeight;
             }
 
             int ResFontBase::GetCellWidth() const {
-                return mFontInfo->pGlyph->cellWidth;
+                return NW4R_FONT_PTR(mFontInfo->pGlyph)->cellWidth;
             }
 
             int ResFontBase::GetMaxCharWidth() const {
-                return mFontInfo->pGlyph->maxCharWidth;
+                return NW4R_FONT_PTR(mFontInfo->pGlyph)->maxCharWidth;
             }
 
             Font::Type ResFontBase::GetType() const {
@@ -58,7 +66,7 @@ namespace nw4r {
             }
 
             GXTexFmt ResFontBase::GetTextureFormat() const {
-                return static_cast< GXTexFmt >(mFontInfo->pGlyph->sheetFormat);
+                return static_cast< GXTexFmt >(static_cast< u16 >(NW4R_FONT_PTR(mFontInfo->pGlyph)->sheetFormat));
             }
 
             int ResFontBase::GetLineFeed() const {
@@ -114,7 +122,7 @@ namespace nw4r {
             }
 
             u16 ResFontBase::FindGlyphIndex(u16 ch) const {
-                for (const FontCodeMap* pIt = mFontInfo->pMap; pIt != NULL; pIt = pIt->pNext) {
+                for (const FontCodeMap* pIt = NW4R_FONT_PTR(mFontInfo->pMap); pIt != NULL; pIt = NW4R_FONT_PTR(pIt->pNext)) {
                     if (pIt->ccodeBegin <= ch && ch <= pIt->ccodeEnd) {
                         return FindGlyphIndex(pIt, ch);
                     }
@@ -139,11 +147,11 @@ namespace nw4r {
 
                 case 2: {
                     struct CMapScanEntry {
-                        u16 ccode;  // at 0x0
-                        u16 index;  // at 0x2
+                        BE(u16) ccode;  // at 0x0
+                        BE(u16) index;  // at 0x2
                     };
                     struct CMapInfoScan {
-                        u16 num;                  // at 0x0
+                        BE(u16) num;              // at 0x0
                         CMapScanEntry entries[];  // at 0x2
                     };
 
@@ -172,7 +180,7 @@ namespace nw4r {
             }
 
             const CharWidths& ResFontBase::GetCharWidthsFromIndex(u16 index) const {
-                for (const FontWidth* pIt = mFontInfo->pWidth; pIt != NULL; pIt = pIt->pNext) {
+                for (const FontWidth* pIt = NW4R_FONT_PTR(mFontInfo->pWidth); pIt != NULL; pIt = NW4R_FONT_PTR(pIt->pNext)) {
                     if (pIt->indexBegin <= index && index <= pIt->indexEnd) {
                         return GetCharWidthsFromIndex(pIt, index);
                     }
@@ -186,7 +194,7 @@ namespace nw4r {
             }
 
             void ResFontBase::GetGlyphFromIndex(Glyph* pGlyph, u16 index) const {
-                const FontTextureGlyph* pTexGlyph = mFontInfo->pGlyph;
+                const FontTextureGlyph* pTexGlyph = NW4R_FONT_PTR(mFontInfo->pGlyph);
 
                 u32 cellsInASheet = pTexGlyph->sheetRow * pTexGlyph->sheetLine;
 
@@ -199,12 +207,12 @@ namespace nw4r {
                 u32 pixelX = unitX * (pTexGlyph->cellWidth + 1);
                 u32 pixelY = unitY * (pTexGlyph->cellHeight + 1);
 
-                pGlyph->pTexture = pTexGlyph->sheetImage + (glyphSheet * pTexGlyph->sheetSize);
+                pGlyph->pTexture = NW4R_FONT_PTR(pTexGlyph->sheetImage) + (glyphSheet * pTexGlyph->sheetSize);
 
                 pGlyph->widths = GetCharWidthsFromIndex(index);
                 pGlyph->height = pTexGlyph->cellHeight;
 
-                pGlyph->texFormat = static_cast< GXTexFmt >(pTexGlyph->sheetFormat);
+                pGlyph->texFormat = static_cast< GXTexFmt >(static_cast< u16 >(pTexGlyph->sheetFormat));
 
                 pGlyph->texWidth = pTexGlyph->sheetWidth;
                 pGlyph->texHeight = pTexGlyph->sheetHeight;

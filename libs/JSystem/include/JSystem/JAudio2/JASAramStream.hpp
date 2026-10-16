@@ -1,5 +1,6 @@
 #pragma once
 
+#include "helpers/endian.h"
 #include "JSystem/JAudio2/JASTaskThread.hpp"
 
 class JASChannel;
@@ -27,30 +28,38 @@ public:
     };
 
     struct Header {
-        /* 0x00 */ u32 tag;
+        /* 0x00 */ BE(u32) tag;
         /* 0x04 */ u8 _4[5];
         /* 0x09 */ u8 format;
         /* 0x0A */ u8 bits;
-        /* 0x0C */ u16 channels;
-        /* 0x0E */ u16 loop;
-        /* 0x10 */ int _10;
+        /* 0x0C */ BE(u16) channels;
+        /* 0x0E */ BE(u16) loop;
+        /* 0x10 */ BE(s32) _10;
         /* 0x14 */ u8 _14[4];
-        /* 0x18 */ int loop_start;
-        /* 0x1C */ int loop_end;
-        /* 0x20 */ u32 block_size;
+        /* 0x18 */ BE(s32) loop_start;
+        /* 0x1C */ BE(s32) loop_end;
+        /* 0x20 */ BE(u32) block_size;
         /* 0x24 */ u8 _24[4];
         /* 0x28 */ u8 _28;
         /* 0x29 */ u8 _29[0x17];
     };
 
+#if TARGET_PC
+    static_assert(sizeof(Header) == 0x40, "JASAramStream::Header must match the .ast layout");
+#endif
+
     struct BlockHeader {
-        /* 0x00 */ u32 tag;
-        /* 0x04 */ u32 _4;
+        /* 0x00 */ BE(u32) tag;
+        /* 0x04 */ BE(u32) _4;
         /* 0x08 */ struct {
-            s16 _0;
-            s16 _2;
+            BE(s16) _0;
+            BE(s16) _2;
         } _8[6];
     };
+#if TARGET_PC
+    static_assert(sizeof(BlockHeader) == 0x20, "JASAramStream::BlockHeader must match the .ast layout");
+#endif
+
 
     static void initSystem(u32, u32);
     JASAramStream();

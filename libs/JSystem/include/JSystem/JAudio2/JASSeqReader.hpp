@@ -1,5 +1,6 @@
 #pragma once
 
+#include "helpers/endian.h"
 #include <revolution/types.h>
 
 class JASSeqReader {
@@ -25,7 +26,7 @@ public:
     }
 
     u32 get24(u32 param_0) const {
-        return (*(u32*)(mSeqBuff + param_0 - 1)) & 0xffffff;
+        return (*(BE(u32)*)(mSeqBuff + param_0 - 1)) & 0xffffff;
     }
 
     u32* getBase() {
@@ -41,10 +42,10 @@ public:
         return *(mSeqBuff + param_0);
     }
     u16 get16(u32 param_0) const {
-        return *(u16*)(mSeqBuff + param_0);
+        return *(BE(u16)*)(mSeqBuff + param_0);
     }
     u32 get32(u32 param_0) const {
-        return *(u32*)(mSeqBuff + param_0);
+        return *(BE(u32)*)(mSeqBuff + param_0);
     }
     u8* getCur() {
         return mSeqCursor;
@@ -56,7 +57,7 @@ public:
 #ifdef __MWERKS__
         return *((u16*)mSeqCursor)++;
 #else
-        u16* value = (u16*)mSeqCursor;
+        BE(u16)* value = (BE(u16)*)mSeqCursor;
         mSeqCursor += 2;
         return *value;
 #endif
@@ -66,7 +67,7 @@ public:
 #ifdef __MWERKS__
         return (*((u32*)mSeqCursor)++) & 0x00ffffff;
 #else
-        u32* value = (u32*)mSeqCursor;
+        BE(u32)* value = (BE(u32)*)mSeqCursor;
         mSeqCursor += 4;
         return *value & 0x00ffffff;
 #endif

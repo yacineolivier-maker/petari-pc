@@ -43,6 +43,216 @@ void KCollisionServer::init(void* pData, const void* pMapData) {
     }
 }
 
+#if TARGET_PC
+#include <cstdlib>
+#include <cstring>
+
+namespace {
+    inline void kclSwap32(void* p) {
+        u32 v;
+        memcpy(&v, p, 4);
+        v = be32(v);
+        memcpy(p, &v, 4);
+    }
+
+    inline void kclSwap16(void* p) {
+        u16 v;
+        memcpy(&v, p, 2);
+        v = be16(v);
+        memcpy(p, &v, 2);
+    }
+
+    inline u32 kclReadBE32(const u8* p) {
+        u32 v;
+        memcpy(&v, p, 4);
+        return be32(v);
+    }
+
+    inline u16 kclReadBE16(const u8* p) {
+        u16 v;
+        memcpy(&v, p, 2);
+        return be16(v);
+    }
+
+    struct KCLU32List {
+        u32* mArr;
+        u32 mNum;
+        u32 mCap;
+
+        void push(u32 value) {
+            if (mNum == mCap) {
+                mCap = mCap != 0 ? mCap * 2 : 1024;
+                mArr = static_cast< u32* >(realloc(mArr, mCap * sizeof(u32)));
+            }
+            mArr[mNum++] = value;
+        }
+    };
+
+    int kclCompareU32(const void* pA, const void* pB) {
+        u32 a = *static_cast< const u32* >(pA);
+        u32 b = *static_cast< const u32* >(pB);
+        return a < b ? -1 : (a > b ? 1 : 0);
+    }
+
+    // Walks one group of node words (still big-endian), mirroring KCollisionServer::searchBlock.
+    // Records node word offsets and leaf list offsets, relative to the octree start.
+    void kclScanOctree(const u8* pOctree, KCLU32List& rNodes, KCLU32List& rLists, u32 groupOffset, u32 nodeNum, int depth) {
+        if (depth > 32) {
+            return;
+        }
+
+        for (u32 i = 0; i < nodeNum; i++) {
+            u32 nodeOffset = groupOffset + i * 4;
+            rNodes.push(nodeOffset);
+            s32 value = static_cast< s32 >(kclReadBE32(pOctree + nodeOffset));
+
+            if (value >= 0) {
+                kclScanOctree(pOctree, rNodes, rLists, groupOffset + value, 8, depth + 1);
+            } else {
+                rLists.push(groupOffset + (value & 0x7FFFFFFF));
+            }
+        }
+    }
+
+    // Swaps the KCL data that follows the header to host order. Called exactly once per file
+    // buffer (tracked by bit 31 of the big-endian header word 0); the header stays big-endian.
+    void kclSwapFileData(u8* pFile) {
+        const KCLFileHeader* header = reinterpret_cast< const KCLFileHeader* >(pFile);
+        u32 posOffset = header->mPosOffset;
+        u32 normOffset = header->mNormOffset;
+        u32 prismOffset = header->mPrismOffset;
+        u32 octreeOffset = header->mOctreeOffset;
+
+        // Prisms: entry 0 is a dummy that overlaps the previous section; real ones are 1..N
+        // (same count as KCollisionServer::getTriangleNum).
+        u32 triNum = (octreeOffset - (prismOffset + sizeof(KC_PrismData))) / sizeof(KC_PrismData);
+        KC_PrismData* prisms = reinterpret_cast< KC_PrismData* >(pFile + prismOffset);
+        u32 maxPos = 0;
+        u32 maxNorm = 0;
+
+        for (u32 i = 1; i <= triNum; i++) {
+            KC_PrismData* prism = &prisms[i];
+            kclSwap32(&prism->mHeight);
+            kclSwap16(&prism->mPositionIndex);
+            kclSwap16(&prism->mNormalIndex);
+            kclSwap16(&prism->mEdgeIndices[0]);
+            kclSwap16(&prism->mEdgeIndices[1]);
+            kclSwap16(&prism->mEdgeIndices[2]);
+            kclSwap16(&prism->mAttribute);
+
+            u32 norms[4] = {prism->mNormalIndex, prism->mEdgeIndices[0], prism->mEdgeIndices[1], prism->mEdgeIndices[2]};
+            maxPos = prism->mPositionIndex > maxPos ? prism->mPositionIndex : maxPos;
+            for (int j = 0; j < 4; j++) {
+                maxNorm = norms[j] > maxNorm ? norms[j] : maxNorm;
+            }
+        }
+
+        // Positions and normals: swap every entry referenced by a prism (order independent of
+        // the section layout and of padding).
+        if (triNum != 0) {
+            u8* pos = pFile + posOffset;
+            for (u32 i = 0; i < (maxPos + 1) * 3; i++) {
+                kclSwap32(pos + i * 4);
+            }
+
+            u8* norm = pFile + normOffset;
+            for (u32 i = 0; i < (maxNorm + 1) * 3; i++) {
+                kclSwap32(norm + i * 4);
+            }
+        }
+
+        // Octree: node words (u32) and leaf lists (u16, from list + 2 up to the 0 terminator;
+        // list[0] is never read). Lists can be shared between leaves, so each unit is deduped.
+        u8* octree = pFile + octreeOffset;
+        s32 xyShift = header->mBlockXYShift;
+        s32 xShift = header->mBlockXShift;
+        u32 rootNum;
+
+        if (xyShift == -1 && xShift == -1) {
+            rootNum = 1;
+        } else {
+            s32 widthShift = header->mBlockWidthShift;
+            u32 numX = (~static_cast< u32 >(header->mXMask.host()) >> widthShift) + 1;
+            u32 numY = (~static_cast< u32 >(header->mYMask.host()) >> widthShift) + 1;
+            u32 numZ = (~static_cast< u32 >(header->mZMask.host()) >> widthShift) + 1;
+            rootNum = numX * numY * numZ;
+        }
+
+        KCLU32List nodes = {};
+        KCLU32List lists = {};
+        kclScanOctree(octree, nodes, lists, 0, rootNum, 0);
+
+        // Collect every u16 slot of every list while the data is still big-endian.
+        KCLU32List slots = {};
+        for (u32 i = 0; i < lists.mNum; i++) {
+            u32 offset = lists.mArr[i] + 2;
+            for (;;) {
+                slots.push(offset);
+                if (kclReadBE16(octree + offset) == 0) {
+                    break;
+                }
+                offset += 2;
+            }
+        }
+
+        if (nodes.mNum != 0) {
+            qsort(nodes.mArr, nodes.mNum, sizeof(u32), kclCompareU32);
+            for (u32 i = 0; i < nodes.mNum; i++) {
+                if (i == 0 || nodes.mArr[i] != nodes.mArr[i - 1]) {
+                    kclSwap32(octree + nodes.mArr[i]);
+                }
+            }
+        }
+
+        if (slots.mNum != 0) {
+            qsort(slots.mArr, slots.mNum, sizeof(u32), kclCompareU32);
+            for (u32 i = 0; i < slots.mNum; i++) {
+                if (i == 0 || slots.mArr[i] != slots.mArr[i - 1]) {
+                    kclSwap16(octree + slots.mArr[i]);
+                }
+            }
+        }
+
+        free(nodes.mArr);
+        free(lists.mArr);
+        free(slots.mArr);
+    }
+}  // namespace
+
+void KCollisionServer::setData(void* pData) {
+    if (*reinterpret_cast< const u32* >(pData) == KCL_HOST_MAGIC) {
+        // Host-built KCLFile (DynamicCollisionObj): already host-endian with real pointers.
+        mFile = reinterpret_cast< KCLFile* >(pData);
+        return;
+    }
+
+    u8* file = reinterpret_cast< u8* >(pData);
+    KCLFileHeader* header = reinterpret_cast< KCLFileHeader* >(pData);
+
+    // The file buffer can be shared by several collision parts: swap its data only once.
+    if (!isBinaryInitialized(pData)) {
+        kclSwapFileData(file);
+        header->mPosOffset = header->mPosOffset | 0x80000000;
+    }
+
+    KCLFile* host = &mPcFile;
+    host->mPos = reinterpret_cast< TVec3f* >(file + (header->mPosOffset & 0x7FFFFFFF));
+    host->mNorms = reinterpret_cast< TVec3f* >(file + header->mNormOffset);
+    host->mPrisms = reinterpret_cast< KC_PrismData* >(file + header->mPrismOffset);
+    host->mOctree = reinterpret_cast< void* >(file + header->mOctreeOffset);
+    host->mThickness = header->mThickness;
+    host->mMin.x = header->mMin[0];
+    host->mMin.y = header->mMin[1];
+    host->mMin.z = header->mMin[2];
+    host->mXMask = header->mXMask;
+    host->mYMask = header->mYMask;
+    host->mZMask = header->mZMask;
+    host->mBlockWidthShift = header->mBlockWidthShift;
+    host->mBlockXShift = header->mBlockXShift;
+    host->mBlockXYShift = header->mBlockXYShift;
+    mFile = host;
+}
+#else
 void KCollisionServer::setData(void* pData) {
     mFile = reinterpret_cast< KCLFile* >(pData);
 
@@ -53,6 +263,7 @@ void KCollisionServer::setData(void* pData) {
         mFile->mOctree = reinterpret_cast< void* >(reinterpret_cast< u8* >(mFile) + mFile->mOctreeOffset);
     }
 }
+#endif
 
 bool KCollisionServer::calcFarthestVertexDistance() {
     s32 triCount = getTriangleNum();
@@ -89,7 +300,12 @@ bool KCollisionServer::calcFarthestVertexDistance() {
 }
 
 bool KCollisionServer::isBinaryInitialized(const void* pData) NO_INLINE {
+#if TARGET_PC
+    // Raw file data only: bit 31 of the big-endian word 0 marks the data as swapped to host order.
+    return static_cast< s32 >(reinterpret_cast< const KCLFileHeader* >(pData)->mPosOffset.host()) < 0;
+#else
     return reinterpret_cast< const s32* >(pData)[0] < 0;
+#endif
 }
 
 KC_PrismData* KCollisionServer::checkPoint(Fxyz* pPoint, f32 param, f32* pDist) {

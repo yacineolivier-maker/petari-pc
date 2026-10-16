@@ -46,21 +46,21 @@ void MirrorCamera::setMirrorMapInfo(J3DModelData* pModelData) {
     TVec3f normal;
     const GXVtxAttrFmtList* format = ::getVertexFormat(pModelData, GX_VA_POS);
     if (format->type == GX_S16) {
-        const s16* data = static_cast< const s16* >(pModelData->getVtxPosArray());
+        const BE(s16)* data = static_cast< const BE(s16)* >(pModelData->getVtxPosArray());
         TVec3s fixed(data[0], data[1], data[2]);
         MR::fixed16ToFloat(&position, fixed, format->frac);
     } else {
-        const f32* data = static_cast< const f32* >(pModelData->getVtxPosArray());
+        const BE(f32)* data = static_cast< const BE(f32)* >(pModelData->getVtxPosArray());
         position.set< f32 >(data[0], data[1], data[2]);
     }
 
     format = ::getVertexFormat(pModelData, GX_VA_NRM);
     if (format->type == GX_S16) {
-        const s16* data = static_cast< const s16* >(pModelData->getVtxNrmArray());
+        const BE(s16)* data = static_cast< const BE(s16)* >(pModelData->getVtxNrmArray());
         TVec3s fixed(data[0], data[1], data[2]);
         MR::fixed16ToFloat(&normal, fixed, format->frac);
     } else {
-        const f32* data = static_cast< const f32* >(pModelData->getVtxNrmArray());
+        const BE(f32)* data = static_cast< const BE(f32)* >(pModelData->getVtxNrmArray());
         normal.set< f32 >(data[0], data[1], data[2]);
     }
 

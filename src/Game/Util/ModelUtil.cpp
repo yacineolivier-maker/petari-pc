@@ -504,7 +504,7 @@ namespace MR {
             vtxAttrFmtList++;
         }
 
-        s16* vertexPosArray = static_cast< s16* >(pModelData->getVertexData().getVtxPosArray());
+        BE(s16)* vertexPosArray = static_cast< BE(s16)* >(pModelData->getVertexData().getVtxPosArray());
         for (u32 i = 0; i < vtxNum * 3; i++) {
             vertexPosArray[i] >>= 1;
         }

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "helpers/endian.h"
 #include <revolution/types.h>
 
 class JKRHeap;
@@ -73,7 +74,7 @@ public:
     /* 0x2C */ JPADynamicsBlock* mpDynamicsBlock;
     /* 0x30 */ JPAFieldBlock** mpFieldBlocks;
     /* 0x34 */ JPAKeyBlock** mpKeyBlocks;
-    /* 0x38 */ u16 const* mpTDB1;
+    /* 0x38 */ BE(u16) const* mpTDB1;
     /* 0x3C */ u16 mUsrIdx;
     /* 0x3E */ u8 mFieldBlockNum;
     /* 0x3F */ u8 mKeyBlockNum;

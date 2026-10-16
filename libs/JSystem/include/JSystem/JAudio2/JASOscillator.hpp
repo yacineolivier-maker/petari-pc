@@ -1,12 +1,13 @@
 #pragma once
 
+#include "helpers/endian.h"
 #include <revolution.h>
 
 struct JASOscillator {
     struct Point {
-        /* 0x0 */ s16 _0;
-        /* 0x2 */ s16 _2;
-        /* 0x4 */ s16 _4;
+        /* 0x0 */ BE(s16) _0;
+        /* 0x2 */ BE(s16) _2;
+        /* 0x4 */ BE(s16) _4;
     };
 
     struct EffectParams {

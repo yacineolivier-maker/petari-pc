@@ -5,6 +5,9 @@
 #include "Game/Util/StringUtil.hpp"
 #include <cstring>
 #include <revolution/types.h>
+#if TARGET_PC
+#include <JSystem/J3DGraphAnimator/J3DAnimation.hpp>
+#endif
 
 static bool unknownByte;
 XanimeResourceTable::XanimeResourceTable(ResourceHolder* pArg) {
@@ -192,9 +195,16 @@ u32 XanimeResourceTable::initGroupInfo(ResourceHolder* pResourceHolder, XanimeGr
             entry->mLoop = 0.0f;
             entry->mAttribute = 0;
         } else {
+#if TARGET_PC
+            // _20[0] is a host J3DAnmTransform object (raw offsets 4/6 assume a 4-byte vtable pointer).
+            entry->mAttribute = static_cast< J3DAnmTransform* >(entry->_20[0])->getAttribute();
+            entry->mLoop = 0.0f;
+            entry->mEnd = static_cast< f32 >(static_cast< J3DAnmTransform* >(entry->_20[0])->getFrameMax());
+#else
             entry->mAttribute = static_cast< u8* >(entry->_20[0])[4];
             entry->mLoop = 0.0f;
             entry->mEnd = static_cast< f32 >(reinterpret_cast< const s16* >(entry->_20[0])[3]);
+#endif
         }
 
         XanimeBckTable* ofsTables[1];

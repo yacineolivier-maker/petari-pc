@@ -76,6 +76,20 @@ public:
 
     /* 0x00 */ union {
         u32 mComposite;
+#if TARGET_PC
+        // Runtime value (host-endian u32 = section << 24 | group << 16 | wave): on little-endian
+        // the halves/bytes are stored in reverse order so the parts keep their meaning.
+        struct {
+            u16 waveID;
+            union {
+                u16 value;
+                struct {
+                    u8 groupID;
+                    u8 sectionID;
+                } parts;
+            } type;
+        } info;
+#else
         struct {
             union {
                 u16 value;
@@ -86,6 +100,7 @@ public:
             } type;
             u16 waveID;
         } info;
+#endif
     } mID;
 };
 

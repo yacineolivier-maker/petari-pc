@@ -56,7 +56,7 @@ namespace nw4r {
             };
 
             inline const char* GetStrTableStr(const void* pTable, int idx) {
-                const u32* offs = static_cast< const u32* >(pTable);
+                const ResU32* offs = static_cast< const ResU32* >(pTable);
                 const char* pool = static_cast< const char* >(pTable);
                 return &pool[offs[idx]];
             }
@@ -87,7 +87,12 @@ namespace nw4r {
             }
 
             inline s32 GetSignatureInt(const char sig[4]) {
+#if TARGET_PC
+                // The signature bytes are compared against multi-character constants ('lyt1').
+                return *reinterpret_cast< const ResS32* >(sig);
+#else
                 return *reinterpret_cast< const s32* >(sig);
+#endif
             }
 
             inline u8 GetVtxColorElement(const ut::Color* pColors, u32 idx) {

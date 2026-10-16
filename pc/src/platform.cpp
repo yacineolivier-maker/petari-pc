@@ -71,6 +71,7 @@ const char* FindDisc(int argc, char* argv[]) {
 extern "C" void pc_platform_init(int argc, char* argv[]) {
     pc_log_file_init();
     pc_install_crash_handler();
+    pc_watchdog_tick();  // SMGPC_WATCHDOG=N also covers the boot, before the first frame
     std::setvbuf(stdout, nullptr, _IONBF, 0);
 
     bool startFullscreen = false;
