@@ -10,6 +10,9 @@
 //   LB ................ C                      Start ....... +   Back ....... -
 //   D-pad ............. D-pad                  Y ........... 1   R3 ......... recentre pointer
 //
+// Mouse (PC addition): moving it inside the window places the pointer there; left button = A,
+// right button = B. SMGPC_NO_MOUSE=1 turns it off.
+//
 // The spin is detected by the game from accelerometer changes (WPadHVSwing); pressing the
 // shake button produces a short synthetic shake of the remote's accelerometer.
 
@@ -17,6 +20,9 @@
 #include <revolution/wpad.h>
 
 #include <dolphin/pad.h>
+
+#include <SDL3/SDL_mouse.h>
+#include <SDL3/SDL_video.h>
 
 #include <cmath>
 #include <cstdio>
@@ -28,6 +34,46 @@
 namespace {
 
 constexpr int kNumChannels = 4;
+
+// Mouse state for the first remote: pointer position (-1..1) when the mouse moved over the
+// window this frame, and the A/B buttons from its left/right buttons.
+struct MouseInput {
+    bool moved = false;
+    f32 x = 0.0f, y = 0.0f;
+    u32 buttons = 0;
+};
+
+MouseInput ReadMouse() {
+    static const bool sDisabled = std::getenv("SMGPC_NO_MOUSE") != nullptr;
+    static f32 sLastX = -1.0f, sLastY = -1.0f;
+    MouseInput m;
+    if (sDisabled) {
+        return m;
+    }
+    SDL_Window* window = SDL_GetMouseFocus();
+    if (window == nullptr) {
+        return m;
+    }
+    int w = 0, h = 0;
+    SDL_GetWindowSize(window, &w, &h);
+    if (w <= 0 || h <= 0) {
+        return m;
+    }
+    float mx = 0.0f, my = 0.0f;
+    const SDL_MouseButtonFlags b = SDL_GetMouseState(&mx, &my);
+    if (mx != sLastX || my != sLastY) {
+        if (sLastX >= 0.0f) {
+            m.moved = true;
+        }
+        sLastX = mx;
+        sLastY = my;
+    }
+    m.x = mx / w * 2.0f - 1.0f;
+    m.y = my / h * 2.0f - 1.0f;
+    if (b & SDL_BUTTON_LMASK) m.buttons |= WPAD_BUTTON_A;
+    if (b & SDL_BUTTON_RMASK) m.buttons |= WPAD_BUTTON_B;
+    return m;
+}
 
 struct ChannelState {
     bool connected = false;
@@ -259,8 +305,11 @@ s32 KPADRead(s32 chan, KPADStatus status[], u32 count) {
     u32 hold = MapButtons(pad, shakeButton);
     f32 stickX = StickAxis(pad.stickX);
     f32 stickY = StickAxis(pad.stickY);
+    MouseInput mouse;
     if (chan == 0) {
         ApplyScript(sFrame, hold, shakeButton, stickX, stickY, ch.pointerX, ch.pointerY);
+        mouse = ReadMouse();
+        hold |= mouse.buttons;
     }
     s.hold = hold;
     s.trig = hold & ~ch.prevHold;
@@ -275,6 +324,10 @@ s32 KPADRead(s32 chan, KPADStatus status[], u32 count) {
     ch.pointerY -= ry * std::fabs(ry) * speed * 1.6f + ry * speed * 0.4f;
     if (pad.extButton & PAD_BUTTON_RIGHT_STICK) {
         ch.pointerX = ch.pointerY = 0.0f;
+    }
+    if (mouse.moved) {
+        ch.pointerX = mouse.x;
+        ch.pointerY = mouse.y;
     }
     if (ch.pointerX > 1.0f) ch.pointerX = 1.0f;
     if (ch.pointerX < -1.0f) ch.pointerX = -1.0f;
