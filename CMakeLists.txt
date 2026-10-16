@@ -151,7 +151,9 @@ smg_add_lib(smg_pc
         pc/src/os/user_files.cpp
         pc/src/os/wii_arena.cpp
         pc/src/os/wii_system.cpp
-        pc/src/input/wiimote.cpp)
+        pc/src/input/wiimote.cpp
+        pc/src/ui/xbox_glyphs.cpp
+        pc/src/ui/xbox_glyphs_gdi.cpp)
 if (WIN32)
     target_link_libraries(smg_pc PUBLIC dbghelp psapi)
 endif ()

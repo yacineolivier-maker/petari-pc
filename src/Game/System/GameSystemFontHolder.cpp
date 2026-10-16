@@ -1,4 +1,7 @@
 #include "Game/System/GameSystemFontHolder.hpp"
+#if TARGET_PC
+#include "pc/xbox_glyphs.h"
+#endif
 #include "Game/System/FileLoader.hpp"
 #include "Game/System/Language.hpp"
 #include "Game/Util/FileUtil.hpp"
@@ -53,6 +56,9 @@ void GameSystemFontHolder::createFontFromFile() {
     mMessageFont = createFont(pArchive, "/MessageFont26.brfnt");
 
     mPictureFont = createFont(pArchive, "/PictureFont.brfnt");
+#if TARGET_PC
+    pc_patch_picture_font(mPictureFont);
+#endif
 
     mMenuFont = createFont(pArchive, "/MenuFont64.brfnt");
 
