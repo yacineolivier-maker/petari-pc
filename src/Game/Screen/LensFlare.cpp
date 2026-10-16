@@ -272,12 +272,28 @@ void LensFlareDirector::controlFlare(s32 area, bool hasBrightObj) {
     mGlow->update(area >> 2 & 1, hasBrightObj);
     mLine->update(area >> 3 & 1, hasBrightObj);
 
+#if TARGET_PC
+    extern float gPcSunBright;
+    gPcSunBright = 0.0f;
+    static const bool sDebug = getenv("SMGPC_DEBUG_GODRAYS") != nullptr;
+    static int sFrames = 0;
+    if (sDebug && sFrames++ % 60 == 0) {
+        OSReport("[pc] lens flare: area %ld, bright obj %d (count %lu, bright %.2f)\n", area, hasBrightObj, mBrightObjCount, _68);
+    }
+#endif
     if (!hasBrightObj || area == 0) {
         return;
     }
 
     TVec2f position(_60 - _6C);
     position += _74;
+#if TARGET_PC
+    // Sun shafts (pc/src/fx/god_rays.cpp) follow the flare.
+    extern float gPcSunScreenX, gPcSunScreenY;
+    gPcSunScreenX = position.x;
+    gPcSunScreenY = position.y;
+    gPcSunBright = MR::clamp(_68, 0.0f, 1.0f);
+#endif
     TVec3f flarePos(position.x, -position.y, 0.0f);
     mRing->mPosition.set(flarePos);
     mGlow->mPosition.set(flarePos);

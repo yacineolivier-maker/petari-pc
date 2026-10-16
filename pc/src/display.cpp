@@ -26,6 +26,7 @@ struct Settings {
     int supersampling = 2;
     float drawDistance = 2.0f;
     float particleDensity = 1.5f;
+    float godRays = 0.6f;
     std::string language = "fr";
 };
 
@@ -88,6 +89,11 @@ void Load(FILE* f) {
             if (f >= 1.0f && f <= 3.0f) {
                 g_settings.particleDensity = f;
             }
+        } else if (key == "rayons_soleil") {
+            const float f = float(std::atof(value.c_str()));
+            if (f >= 0.0f && f <= 2.0f) {
+                g_settings.godRays = f;
+            }
         } else if (key == "langue" && (value == "fr" || value == "en" || value == "es")) {
             g_settings.language = value;
         }
@@ -131,11 +137,15 @@ void Save(const std::string& path) {
                  "; simplifiee ou disparaissent (1 = Wii, jusqu'a 4)\n"
                  "distance_affichage = %.1f\n"
                  "; Densite des particules (poussieres, etincelles...) : 1 = Wii, jusqu'a 3\n"
-                 "particules = %.1f\n",
+                 "particules = %.1f\n"
+                 "; Rayons de soleil la ou le jeu affiche un reflet du soleil : 0 = desactive,\n"
+                 "; sinon intensite (jusqu'a 2)\n"
+                 "rayons_soleil = %.1f\n",
                  g_settings.fullscreen ? 1 : 0, g_settings.windowWidth, g_settings.windowHeight, g_settings.msaa,
                  g_settings.anisotropy, g_settings.alphaToCoverage ? 1 : 0, g_settings.textureMipmaps ? 1 : 0,
                  g_settings.vsync ? 1 : 0, g_settings.backend.c_str(), g_settings.supersampling,
-                 g_settings.language.c_str(), g_settings.drawDistance, g_settings.particleDensity);
+                 g_settings.language.c_str(), g_settings.drawDistance, g_settings.particleDensity,
+                 g_settings.godRays);
     std::fclose(f);
 }
 
@@ -196,6 +206,12 @@ float pc_settings_draw_distance() {
 float pc_settings_particle_density() {
     static const float value = std::getenv("SMGPC_PARTICLES") ? float(std::atof(std::getenv("SMGPC_PARTICLES")))
                                                              : g_settings.particleDensity;
+    return value;
+}
+
+float pc_settings_god_rays() {
+    static const float value = std::getenv("SMGPC_GOD_RAYS") ? float(std::atof(std::getenv("SMGPC_GOD_RAYS")))
+                                                            : g_settings.godRays;
     return value;
 }
 

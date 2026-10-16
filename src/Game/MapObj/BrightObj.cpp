@@ -8,6 +8,7 @@
 #include "Game/Util/DirectDraw.hpp"
 #include "Game/Util/JMapUtil.hpp"
 #include "Game/Util/LiveActorUtil.hpp"
+#include "Game/Util/MapUtil.hpp"
 #include "Game/Util/MathUtil.hpp"
 #include "Game/Util/MtxUtil.hpp"
 #include "Game/Util/ObjUtil.hpp"
@@ -72,6 +73,10 @@ namespace {
         return ret;
     }
 };  // namespace
+
+#if TARGET_PC
+static TVec3f sPcBrightCamPos(0.0f, 0.0f, 0.0f);  // camera of the visibility test in progress
+#endif
 
 BrightInfo::BrightInfo() {
     reset();
@@ -196,6 +201,9 @@ void BrightObjBase::checkVisibilityOfSphere(u16 index, const BrightCamInfo& rCam
     const TProj3f& rProj = rCamInfo.mProjectionMtx[index];
 
     ::calcScreenPosition(&args.mCenter, drawPos, rView, rProj);
+#if TARGET_PC
+    sPcBrightCamPos.set(rCamInfo.mCameraPos[index]);
+#endif
     checkVisible(&args, drawPos, rView, rProj);
 
     for (u32 idx = 0; idx < 8; idx++) {
@@ -228,8 +236,20 @@ void BrightObjBase::checkVisible(BrightObjBase::CheckArg* pArg, const TVec3f& rT
         TVec2f frameBufferPos;
         MR::convertScreenPosToFrameBufferPos(&frameBufferPos, screenPos);
 
+#if TARGET_PC
+        // The Wii reads back the EFB alpha written by drawSphere where the sun isn't hidden;
+        // Aurora can't read the EFB back. A line test against the map collision from the
+        // camera towards the point tells the same thing (foliage without collision aside).
+        TVec3f toPoint(rTrans - sPcBrightCamPos);
+        const f32 length = toPoint.length();
+        if (length > 30000.0f) {
+            toPoint.scale(30000.0f / length);
+        }
+        const u32 color = MR::isExistMapCollision(sPcBrightCamPos, toPoint) ? 0 : 0xFF000000;
+#else
         u32 color;
         GXPeekARGB(frameBufferPos.x, frameBufferPos.y, &color);
+#endif
 
         if ((color & 0xFF000000) >= 0xF0000000) {
             pArg->mCurrBrightness++;

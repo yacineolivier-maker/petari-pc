@@ -409,6 +409,10 @@ void GameScene::draw3D() const {
     MR::setStarPointerDrawSyncToken();
     MR::setTalkDirectorDrawSyncToken();
     SceneFunction::executeDrawImageEffect();
+#if TARGET_PC
+    extern void pc_god_rays_draw();
+    pc_god_rays_draw();  // PC enhancement: sun shafts (display.ini "rayons_soleil")
+#endif
     GXSetDither(GX_TRUE);
     MR::loadViewMtx();
     MR::loadProjectionMtx();
