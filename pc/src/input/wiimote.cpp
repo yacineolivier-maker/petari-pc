@@ -31,6 +31,8 @@
 #include <string>
 #include <vector>
 
+bool pc_settings_co_star();
+
 namespace {
 
 constexpr int kNumChannels = 4;
@@ -91,6 +93,8 @@ struct ChannelState {
 ChannelState sChannels[kNumChannels];
 bool sPadInitialized = false;
 PADStatus sPads[PAD_MAX_CONTROLLERS];
+// Co-star mode: gamepad port of each remote (-1: every gamepad drives the first remote).
+int sPadPort[PAD_MAX_CONTROLLERS] = {-1, -1, -1, -1};
 u32 sLastPadReadFrame = 0xFFFFFFFF;
 u32 sFrame = 0;
 
@@ -117,6 +121,32 @@ void ReadPads() {
     PADStatus raw[PAD_MAX_CONTROLLERS];
     PADRead(raw);
     PADClamp(raw);
+    // Co-star (display.ini "deux_joueurs"): with two gamepads, the second one is the second Wii
+    // Remote (the co-star's Star Pointer).
+    if (pc_settings_co_star()) {
+        int ports[PAD_MAX_CONTROLLERS];
+        int count = 0;
+        for (int i = 0; i < PAD_MAX_CONTROLLERS; i++) {
+            if (raw[i].err == PAD_ERR_NONE) {
+                ports[count++] = i;
+            }
+        }
+        if (count >= 2) {
+            for (int i = 0; i < PAD_MAX_CONTROLLERS; i++) {
+                sPadPort[i] = i < 2 ? ports[i] : -1;
+                if (i < 2) {
+                    sPads[i] = raw[ports[i]];
+                } else {
+                    sPads[i] = {};
+                    sPads[i].err = PAD_ERR_NO_CONTROLLER;
+                }
+            }
+            return;
+        }
+    }
+    for (int& port : sPadPort) {
+        port = -1;
+    }
     // Single player: every connected gamepad (and the keyboard) drives the first Wii Remote, so it
     // doesn't matter which port SDL gives the Xbox controller. The other remotes stay disconnected
     // (otherwise the game shows a second player's "co-star" cursor).
@@ -318,8 +348,14 @@ s32 KPADRead(s32 chan, KPADStatus status[], u32 count) {
     ch.prevHold = hold;
 
     // Pointer: the right stick moves it (velocity control); R3 recentres it.
-    const f32 rx = StickAxis(pad.substickX);
-    const f32 ry = StickAxis(pad.substickY);
+    f32 rx = StickAxis(pad.substickX);
+    f32 ry = StickAxis(pad.substickY);
+    if (chan != 0) {
+        // The co-star has no Nunchuk: either stick moves the pointer.
+        if (std::fabs(stickX) > std::fabs(rx)) rx = stickX;
+        if (std::fabs(stickY) > std::fabs(ry)) ry = stickY;
+        stickX = stickY = 0.0f;
+    }
     const f32 speed = 0.035f;
     ch.pointerX += rx * std::fabs(rx) * speed * 1.6f + rx * speed * 0.4f;
     ch.pointerY -= ry * std::fabs(ry) * speed * 1.6f + ry * speed * 0.4f;
@@ -407,6 +443,10 @@ s32 WPADSendStreamData(s32, void*, u16) { return WPAD_ERR_NONE; }
 BOOL WPADCanSendStreamData(s32) { return FALSE; }
 
 void WPADControlMotor(s32 chan, u32 command) {
+    if (chan >= 0 && chan < PAD_MAX_CONTROLLERS && sPadPort[chan] >= 0) {  // co-star mode
+        PADControlMotor(sPadPort[chan], command != 0 ? PAD_MOTOR_RUMBLE : PAD_MOTOR_STOP);
+        return;
+    }
     // The first remote is all the gamepads (see ReadPads): rumble every port.
     if (chan == 0) {
         for (int port = 0; port < PAD_MAX_CONTROLLERS; port++) {

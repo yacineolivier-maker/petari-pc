@@ -27,6 +27,7 @@ struct Settings {
     float drawDistance = 2.0f;
     float particleDensity = 1.5f;
     float godRays = 0.6f;
+    bool coStar = false;
     std::string language = "fr";
 };
 
@@ -89,6 +90,8 @@ void Load(FILE* f) {
             if (f >= 1.0f && f <= 3.0f) {
                 g_settings.particleDensity = f;
             }
+        } else if (key == "deux_joueurs") {
+            g_settings.coStar = ParseBool(value);
         } else if (key == "rayons_soleil") {
             const float f = float(std::atof(value.c_str()));
             if (f >= 0.0f && f <= 2.0f) {
@@ -140,12 +143,16 @@ void Save(const std::string& path) {
                  "particules = %.1f\n"
                  "; Rayons de soleil la ou le jeu affiche un reflet du soleil : 0 = desactive,\n"
                  "; sinon intensite (jusqu'a 2)\n"
-                 "rayons_soleil = %.1f\n",
+                 "rayons_soleil = %.1f\n"
+                 "\n"
+                 "; Mode deux joueurs (co-star) : avec deux manettes, la deuxieme pilote le pointeur\n"
+                 "; etoile du second joueur (1 = active)\n"
+                 "deux_joueurs = %d\n",
                  g_settings.fullscreen ? 1 : 0, g_settings.windowWidth, g_settings.windowHeight, g_settings.msaa,
                  g_settings.anisotropy, g_settings.alphaToCoverage ? 1 : 0, g_settings.textureMipmaps ? 1 : 0,
                  g_settings.vsync ? 1 : 0, g_settings.backend.c_str(), g_settings.supersampling,
                  g_settings.language.c_str(), g_settings.drawDistance, g_settings.particleDensity,
-                 g_settings.godRays);
+                 g_settings.godRays, g_settings.coStar ? 1 : 0);
     std::fclose(f);
 }
 
@@ -234,4 +241,9 @@ extern "C" unsigned char pc_settings_language() {
 
 bool pc_display_vsync() {
     return g_settings.vsync;
+}
+
+bool pc_settings_co_star() {
+    static const bool value = std::getenv("SMGPC_CO_STAR") ? ParseBool(std::getenv("SMGPC_CO_STAR")) : g_settings.coStar;
+    return value;
 }
