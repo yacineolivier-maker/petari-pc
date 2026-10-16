@@ -52,6 +52,8 @@ namespace {
 };  // namespace
 
 #if TARGET_PC
+extern "C" unsigned char pc_settings_language();  // SC_LANG_*: 3 French, 1 English, 4 Spanish
+
 namespace {
     bool pcIsLetter(wchar_t c) {
         return (c >= L'a' && c <= L'z') || (c >= L'A' && c <= L'Z') || c >= 0xC0;
@@ -157,7 +159,8 @@ namespace {
                     return pOriginal;
                 }
                 MessageEditorMessageTag tag(pTag + 1);
-                sText = L"Appuyez sur ";
+                const unsigned char language = pc_settings_language();
+                sText = language == 1 ? L"Press " : language == 4 ? L"Presiona " : L"Appuyez sur ";
                 sText.append(pTag, tag.getSkipLength() + 1);
                 sText += L".";
             }
