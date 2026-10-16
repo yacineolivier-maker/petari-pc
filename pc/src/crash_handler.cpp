@@ -71,11 +71,36 @@ static void pc_print_stack(HANDLE process, HANDLE thread, CONTEXT ctx) {
     }
 }
 
+// Raw frames as offsets into smgpc.exe, printed before anything that allocates (symbolization
+// can itself crash when the heap is corrupted). Resolve them offline from smgpc.pdb.
+static void pc_print_raw_frames(const CONTEXT& context) {
+    const DWORD64 base = (DWORD64)GetModuleHandleW(nullptr);
+    CONTEXT ctx = context;
+    std::fprintf(stderr, "  raw frames (smgpc.exe RVA):");
+    for (int i = 0; i < 24 && ctx.Rip != 0; i++) {
+        DWORD64 imageBase = 0;
+        PRUNTIME_FUNCTION fn = RtlLookupFunctionEntry(ctx.Rip, &imageBase, nullptr);
+        if (imageBase == base) {
+            std::fprintf(stderr, " %llx", (unsigned long long)(ctx.Rip - base));
+        } else {
+            std::fprintf(stderr, " ext:%llx", (unsigned long long)ctx.Rip);
+        }
+        if (fn == nullptr) {
+            ctx.Rip = *(DWORD64*)ctx.Rsp;
+            ctx.Rsp += 8;
+        } else {
+            void* handlerData = nullptr;
+            DWORD64 establisher = 0;
+            RtlVirtualUnwind(UNW_FLAG_NHANDLER, imageBase, ctx.Rip, fn, &ctx, &handlerData, &establisher, nullptr);
+        }
+    }
+    std::fprintf(stderr, "\n");
+    std::fflush(stderr);
+}
+
 static LONG WINAPI pc_unhandled_exception(EXCEPTION_POINTERS* info) {
     HANDLE process = GetCurrentProcess();
     HANDLE thread = GetCurrentThread();
-    SymSetOptions(SYMOPT_LOAD_LINES | SYMOPT_UNDNAME | SYMOPT_DEFERRED_LOADS);
-    SymInitialize(process, pc_symbol_path(), TRUE);
 
     EXCEPTION_RECORD* rec = info->ExceptionRecord;
     std::fflush(stdout);
@@ -86,6 +111,10 @@ static LONG WINAPI pc_unhandled_exception(EXCEPTION_POINTERS* info) {
                      (void*)rec->ExceptionInformation[1]);
     }
     std::fprintf(stderr, " ===\n");
+    pc_print_raw_frames(*info->ContextRecord);
+
+    SymSetOptions(SYMOPT_LOAD_LINES | SYMOPT_UNDNAME | SYMOPT_DEFERRED_LOADS);
+    SymInitialize(process, pc_symbol_path(), TRUE);
 
     pc_print_stack(process, thread, *info->ContextRecord);
     std::fflush(stderr);

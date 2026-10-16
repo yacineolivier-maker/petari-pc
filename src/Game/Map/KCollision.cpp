@@ -1626,6 +1626,11 @@ KC_PrismData* KCollisionServer::getPrismData(u32 index) const {
 }
 
 s32 KCollisionServer::getTriangleNum() const {
+#if TARGET_PC
+    if (mFile->mTriangleNum >= 0) {
+        return mFile->mTriangleNum;
+    }
+#endif
     return (reinterpret_cast< u8* >(mFile->mOctree) - reinterpret_cast< u8* >(mFile->mPrisms + 1)) / sizeof(KC_PrismData);
 }
 

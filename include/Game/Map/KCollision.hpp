@@ -45,6 +45,9 @@ struct KCLFile {
     s32 mBlockWidthShift;
     s32 mBlockXShift;
     s32 mBlockXYShift;
+    // Triangle count when the arrays aren't laid out back to back (DynamicCollisionObj allocates
+    // them separately; the Wii's heap happened to place them contiguously). -1: use the layout.
+    s32 mTriangleNum = -1;
 };
 
 // Raw KCL file header (big-endian). The header itself is never byte-swapped; bit 31 of

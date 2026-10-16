@@ -1025,6 +1025,22 @@ void StorySequenceExecutor::decideNextStageForGalaxyOut(GalaxyMoveArgument* pMov
 }
 
 void StorySequenceExecutor::overwriteGalaxyNameAfterLoading(GalaxyMoveArgument* pMoveArgument) {
+#if TARGET_PC
+    // SMGPC_START_STAGE=<StageName>[:<scenario>]: after loading a file, go straight to that galaxy
+    // (testing aid), e.g. SMGPC_START_STAGE=HeavensDoorGalaxy:1.
+    static char sStartStage[64];
+    if (const char* pEnv = getenv("SMGPC_START_STAGE")) {
+        snprintf(sStartStage, sizeof(sStartStage), "%s", pEnv);
+        s32 scenario = 1;
+        if (char* pColon = strchr(sStartStage, ':')) {
+            *pColon = '\0';
+            scenario = atoi(pColon + 1);
+        }
+        pMoveArgument->mStageName = sStartStage;
+        pMoveArgument->mScenarioNo = scenario;
+        return;
+    }
+#endif
     if (GameDataFunction::hasGrandStar(1)) {
         setNextStageToAstroGalaxy(pMoveArgument);
     } else if (GameDataFunction::isPassedStoryEvent("ピーチ城浮上後") || !GameDataFunction::isDataMario()) {
