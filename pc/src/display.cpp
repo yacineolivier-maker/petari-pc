@@ -21,6 +21,7 @@ struct Settings {
     bool alphaToCoverage = true;
     bool textureMipmaps = true;
     bool vsync = true;
+    std::string backend = "auto";
 };
 
 Settings g_settings;
@@ -68,6 +69,8 @@ void Load(FILE* f) {
             g_settings.textureMipmaps = ParseBool(value);
         } else if (key == "vsync") {
             g_settings.vsync = ParseBool(value);
+        } else if (key == "backend") {
+            g_settings.backend = value;
         }
     }
 }
@@ -95,10 +98,12 @@ void Save(const std::string& path) {
                  "; Mipmaps generees pour les textures qui n'en ont pas (moins de scintillement au loin)\n"
                  "texture_mipmaps = %d\n"
                  "; Synchronisation verticale\n"
-                 "vsync = %d\n",
+                 "vsync = %d\n"
+                 "; API graphique : auto, d3d12, vulkan ou d3d11\n"
+                 "backend = %s\n",
                  g_settings.fullscreen ? 1 : 0, g_settings.windowWidth, g_settings.windowHeight, g_settings.msaa,
                  g_settings.anisotropy, g_settings.alphaToCoverage ? 1 : 0, g_settings.textureMipmaps ? 1 : 0,
-                 g_settings.vsync ? 1 : 0);
+                 g_settings.vsync ? 1 : 0, g_settings.backend.c_str());
     std::fclose(f);
 }
 
@@ -117,6 +122,21 @@ void pc_display_configure(AuroraConfig* config, bool forceFullscreen) {
     config->msaa = uint32_t(g_settings.msaa);
     config->maxTextureAnisotropy = uint16_t(g_settings.anisotropy);
     config->vsync = g_settings.vsync;
+    // SMGPC_BACKEND overrides the file (tests).
+    std::string backend = g_settings.backend;
+    if (const char* env = std::getenv("SMGPC_BACKEND")) {
+        backend = env;
+    }
+    for (char& c : backend) {
+        c = char(std::tolower((unsigned char)c));
+    }
+    if (backend == "d3d12") {
+        config->desiredBackend = BACKEND_D3D12;
+    } else if (backend == "vulkan") {
+        config->desiredBackend = BACKEND_VULKAN;
+    } else if (backend == "d3d11") {
+        config->desiredBackend = BACKEND_D3D11;
+    }
 }
 
 void pc_display_apply_after_init() {

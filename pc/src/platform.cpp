@@ -29,6 +29,7 @@
 #include <vector>
 
 bool pc_load_window_icon(std::vector<uint8_t>& rgba, uint32_t& size);
+extern "C" unsigned long long pc_private_bytes(void);
 
 namespace pc {
 bool IsShuttingDown = false;
@@ -165,6 +166,17 @@ extern "C" int pc_platform_begin_frame(void) {
     }
     sFrameStarted = true;
     pc_watchdog_tick();
+    // SMGPC_LOG_MEMORY=1: committed private memory, whenever it changed by 64 MB.
+    static const bool sLogMemory = std::getenv("SMGPC_LOG_MEMORY") != nullptr;
+    static u32 sMemoryFrames = 0;
+    if (sLogMemory && ++sMemoryFrames != 0) {
+        static unsigned long long sLast = 0;
+        const unsigned long long now = pc_private_bytes();
+        if (now > sLast + (64ull << 20) || now + (64ull << 20) < sLast) {
+            std::fprintf(stderr, "[pc] memory: %llu MB private at frame %u\n", now >> 20, sMemoryFrames);
+            sLast = now;
+        }
+    }
     // SMGPC_WINDOW_TITLE=<title>: rename the window (test scripts find their own instance by it).
     static bool sTitleSet = false;
     if (!sTitleSet) {

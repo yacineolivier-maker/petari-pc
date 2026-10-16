@@ -59,7 +59,8 @@ python tools/gen_pc_files.py                            # regenerate files.cmake
     "unsigned long"; long is 32-bit on Windows).
   - `GXWGFifo.u8 = x` writes are redirected to Aurora's `GXCmd1u*` (pc_extras/gx.h).
 - Aurora (`extern/aurora`, submodule pinned at the Wind Waker port's commit) + local patches in
-  `pc/patches/aurora` (0001 = fixes from the Wind Waker port, 0002 = SDK struct/enum tags), applied at
+  `pc/patches/aurora` (0001 = fixes from the Wind Waker port, 0002 = SDK struct/enum tags, 0003 = debug toggles + Z textures,
+  0004 = strip/fan index reserve underflow that committed 8 GB), applied at
   configure time. `GXSetArray` on PC takes `(attr, data, size, stride, little_endian)`.
 - `OPNEW_SIZE_T` = size type of operator new/delete (u32 on Wii, size_t on PC).
 
@@ -86,7 +87,8 @@ python tools/gen_pc_files.py                            # regenerate files.cmake
 - Diagnostics: `SMGPC_CONSOLE`, `SMGPC_LOG_FRAMES` (fps), `SMGPC_LOG_STATE`, `SMGPC_WATCHDOG=N`,
   `SMGPC_DUMP_THREADS=N`, `SMGPC_LOG_PLACEMENT`, `SMGPC_DEBUG_MTX`, `SMGPC_DEBUG_ASYNC`,
   `SMGPC_DEBUG_SPIN`, `SMGPC_TEST_MESSAGES`, `SMGPC_AUDIO_DUMP=out.wav`, `SMGPC_NO_AUDIO`,
-  `SMGPC_NO_MOUSE`, `SMGPC_WII_ICONS`, `SMGPC_WINDOW_TITLE`; Aurora: `AURORA_DEBUG_NOCULL`,
+  `SMGPC_NO_MOUSE`, `SMGPC_WII_ICONS`, `SMGPC_WINDOW_TITLE`, `SMGPC_LOG_MEMORY` (committed
+  memory), `SMGPC_TRACE_BIG_ALLOC=<MB>` (stack of big malloc/realloc), `SMGPC_BACKEND=d3d12|vulkan|d3d11`; Aurora: `AURORA_DEBUG_NOCULL`,
   `AURORA_DEBUG_NODEPTH` (patch 0003).
 - Local helper scripts (not in git) live in `D:\SUPER_MARIO_GALAXY\Outils_Claude`: `shots.ps1`
   (screenshots of a frozen copy of the build, without taking the focus), `sweep.ps1` (loads every

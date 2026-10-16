@@ -13,6 +13,7 @@
 #include <cstdio>
 #include <csignal>
 #include <cstdlib>
+#include <cstring>
 
 // Look for the .pdb next to the executable first: the path embedded in the exe points at the
 // build directory, which may hold a newer build than a copied executable.
@@ -324,4 +325,86 @@ static struct PcCrashHandlerInstaller {
 void pc_install_crash_handler() {}
 void pc_print_current_stack(const char*) {}
 void pc_watchdog_tick() {}
+#endif
+
+#if defined(_WIN32)
+#include <psapi.h>
+// Committed private bytes of the process (SMGPC_LOG_MEMORY).
+extern "C" unsigned long long pc_private_bytes(void) {
+    PROCESS_MEMORY_COUNTERS_EX pmc = {};
+    pmc.cb = sizeof(pmc);
+    if (GetProcessMemoryInfo(GetCurrentProcess(), reinterpret_cast<PROCESS_MEMORY_COUNTERS*>(&pmc), sizeof(pmc))) {
+        return pmc.PrivateUsage;
+    }
+    return 0;
+}
+#endif
+
+#if defined(_WIN32)
+// SMGPC_TRACE_BIG_ALLOC=<MB>: print the stack of CRT allocations (malloc & co.) bigger than that,
+// by patching the executable's import table.
+namespace {
+size_t s_bigAlloc;
+void* (*s_malloc)(size_t);
+void* (*s_calloc)(size_t, size_t);
+void* (*s_realloc)(void*, size_t);
+void* (*s_alignedMalloc)(size_t, size_t);
+void ReportBig(const char* what, size_t size) {
+    static volatile LONG s_reports;
+    if (InterlockedIncrement(&s_reports) <= 8) {
+        char why[96];
+        std::snprintf(why, sizeof(why), "%s(%zu MB)", what, size >> 20);
+        pc_print_current_stack(why);
+    }
+}
+void* HookMalloc(size_t n) {
+    if (n >= s_bigAlloc) ReportBig("malloc", n);
+    return s_malloc(n);
+}
+void* HookCalloc(size_t c, size_t n) {
+    if (c * n >= s_bigAlloc) ReportBig("calloc", c * n);
+    return s_calloc(c, n);
+}
+void* HookRealloc(void* p, size_t n) {
+    if (n >= s_bigAlloc) ReportBig("realloc", n);
+    return s_realloc(p, n);
+}
+void* HookAlignedMalloc(size_t n, size_t a) {
+    if (n >= s_bigAlloc) ReportBig("_aligned_malloc", n);
+    return s_alignedMalloc(n, a);
+}
+struct BigAllocTracer {
+    BigAllocTracer() {
+        const char* env = std::getenv("SMGPC_TRACE_BIG_ALLOC");
+        if (env == nullptr) return;
+        s_bigAlloc = size_t(std::atoll(env)) << 20;
+        auto* base = reinterpret_cast<uint8_t*>(GetModuleHandleW(nullptr));
+        auto* nt = reinterpret_cast<IMAGE_NT_HEADERS*>(base + reinterpret_cast<IMAGE_DOS_HEADER*>(base)->e_lfanew);
+        const auto& dir = nt->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT];
+        int hooked = 0;
+        for (auto* imp = reinterpret_cast<IMAGE_IMPORT_DESCRIPTOR*>(base + dir.VirtualAddress); imp->Name; imp++) {
+            auto* names = reinterpret_cast<IMAGE_THUNK_DATA*>(base + imp->OriginalFirstThunk);
+            auto* funcs = reinterpret_cast<IMAGE_THUNK_DATA*>(base + imp->FirstThunk);
+            for (; names->u1.AddressOfData; names++, funcs++) {
+                if (IMAGE_SNAP_BY_ORDINAL(names->u1.Ordinal)) continue;
+                const char* name = reinterpret_cast<IMAGE_IMPORT_BY_NAME*>(base + names->u1.AddressOfData)->Name;
+                void* hook = nullptr;
+                void** orig = nullptr;
+                if (std::strcmp(name, "malloc") == 0) { hook = (void*)&HookMalloc; orig = (void**)&s_malloc; }
+                else if (std::strcmp(name, "calloc") == 0) { hook = (void*)&HookCalloc; orig = (void**)&s_calloc; }
+                else if (std::strcmp(name, "realloc") == 0) { hook = (void*)&HookRealloc; orig = (void**)&s_realloc; }
+                else if (std::strcmp(name, "_aligned_malloc") == 0) { hook = (void*)&HookAlignedMalloc; orig = (void**)&s_alignedMalloc; }
+                if (hook == nullptr) continue;
+                DWORD old;
+                VirtualProtect(&funcs->u1.Function, sizeof(void*), PAGE_READWRITE, &old);
+                *orig = reinterpret_cast<void*>(funcs->u1.Function);
+                funcs->u1.Function = reinterpret_cast<ULONGLONG>(hook);
+                VirtualProtect(&funcs->u1.Function, sizeof(void*), old, &old);
+                hooked++;
+            }
+        }
+        std::fprintf(stderr, "[pc] big allocation tracer: %d CRT imports hooked\n", hooked);
+    }
+} s_bigAllocTracer;
+}  // namespace
 #endif
