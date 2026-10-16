@@ -142,6 +142,21 @@ namespace MR {
     }
 
     void loadProjectionMtx() {
+#if TARGET_PC
+        // SMGPC_DEBUG_CAM=1: print the camera's projection and view matrices now and then.
+        static const bool sDebugCam = getenv("SMGPC_DEBUG_CAM") != nullptr;
+        static u32 sCount = 0;
+        if (sDebugCam && sCount++ % 120 == 0) {
+            const CameraContext* ctx = ::getCameraContext();
+            const f32(*p)[4] = ctx->mProjection.mMtx;
+            const f32(*v)[4] = ctx->mView.mMtx;
+            fprintf(stderr, "[pc] proj %g %g %g %g | %g %g %g %g | %g %g %g %g | %g %g %g %g\n", p[0][0], p[0][1], p[0][2],
+                    p[0][3], p[1][0], p[1][1], p[1][2], p[1][3], p[2][0], p[2][1], p[2][2], p[2][3], p[3][0], p[3][1], p[3][2],
+                    p[3][3]);
+            fprintf(stderr, "[pc] view %g %g %g %g | %g %g %g %g | %g %g %g %g\n", v[0][0], v[0][1], v[0][2], v[0][3], v[1][0],
+                    v[1][1], v[1][2], v[1][3], v[2][0], v[2][1], v[2][2], v[2][3]);
+        }
+#endif
         GXSetProjection(::getCameraContext()->mProjection, (GXProjectionType)0);
     }
 

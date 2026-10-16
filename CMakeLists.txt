@@ -25,7 +25,6 @@ if (CMAKE_CXX_COMPILER_FRONTEND_VARIANT STREQUAL "MSVC")
             $<$<COMPILE_LANGUAGE:C,CXX>:/bigobj>
             $<$<COMPILE_LANGUAGE:C,CXX>:/MP>
             $<$<COMPILE_LANGUAGE:C,CXX>:/FS>
-            $<$<COMPILE_LANGUAGE:C,CXX>:/utf-8>
             $<$<COMPILE_LANGUAGE:CXX>:/Zc:__cplusplus>
             $<$<COMPILE_LANGUAGE:C,CXX>:/W0>
             # Missing return values: UB the PowerPC build tolerated.
@@ -57,7 +56,18 @@ foreach (patch IN LISTS SMG_AURORA_PATCHES)
     endif ()
 endforeach ()
 
+# Aurora (and fmt) need /utf-8. The game doesn't get it: see smg_game_headers (Shift-JIS strings).
+# fmt would otherwise push /utf-8 onto every target linking it (FMT_UNICODE adds a PUBLIC option).
+set(FMT_UNICODE OFF CACHE BOOL "" FORCE)
+set(SMG_SAVED_C_FLAGS "${CMAKE_C_FLAGS}")
+set(SMG_SAVED_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
+if (MSVC)
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} /utf-8")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /utf-8")
+endif ()
 add_subdirectory(extern/aurora EXCLUDE_FROM_ALL)
+set(CMAKE_C_FLAGS "${SMG_SAVED_C_FLAGS}")
+set(CMAKE_CXX_FLAGS "${SMG_SAVED_CXX_FLAGS}")
 target_compile_definitions(aurora_mtx PRIVATE MTX_USE_PS=1)
 
 # Headers and defines shared by every game target. VERSION/RMGx01 mirror configure.py
@@ -83,6 +93,10 @@ target_link_libraries(smg_game_headers INTERFACE aurora::core)
 if (CMAKE_CXX_COMPILER_FRONTEND_VARIANT STREQUAL "MSVC")
     # /permissive and /Zc:strictStrings-: the decomp code passes string literals as char* and relies
     # on other pre-C++11 leniencies.
+    # The sources are UTF-8; narrow string literals must be Shift-JIS like the game's data (the
+    # Wii build converts them with sjiswrap): Japanese demo/effect/nerve names are looked up by
+    # name or hash in the game files.
+    target_compile_options(smg_game_headers INTERFACE /source-charset:utf-8 /execution-charset:.932)
     target_compile_options(smg_game_headers INTERFACE /FIpc_compat.h
             $<$<COMPILE_LANGUAGE:CXX>:/permissive> $<$<COMPILE_LANGUAGE:CXX>:/Zc:strictStrings->
             # Pointer truncation is a real bug on 64-bit; make it an error.

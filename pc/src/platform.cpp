@@ -10,6 +10,7 @@
 #include <aurora/aurora.h>
 #include <aurora/dvd.h>
 #include <aurora/event.h>
+#include <aurora/gfx.h>
 
 #include <revolution/os.h>
 #include <revolution/vi.h>
@@ -133,7 +134,10 @@ extern "C" int pc_platform_begin_frame(void) {
     static u32 sFrameCount = 0;
     sFrameCount++;
     if (sLogFrames && (sFrameCount <= 10 || sFrameCount % 60 == 0)) {
-        std::fprintf(stderr, "[pc] frame %u\n", sFrameCount);
+        const AuroraStats* stats = aurora_get_stats();
+        std::fprintf(stderr, "[pc] frame %u: %u draws (%u merged), %u pipelines created, %u queued\n", sFrameCount,
+                     stats ? stats->drawCallCount : 0, stats ? stats->mergedDrawCallCount : 0,
+                     stats ? stats->createdPipelines : 0, stats ? stats->queuedPipelines : 0);
     }
     // Drives the VI retrace callbacks once per frame, like the Wii's VI interrupt: JUTVideo's
     // post-retrace callback posts the message MainLoopFramework::waitForRetrace waits for.
