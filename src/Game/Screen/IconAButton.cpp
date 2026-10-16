@@ -3,6 +3,11 @@
 #include "Game/Util/LayoutUtil.hpp"
 #include "Game/Util/ObjUtil.hpp"
 #include <cstdio>
+#if TARGET_PC
+#include <cstdlib>
+#include <nw4r/lyt/material.h>
+#include <nw4r/lyt/pane.h>
+#endif
 
 namespace NrvIconAButton {
     NEW_NERVE(IconAButtonNrvOpen, IconAButton, Open);
@@ -27,6 +32,20 @@ void IconAButton::init(const JMapInfoIter& rIter) {
     initNerve(GET_NERVE(IconAButton, IconAButtonNrvOpen));
     MR::startAnim(this, "Appear", 0);
     MR::setAnimFrameAndStop(this, 0.0f, 0);
+#if TARGET_PC
+    // Xbox look: the A disc (white in the grey-scale IA4 textures, tinted by the material's
+    // TEV colors) turns Xbox green; the letter stays dark. SMGPC_WII_ICONS keeps the Wii one.
+    if (getenv("SMGPC_WII_ICONS") == nullptr) {
+        const char* names[] = {"PicIconA", "PicIconA1"};
+        for (const char* name : names) {
+            nw4r::lyt::Pane* pane = MR::getPane(this, name);
+            if (nw4r::lyt::Material* mat = pane != nullptr ? pane->GetMaterial() : nullptr) {
+                const GXColorS10 green = {110, 200, 40, 255};
+                mat->SetTevColor(1, green);
+            }
+        }
+    }
+#endif
     kill();
 }
 
