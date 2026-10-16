@@ -88,7 +88,11 @@ if (CMAKE_CXX_COMPILER_FRONTEND_VARIANT STREQUAL "MSVC")
             # Pointer truncation is a real bug on 64-bit; make it an error.
             /we4311 /we4302 /we4312
             # delete of an incomplete type skips the destructor and the array cookie (heap corruption).
-            /we4150)
+            /we4150
+            # Pointers to members: one general representation everywhere. With the default /vmb, a
+            # pointer-to-member type formed while its class is only forward-declared gets a different
+            # layout than in TUs where the class is complete, and calls through it jump anywhere.
+            /vmg)
 else ()
     target_compile_options(smg_game_headers INTERFACE "SHELL:-include pc_compat.h")
 endif ()

@@ -116,11 +116,17 @@ public:
         mVtxCol = pVtxCol;
     }
 
+#if TARGET_PC
+    // Number of matrices in the current model's draw matrix buffer (at least 10). J3DSys.cpp.
+    u32 pcModelMtxCount();
+#endif
+
     void setModelDrawMtx(Mtx* pMtxArr) {
         mModelDrawMtx = pMtxArr;
 #if TARGET_PC
-        // Matrices are computed on the CPU (host-endian); J3D indexes up to 10 of them.
-        GXSetArray(GX_POS_MTX_ARRAY, mModelDrawMtx, 10 * sizeof(Mtx), sizeof(*mModelDrawMtx), true);
+        // Matrices are computed on the CPU (host-endian). The array is the current model's
+        // draw matrix buffer (see pcModelMtxCount).
+        GXSetArray(GX_POS_MTX_ARRAY, mModelDrawMtx, pcModelMtxCount() * sizeof(Mtx), sizeof(*mModelDrawMtx), true);
 #else
         GXSetArray(GX_POS_MTX_ARRAY, mModelDrawMtx, sizeof(*mModelDrawMtx));
 #endif
@@ -129,7 +135,7 @@ public:
     void setModelNrmMtx(Mtx33* pMtxArr) {
         mModelNrmMtx = pMtxArr;
 #if TARGET_PC
-        GXSetArray(GX_NRM_MTX_ARRAY, mModelNrmMtx, 10 * sizeof(Mtx33), sizeof(*mModelNrmMtx), true);
+        GXSetArray(GX_NRM_MTX_ARRAY, mModelNrmMtx, pcModelMtxCount() * sizeof(Mtx33), sizeof(*mModelNrmMtx), true);
 #else
         GXSetArray(GX_NRM_MTX_ARRAY, mModelNrmMtx, sizeof(*mModelNrmMtx));
 #endif

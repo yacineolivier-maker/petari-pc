@@ -36,7 +36,20 @@ namespace JMath {
         if (x == 0.0f) {
             return 0.0f;
         }
+#if TARGET_PC
+        // A NaN or out-of-range ratio indexed far outside the table (the Wii just read garbage).
+        // Valid indices are 0..Len (mTable[Len] is _1000, pi/4).
+        T index = 0.5f + Len * y / x;
+        if (!(index >= 0.0f)) {
+            return mTable[0];
+        }
+        if (index > static_cast< T >(Len)) {
+            index = static_cast< T >(Len);
+        }
+        return mTable[static_cast< s32 >(index)];
+#else
         return mTable[static_cast< s32 >(0.5f + Len * y / x)];
+#endif
     }
 
     template < int Bits, typename T >
