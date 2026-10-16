@@ -150,10 +150,21 @@ void HeapMemoryWatcher::createRootHeap() {
     HeapMemoryWatcher::sRootHeapGDDR3 = pHeap;
 }
 
+#if TARGET_PC
+#define SMG_TRACE_ROOT(what)                                                                                           \
+    if (getenv("SMGPC_LOG_HEAPS") != nullptr)                                                                          \
+    fprintf(stderr, "[pc] %s: root free %#lx\n", what, (unsigned long)JKRHeap::sRootHeap->getFreeSize())
+#else
+#define SMG_TRACE_ROOT(what)
+#endif
+
 void HeapMemoryWatcher::createHeaps() {
     MR::CurrentHeapRestorer heapRestorer = MR::CurrentHeapRestorer(JKRHeap::sRootHeap);
+    SMG_TRACE_ROOT("start");
     ::createExpHeap(0x40000, JKRHeap::sRootHeap, false)->becomeSystemHeap();
+    SMG_TRACE_ROOT("system heap");
     mAudSystemHeap = ::createSolidHeap(0x1E0000, JKRHeap::sRootHeap);
+    SMG_TRACE_ROOT("audio heap");
     mStationedHeapNapa = ::createExpHeap(0x900000, JKRHeap::sRootHeap, false);
     JKRHeap* pRootHeapGDDR = HeapMemoryWatcher::sRootHeapGDDR3;
     u32 wpadHeapSize = OSRoundUp32B(WPADGetWorkMemorySize()) + 0xD0;
@@ -173,6 +184,16 @@ HeapMemoryWatcher::HeapMemoryWatcher()
       mSceneHeapNapa(nullptr), mSceneHeapGDDR(nullptr), mWPadHeap(nullptr), mHomeButtonLayoutHeap(nullptr), mAudSystemHeap(nullptr) {
     JKRHeap::setErrorHandler(HeapMemoryWatcher::memoryErrorCallback);
     createHeaps();
+#if TARGET_PC
+    if (getenv("SMGPC_LOG_HEAPS") != nullptr) {
+        fprintf(stderr, "[pc] heaps: root %p gddr %p stNapa %p stGDDR %p gameNapa %p gameGDDR %p aud %p cur %p\n",
+                (void*)JKRHeap::sRootHeap, (void*)sRootHeapGDDR3, (void*)mStationedHeapNapa, (void*)mStationedHeapGDDR,
+                (void*)mGameHeapNapa, (void*)mGameHeapGDDR, (void*)mAudSystemHeap, (void*)JKRHeap::sCurrentHeap);
+        fprintf(stderr, "[pc] root: start %p end %p size %#lx free %#lx total free %#lx\n", JKRHeap::sRootHeap->mStart,
+                JKRHeap::sRootHeap->mEnd, (unsigned long)JKRHeap::sRootHeap->mSize, (unsigned long)JKRHeap::sRootHeap->getFreeSize(),
+                (unsigned long)JKRHeap::sRootHeap->getTotalFreeSize());
+    }
+#endif
 }
 
 void HeapMemoryWatcher::memoryErrorCallback(void*, u32, int) {

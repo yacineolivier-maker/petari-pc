@@ -1,6 +1,30 @@
 #pragma once
 
 #include "JSystem/JKernel/JKRFileLoader.hpp"
+#include "helpers/endian.h"
+
+#if TARGET_PC
+// A pointer field stored inside archive file data (SDIFileEntry::mFileData): 4 bytes in the file,
+// too small for a 64-bit pointer. It holds a slot number into a process-wide pointer table
+// instead (0 = null, which is what the file contains). See JKRArchivePub.cpp.
+struct JKRPCFileDataRef {
+    u32 mSlot;
+    operator void*() const;
+    JKRPCFileDataRef& operator=(void* p);
+    JKRPCFileDataRef& operator=(const JKRPCFileDataRef& other) { return *this = static_cast< void* >(other); }
+};
+static_assert(sizeof(JKRPCFileDataRef) == 4);
+
+// The flag byte and 24-bit name offset of SDIFileEntry share one big-endian word.
+struct JKRPCFileFlag {
+    u8 mBytes[4];
+    operator u8() const { return mBytes[0]; }
+};
+struct JKRPCFileNameOffset {
+    u8 mBytes[4];
+    operator u32() const { return ((u32)mBytes[1] << 16) | ((u32)mBytes[2] << 8) | mBytes[3]; }
+};
+#endif
 
 class JKRArcFinder;
 
@@ -34,6 +58,55 @@ public:
         FILE_FLAG_IS_YAZ0 = 1 << FILE_FLAG_IS_YAZ0_SHIFT
     };
 
+#if TARGET_PC
+    // Archive file structures: big-endian in memory, read through BE() fields.
+    struct RarcHeader {
+        /* 0x00 */ BE(u32) mMagic;
+        /* 0x04 */ BE(u32) mFileSize;
+        /* 0x08 */ BE(u32) mHeaderSize;
+        /* 0x0C */ BE(u32) mFileDataOffset;
+        /* 0x10 */ BE(u32) mTotalDataSize;
+        /* 0x14 */ BE(u32) mMRamDataSize;
+        /* 0x18 */ BE(u32) mARamDataSize;
+        /* 0x1C */ BE(u32) _1C;
+    };
+
+    struct RarcInfoBlock {
+        /* 0x00 */ BE(u32) mNrDirs;
+        /* 0x04 */ BE(u32) mDirOffset;
+        /* 0x08 */ BE(u32) mNrFiles;
+        /* 0x0C */ BE(u32) mFileOffset;
+        /* 0x10 */ BE(u32) mStringTableSize;
+        /* 0x14 */ BE(u32) mStringTableOffset;
+        /* 0x18 */ BE(u16) mNextAvailableFileID;
+        /* 0x1A */ BE(u16) mFileIDIsIndex;
+        /* 0x1C */ BE(u32) _1C;
+    };
+
+    struct SDIFileEntry {
+        /* 0x00 */ BE(u16) mFileID;
+        /* 0x02 */ BE(u16) mHash;
+        union {
+            /* 0x04 */ JKRPCFileFlag mFlag;
+            /* 0x04 */ JKRPCFileNameOffset mNameOffset;
+        };
+        union {
+            /* 0x08 */ BE(u32) mDataOffset;
+            /* 0x08 */ BE(u32) mDirIndex;
+        };
+        /* 0x0C */ BE(u32) mDataSize;
+        /* 0x10 */ JKRPCFileDataRef mFileData;
+    };
+    static_assert(sizeof(SDIFileEntry) == 0x14);
+
+    struct SDIDirEntry {
+        /* 0x0 */ BE(u32) mID;
+        /* 0x4 */ BE(u32) mNameOffset;
+        /* 0x8 */ BE(u16) mHash;
+        /* 0xA */ BE(u16) mNrFiles;
+        /* 0xC */ BE(u32) mFirstFileIndex;
+    };
+#else
     struct RarcHeader {
         /* 0x00 */ u32 mMagic;
         /* 0x04 */ u32 mFileSize;
@@ -77,6 +150,8 @@ public:
         /* 0xA */ u16 mNrFiles;
         /* 0xC */ u32 mFirstFileIndex;
     };
+
+#endif
 
     struct SDirEntry {
         /* 0x0 */ u8 mFileFlag;

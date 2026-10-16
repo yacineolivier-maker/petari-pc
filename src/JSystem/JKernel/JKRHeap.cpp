@@ -317,6 +317,97 @@ JKRErrorHandler JKRHeap::setErrorHandler(JKRErrorHandler errorHandler) {
     return prev;
 }
 
+#if TARGET_PC
+// On PC the global allocation functions are also used by Aurora, SDL and the C++ library, from
+// before main() and from other threads: plain new/delete use host memory (like the Wind Waker
+// port). The game's heap-directed forms (new (align) / new (heap, align)) still go to the
+// JKRHeaps, and delete accepts pointers from either.
+// TODO(pc): plain `new T` in game code no longer lands in the current JKRHeap, so it isn't
+// freed with its scene heap (leaks across scene changes until it's converted).
+static void* jkr_host_alloc(size_t size, size_t align) {
+    if (align < 16) {
+        align = 16;
+    }
+    return _aligned_malloc(size == 0 ? 1 : size, align);
+}
+
+extern "C" bool pc_is_wii_memory(const void* p);
+
+static void jkr_free_any(void* pData) {
+    if (pData == nullptr) {
+        return;
+    }
+    JKRHeap* heap = pc_is_wii_memory(pData) ? JKRHeap::findFromRoot(pData) : nullptr;
+    if (heap != nullptr) {
+        heap->free(pData);
+    } else {
+        _aligned_free(pData);
+    }
+}
+
+static void* jkr_heap_alloc(size_t size, int align, JKRHeap* pHeap) {
+    if (pHeap == nullptr && JKRHeap::getCurrentHeap() == nullptr) {
+        return jkr_host_alloc(size, align < 0 ? -align : align);
+    }
+    return JKRHeap::alloc(size, align, pHeap);
+}
+
+void* operator new(size_t size) {
+    void* mem = jkr_host_alloc(size, 0);
+    if (mem == nullptr) {
+        throw std::bad_alloc();
+    }
+    return mem;
+}
+
+void* operator new[](size_t size) {
+    void* mem = jkr_host_alloc(size, 0);
+    if (mem == nullptr) {
+        throw std::bad_alloc();
+    }
+    return mem;
+}
+
+void* operator new(size_t size, int align) {
+    return jkr_heap_alloc(size, align, nullptr);
+}
+
+void* operator new(size_t size, JKRHeap* pHeap, int align) {
+    return jkr_heap_alloc(size, align, pHeap);
+}
+
+void* operator new[](size_t size, int align) {
+    return jkr_heap_alloc(size, align, nullptr);
+}
+
+void* operator new[](size_t size, JKRHeap* pHeap, int align) {
+    return jkr_heap_alloc(size, align, pHeap);
+}
+
+void operator delete(void* pData) noexcept {
+    jkr_free_any(pData);
+}
+
+void operator delete[](void* pData) noexcept {
+    jkr_free_any(pData);
+}
+
+void operator delete(void* pData, size_t) noexcept {
+    jkr_free_any(pData);
+}
+
+void operator delete[](void* pData, size_t) noexcept {
+    jkr_free_any(pData);
+}
+
+void operator delete(void* pData, int) noexcept {
+    jkr_free_any(pData);
+}
+
+void operator delete(void* pData, JKRHeap*, int) noexcept {
+    jkr_free_any(pData);
+}
+#else
 void* operator new(OPNEW_SIZE_T size) {
     return JKRHeap::alloc(size, 4, nullptr);
 }
@@ -348,6 +439,8 @@ void operator delete(void* pData) {
 void operator delete[](void* pData) {
     JKRHeap::free(pData, nullptr);
 }
+
+#endif
 
 void JKRHeap::state_register(TState*, u32) const {
     return;

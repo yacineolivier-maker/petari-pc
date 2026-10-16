@@ -12,6 +12,7 @@
 
 namespace {
 
+constexpr size_t kMem1Size = 256u * 1024 * 1024;  // keep in sync with platform.cpp
 constexpr size_t kMem2Size = 256u * 1024 * 1024;
 u8* sMem2Start = nullptr;
 u8* sMem2End = nullptr;
@@ -56,6 +57,18 @@ void OSSetMEM2ArenaLo(void* lo) {
 void OSSetMEM2ArenaHi(void* hi) {
     InitMem2();
     sMem2ArenaHi = hi;
+}
+
+// True if p is inside the emulated Wii memory (MEM1 or MEM2), where all JKRHeaps live.
+// Host allocations (operator new on PC) never are.
+bool pc_is_wii_memory(const void* p) {
+    // MEM1 is Aurora's emulated main memory: AuroraConfig::mem1Size bytes (pc/src/platform.cpp).
+    const u8* mem1Start = static_cast<const u8*>(OSPhysicalToCached(0));
+    const u8* b = static_cast<const u8*>(p);
+    if (mem1Start != nullptr && b >= mem1Start && b < mem1Start + kMem1Size) {
+        return true;
+    }
+    return sMem2Start != nullptr && b >= sMem2Start && b < sMem2End;
 }
 
 void* OSAllocFromMEM1ArenaLo(u32 size, u32 align) { return OSAllocFromArenaLo(size, align); }

@@ -2,6 +2,7 @@
 
 #include "pc/platform.h"
 
+#include "pc/crash_handler.h"
 #include "pc/main.h"
 #include "pc/os.h"
 #include "pc/user_files.h"
@@ -69,6 +70,7 @@ const char* FindDisc(int argc, char* argv[]) {
 
 extern "C" void pc_platform_init(int argc, char* argv[]) {
     pc_log_file_init();
+    pc_install_crash_handler();
     std::setvbuf(stdout, nullptr, _IONBF, 0);
 
     bool startFullscreen = false;
@@ -123,6 +125,7 @@ extern "C" int pc_platform_begin_frame(void) {
         }
     }
     sFrameStarted = true;
+    pc_watchdog_tick();
     return 1;
 }
 

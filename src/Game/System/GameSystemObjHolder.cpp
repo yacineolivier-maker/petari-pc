@@ -1,3 +1,4 @@
+#include "JSystem/JKernel/JKRHeap.hpp"
 #include "Game/System/GameSystemObjHolder.hpp"
 #include "Game/Effect/ParticleResourceHolder.hpp"
 #include "Game/NameObj/NameObjRegister.hpp"
@@ -31,7 +32,20 @@ GameSystemObjHolder::GameSystemObjHolder()
     initDvd();
     initNAND();
     initNameObj();
+#if TARGET_PC
+    {
+        // The archive is embedded in the executable as const data, which the Wii could write to
+        // (archives store fetched resource pointers in their file table). Mount a writable copy.
+        const u8* src = cErrorMessageArchive;
+        u32 size = ((u32)src[4] << 24) | ((u32)src[5] << 16) | ((u32)src[6] << 8) | src[7];
+        // (The stationed heap doesn't exist yet: null means the current heap, as on the Wii.)
+        void* copy = JKRHeap::alloc(size, 32, MR::getStationedHeapNapa());
+        memcpy(copy, src, size);
+        MR::createAndAddArchive(copy, MR::getStationedHeapNapa(), "ErrorMessageArchive.arc");
+    }
+#else
     MR::createAndAddArchive((void*)cErrorMessageArchive, MR::getStationedHeapNapa(), "ErrorMessageArchive.arc");
+#endif
 }
 
 void GameSystemObjHolder::initAfterStationedResourceLoaded() {

@@ -176,7 +176,12 @@ bool FileRipper::decompressSzsSub(u8* src, u8* dest) {
         return false;
     }
 
+#if TARGET_PC
+    // The Yaz0 header is big-endian.
+    u32 data_len = ((u32)src[4] << 24) | ((u32)src[5] << 16) | ((u32)src[6] << 8) | src[7];
+#else
     u32 data_len = *(u32*)(src + 4);
+#endif
     u8* dest_end = dest + data_len;
     src += 0x10;
 

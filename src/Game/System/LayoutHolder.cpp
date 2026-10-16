@@ -157,7 +157,12 @@ u32 LayoutHolder::count(const char* pExtension, const char* pRoot) {
         if (pFinder->mFileIsFolder) {
             if (pFinder->mName[0] != '.') {
                 char path[128];
+#if TARGET_PC
+                // MSL prints a null %s as an empty string (the MSVC CRT prints "(null)").
+                sprintf(path, "%s%s%s", pRoot != nullptr ? pRoot : "", "/", pFinder->mName);
+#else
                 sprintf(path, "%s%s%s", pRoot, "/", pFinder->mName);
+#endif
                 resCount += count(pExtension, path);
             }
         } else {
@@ -180,7 +185,11 @@ void LayoutHolder::mount(char* pRoot) {
         if (pFinder->mFileIsFolder) {
             if (pFinder->mName[0] != '.') {
                 char path[128];
+#if TARGET_PC
+                snprintf(path, 128, "%s/%s", pRoot != nullptr ? pRoot : "", pFinder->mName);
+#else
                 snprintf(path, 128, "%s/%s", pRoot, pFinder->mName);
+#endif
                 mount(path);
             }
         } else {

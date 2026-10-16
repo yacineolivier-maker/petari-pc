@@ -35,7 +35,16 @@ public:
         /* 0x04 */ u32 mSize;
         /* 0x08 */ CMemBlock* mPrev;
         /* 0x0C */ CMemBlock* mNext;
+#if TARGET_PC
+        // The header is 16 bytes on the Wii, so block contents stay 16-byte aligned and the
+        // allocator rarely needs its "misaligned content" path. With 64-bit pointers it would be
+        // 24 bytes; pad it to 32 to keep the original alignment behaviour.
+        u8 mPcPadding[8];
+#endif
     };
+#if TARGET_PC
+    static_assert(sizeof(CMemBlock) == 32);
+#endif
 
     JKRExpHeap(void*, u32, JKRHeap*, bool);
 

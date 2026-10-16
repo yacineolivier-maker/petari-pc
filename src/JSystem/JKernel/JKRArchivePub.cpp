@@ -7,6 +7,56 @@
 #include "JSystem/JKernel/JKRMemArchive.hpp"
 #include <revolution.h>
 
+#if TARGET_PC
+#include <atomic>
+#include <mutex>
+
+// Slot table behind JKRPCFileDataRef (see JKRArchive.hpp). Slots are never reused: a resource
+// fetch costs 8 bytes for the life of the process, and a stale slot number can't come back from
+// a newly loaded archive (its file entries read 0 from the file).
+namespace {
+    constexpr u32 kSlotsPerChunk = 1u << 14;
+    constexpr u32 kMaxChunks = 1u << 14;
+    std::atomic< void** > sSlotChunks[kMaxChunks];
+    std::mutex sSlotMutex;
+    u32 sNextSlot = 1;
+
+    void** slotAddress(u32 slot) {
+        void** chunk = sSlotChunks[slot / kSlotsPerChunk].load(std::memory_order_acquire);
+        return chunk != nullptr ? &chunk[slot % kSlotsPerChunk] : nullptr;
+    }
+}  // namespace
+
+JKRPCFileDataRef::operator void*() const {
+    if (mSlot == 0) {
+        return nullptr;
+    }
+    void** p = slotAddress(mSlot);
+    return p != nullptr ? *p : nullptr;
+}
+
+JKRPCFileDataRef& JKRPCFileDataRef::operator=(void* p) {
+    if (p == nullptr) {
+        mSlot = 0;
+        return *this;
+    }
+    if (mSlot == 0) {
+        std::lock_guard< std::mutex > lock(sSlotMutex);
+        u32 slot = sNextSlot++;
+        u32 chunk = slot / kSlotsPerChunk;
+        if (chunk >= kMaxChunks) {
+            OSPanic(__FILE__, __LINE__, "JKRPCFileDataRef: out of slots");
+        }
+        if (sSlotChunks[chunk].load(std::memory_order_relaxed) == nullptr) {
+            sSlotChunks[chunk].store(static_cast< void** >(std::calloc(kSlotsPerChunk, sizeof(void*))), std::memory_order_release);
+        }
+        mSlot = slot;
+    }
+    *slotAddress(mSlot) = p;
+    return *this;
+}
+#endif
+
 JKRArchive* JKRArchive::check_mount_already(long entryNum) {
     JSUPtrLink* current = JKRFileLoader::sVolumeList.mHead;
 

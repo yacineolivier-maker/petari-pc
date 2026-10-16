@@ -26,8 +26,16 @@ JKRExpHeap* JKRExpHeap::createRoot(int heapNum, bool errorFlag) {
         char* arena;
         u32 arenaSize;
         JKRHeap::initArena(&arena, &arenaSize, heapNum);
+#if TARGET_PC
+        // The root heap object lives at the start of its arena; 0x90 bytes fit it on the Wii,
+        // but it is larger with 64-bit pointers.
+        const u32 headerSize = ALIGN_NEXT(sizeof(JKRExpHeap), 0x10);
+        char* area = arena + headerSize;
+        u32 size = arenaSize - headerSize;
+#else
         char* area = arena + 0x90;
         u32 size = arenaSize - 0x90;
+#endif
         heap = new (arena) JKRExpHeap(area, size, nullptr, errorFlag);
         JKRHeap::sRootHeap = heap;
     }
@@ -152,6 +160,13 @@ void* JKRExpHeap::do_alloc(u32 size, int align) {
         }
     }
 
+#if TARGET_PC
+    static const bool sTraceAlloc = getenv("SMGPC_TRACE_ALLOC") != nullptr;
+    if (sTraceAlloc) {
+        fprintf(stderr, "[pc] alloc heap %p size %#lx align %d -> %p (head free %p size %#lx)\n", (void*)this,
+                (unsigned long)size, align, ptr, (void*)mHeadFreeList, mHeadFreeList ? (unsigned long)mHeadFreeList->mSize : 0ul);
+    }
+#endif
     if (ptr == nullptr) {
         JUTWarningConsole_f(":::cannot alloc memory (0x%x byte).\n", size);
 

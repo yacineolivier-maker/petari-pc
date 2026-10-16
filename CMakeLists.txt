@@ -117,6 +117,7 @@ set_source_files_properties(src/Game/Screen/THPDraw.c PROPERTIES LANGUAGE CXX)
 smg_add_lib(smg_pc
         pc/src/platform.cpp
         pc/src/sdk_stubs.cpp
+        pc/src/crash_handler.cpp
         pc/src/game_missing.cpp
         pc/src/rfl_stubs.cpp
         pc/src/os/OSAlarm.cpp
