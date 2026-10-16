@@ -7,6 +7,7 @@
 #include "JSystem/J3DGraphBase/J3DShapeMtx.hpp"
 #include "JSystem/JKernel/JKRHeap.hpp"
 #include <cstdio>
+#include <typeinfo>
 #include <mem.h>
 
 J3DError J3DDisplayListObj::newDisplayList(u32 maxSize) {
@@ -169,6 +170,15 @@ bool J3DMatPacket::isSame(J3DMatPacket* pOther) const {
 void J3DMatPacket::callDL() const {
     if (mpMaterial != NULL && mpMaterial->getTevBlock() != NULL) {
         J3DTexture* pTexture = mpTexture != NULL ? mpTexture : j3dSys.getTexture();
+        {
+            static const bool sDbg = getenv("SMGPC_DEBUG_TEX1024") != nullptr;
+            static int sCount = 0;
+            if (sDbg && pTexture != NULL && pTexture->getNum() == 12 && sCount++ < 30) {
+                J3DTevBlock* tb = mpMaterial->getTevBlock();
+                OSReport("[pc] callDL mat %p tev %s texNo %u %u %u %u own %u (pcrec %u %u)\n", mpMaterial, typeid(*tb).name(), tb->getTexNo(0),
+                         tb->getTexNo(1), tb->getTexNo(2), tb->getTexNo(3), mpTexture != NULL, mPCTexNo[0], mPCTexNo[1]);
+            }
+        }
         mpMaterial->getTevBlock()->loadTexture(pTexture);
         if (mpPCTexNoMaterial == mpMaterial && mpPCTexNoDLObj == mpDisplayListObj) {
             // What this packet's own DL selected overrides the material's current numbers.

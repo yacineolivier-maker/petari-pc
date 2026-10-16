@@ -42,7 +42,12 @@ void DrawBufferShapeDrawer::swap(DrawBufferShapeDrawer* pOther) {
 }
 
 void DrawBufferShapeDrawer::draw() const {
+#if TARGET_PC
+    // J3DMatPacket::callDL binds the material's textures first (the DL's addresses are null on PC).
+    mMatPacket->callDL();
+#else
     mMatPacket->mpDisplayListObj->callDL();
+#endif
 
     J3DShapePacket* firstPacket = mPackets[0]->mShapePacket;
     firstPacket->mpShape->loadPreDrawSetting();

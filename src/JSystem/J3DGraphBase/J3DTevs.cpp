@@ -379,6 +379,14 @@ void J3DTexture::loadGX(u16 idx, GXTexMapID texMapID) const {
         GXLoadTlut(&mpTlutObj[idx], (GXTlut)texMapID);
         GXInitTexObjTlut(&mpTexObj[idx], (GXTlut)texMapID);
     }
+#if TARGET_PC
+    static const bool sDbg = getenv("SMGPC_DEBUG_TEX1024") != nullptr;
+    static int sCount = 0;
+    if (sDbg && timg->mWidth == 1024 && sCount++ < 5) {
+        OSReport("[pc] J3D loadGX idx %u map %d data %p fmt %u %ux%u texobj %p\n", idx, texMapID, mpImgDataPtr[idx], timg->mFormat,
+                 (u32)timg->mWidth, (u32)timg->mHeight, &mpTexObj[idx]);
+    }
+#endif
     GXLoadTexObj(&mpTexObj[idx], texMapID);
 }
 #endif

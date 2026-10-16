@@ -298,6 +298,14 @@ void J3DMaterial::setCurrentMtx() {
 }
 
 void J3DMaterial::calcCurrentMtx() {
+#if TARGET_PC
+    // SMGPC_DEBUG_NOTEXMTX=1: every texgen uses the identity matrix (to test texture matrices).
+    static const bool sNoTexMtx = getenv("SMGPC_DEBUG_NOTEXMTX") != nullptr;
+    if (sNoTexMtx) {
+        mCurrentMtx.setCurrentTexMtx(GX_IDENTITY, GX_IDENTITY, GX_IDENTITY, GX_IDENTITY, GX_IDENTITY, GX_IDENTITY, GX_IDENTITY, GX_IDENTITY);
+        return;
+    }
+#endif
     if (!j3dSys.checkFlag(0x40000000)) {
         mCurrentMtx.setCurrentTexMtx(getTexCoord(0)->getTexGenMtx(), getTexCoord(1)->getTexGenMtx(), getTexCoord(2)->getTexGenMtx(),
                                      getTexCoord(3)->getTexGenMtx(), getTexCoord(4)->getTexGenMtx(), getTexCoord(5)->getTexGenMtx(),
