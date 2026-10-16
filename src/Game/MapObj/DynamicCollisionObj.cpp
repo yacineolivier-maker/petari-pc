@@ -163,8 +163,15 @@ void DynamicCollisionObj::createCollision() {
     u16* u16array = new (4) u16[v + 3];
     mKCLFile->mOctree = u16array;
 
+#if TARGET_PC
+    // searchBlock reads the root node as an s32: on the Wii these two u16s read as 0x80000002, a
+    // leaf whose list pointer is 2 bytes in (the lists are read with *++p, so the triangles start
+    // at u16array[2]). Write the same node value in host order.
+    *reinterpret_cast< s32* >(u16array) = s32(0x80000002);
+#else
     u16array[0] = 0x8000;
     u16array[1] = 2;
+#endif
 
     s32 count = v;
     for (s32 i = 0; i <= v; i++) {
