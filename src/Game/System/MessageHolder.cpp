@@ -8,7 +8,9 @@
 #if TARGET_PC
 #include "Game/Screen/MessageTagSkipTagProcessor.hpp"
 #include <cstring>
+#include <mutex>
 #include <string>
+#include <unordered_map>
 #endif
 
 #define SYSTEMMESSAGE_ARC "/Memory/SystemMessage.arc"
@@ -51,6 +53,95 @@ namespace {
 
 #if TARGET_PC
 namespace {
+    bool pcIsLetter(wchar_t c) {
+        return (c >= L'a' && c <= L'z') || (c >= L'A' && c <= L'Z') || c >= 0xC0;
+    }
+
+    // Length (in wchar_t) of the control tag at p (p[0] == 0x1A).
+    size_t pcTagLength(const wchar_t* p) {
+        MessageEditorMessageTag tag(p + 1);
+        return tag.getSkipLength() + 1;
+    }
+
+    bool pcIsPictureTag(const wchar_t* p) {
+        return *p == 0x1A && MessageEditorMessageTag(p + 1).getGroup() == 3;
+    }
+
+    // Skips spaces and control tags other than pictures (colors, sizes...).
+    const wchar_t* pcSkipTagsAndSpaces(const wchar_t* p) {
+        while ((*p == 0x1A && !pcIsPictureTag(p)) || *p == L' ') {
+            p += *p == 0x1A ? pcTagLength(p) : 1;
+        }
+        return p;
+    }
+
+    // The French texts tell to shake the Wii Remote with its icon: "Secoue la [Wii Remote]". On PC
+    // the icon is the gamepad's spin button (see pc/src/ui/xbox_glyphs_gdi.cpp), so the sentence
+    // becomes "Appuie sur [B]" (same for "Secouez"/"secouer"). Control tags are kept as they are.
+    const wchar_t* pcRewriteShakeMessage(const wchar_t* pOriginal) {
+        static std::mutex sMutex;
+        static std::unordered_map< const wchar_t*, std::wstring > sCache;
+        std::lock_guard< std::mutex > lock(sMutex);
+        auto it = sCache.find(pOriginal);
+        if (it != sCache.end()) {
+            return it->second.empty() ? pOriginal : it->second.c_str();
+        }
+
+        static const struct {
+            const wchar_t* from;
+            const wchar_t* to;
+        } kVerbs[] = {
+            {L"Secouez", L"Appuyez"}, {L"secouez", L"appuyez"}, {L"Secouer", L"Appuyer"},
+            {L"secouer", L"appuyer"}, {L"Secoue", L"Appuie"},   {L"secoue", L"appuie"},
+        };
+
+        std::wstring out;
+        bool changed = false;
+        const wchar_t* p = pOriginal;
+        while (*p != 0) {
+            if (*p == 0x1A) {
+                const size_t len = pcTagLength(p);
+                out.append(p, len);
+                p += len;
+                continue;
+            }
+            bool replaced = false;
+            if (p == pOriginal || !pcIsLetter(p[-1])) {
+                for (const auto& verb : kVerbs) {
+                    const size_t n = wcslen(verb.from);
+                    if (wcsncmp(p, verb.from, n) != 0 || pcIsLetter(p[n])) {
+                        continue;
+                    }
+                    // "<verb> [tags] la [tags] <icon tag>"
+                    const wchar_t* q = pcSkipTagsAndSpaces(p + n);
+                    if (q[0] != L'l' || q[1] != L'a' || pcIsLetter(q[2])) {
+                        break;
+                    }
+                    const wchar_t* icon = pcSkipTagsAndSpaces(q + 2);
+                    if (!pcIsPictureTag(icon)) {
+                        break;
+                    }
+                    out += verb.to;
+                    out.append(p + n, q - (p + n));
+                    out += L"sur";
+                    out.append(q + 2, icon - (q + 2));
+                    p = icon;
+                    replaced = changed = true;
+                    break;
+                }
+            }
+            if (!replaced) {
+                out += *p++;
+            }
+        }
+        std::wstring& entry = sCache[pOriginal];
+        if (changed) {
+            entry = std::move(out);
+            return entry.c_str();
+        }
+        return pOriginal;
+    }
+
     // Texts changed by the PC port (the controls differ from the Wii's). Built once from the
     // original message so its control tags (button icons) are kept.
     const wchar_t* pcOverrideMessage(const char* pId, const wchar_t* pOriginal) {
@@ -72,7 +163,7 @@ namespace {
             }
             return sText.c_str();
         }
-        return pOriginal;
+        return pcRewriteShakeMessage(pOriginal);
     }
 }  // namespace
 #endif
@@ -102,6 +193,9 @@ bool MessageData::getMessage(TalkMessageInfo* pMessageInfo, u16, u16 infoToolInd
     pMessageInfo->_A = *(pInfoTool + 0xa);
     pMessageInfo->_B = *(pInfoTool + 0xb);
     pMessageInfo->mBalloonType = *(pInfoTool + 9);
+#if TARGET_PC
+    pMessageInfo->_0 = (u8*)pcRewriteShakeMessage(reinterpret_cast< const wchar_t* >(pMessageInfo->_0));
+#endif
 
     return true;
 }
@@ -206,6 +300,38 @@ MessageData::MessageData(const char* pArchiveName)
     }
 
     mFLI1Block = (MessageFLI1Block*)::getBlock('FLI1', msgData);
+#if TARGET_PC
+    // SMGPC_TEST_MESSAGES=1: print every message the PC port rewrites (tags shown as [..]).
+    if (getenv("SMGPC_TEST_MESSAGES") != nullptr && mInfoBlock != nullptr) {
+        for (u16 i = 0; i < mInfoBlock->mItemCount; i++) {
+            const wchar_t* pOriginal = reinterpret_cast< const wchar_t* >(reinterpret_cast< u8* >(mDataBlock + 1) + BMG_U32(getMessageInfoTool(i)));
+            const wchar_t* pText = pcRewriteShakeMessage(pOriginal);
+            if (pText == pOriginal) {
+                continue;
+            }
+            std::string utf8;
+            for (const wchar_t* p = pText; *p != 0;) {
+                if (*p == 0x1A) {
+                    utf8 += "[..]";
+                    p += pcTagLength(p);
+                    continue;
+                }
+                const wchar_t c = *p++;
+                if (c < 0x80) {
+                    utf8 += char(c);
+                } else if (c < 0x800) {
+                    utf8 += char(0xC0 | (c >> 6));
+                    utf8 += char(0x80 | (c & 0x3F));
+                } else {
+                    utf8 += char(0xE0 | (c >> 12));
+                    utf8 += char(0x80 | ((c >> 6) & 0x3F));
+                    utf8 += char(0x80 | (c & 0x3F));
+                }
+            }
+            OSReport("[pc] message %u rewritten: %s\n", i, utf8.c_str());
+        }
+    }
+#endif
 }
 
 inline JMapInfoIter end(const JMapInfo* pInfo) {
