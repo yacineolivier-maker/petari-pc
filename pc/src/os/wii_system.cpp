@@ -76,7 +76,8 @@ FILE* FileOf(const NANDFileInfo* info) {
 
 extern "C" {
 
-u8 SCGetLanguage(void) { return SC_LANG_FRENCH; }
+unsigned char pc_settings_language();  // display.ini "langue", French by default
+u8 SCGetLanguage(void) { return pc_settings_language(); }
 u8 SCGetSoundMode(void) { return SC_SOUND_MODE_STEREO; }
 u8 SCGetAspectRatio(void) { return SC_ASPECT_RATIO_16x9; }
 u8 SCGetProgressiveMode(void) { return 1; }

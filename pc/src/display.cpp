@@ -4,6 +4,7 @@
 #include "pc/user_files.h"
 
 #include <dolphin/gx/GXAurora.h>
+#include <dolphin/vi.h>
 
 #include <cctype>
 #include <cstdio>
@@ -22,6 +23,8 @@ struct Settings {
     bool textureMipmaps = true;
     bool vsync = true;
     std::string backend = "auto";
+    int supersampling = 1;
+    std::string language = "fr";
 };
 
 Settings g_settings;
@@ -71,6 +74,10 @@ void Load(FILE* f) {
             g_settings.vsync = ParseBool(value);
         } else if (key == "backend") {
             g_settings.backend = value;
+        } else if (key == "supersampling" && n >= 1 && n <= 4) {
+            g_settings.supersampling = n;
+        } else if (key == "langue" && (value == "fr" || value == "en" || value == "es")) {
+            g_settings.language = value;
         }
     }
 }
@@ -100,10 +107,16 @@ void Save(const std::string& path) {
                  "; Synchronisation verticale\n"
                  "vsync = %d\n"
                  "; API graphique : auto, d3d12, vulkan ou d3d11\n"
-                 "backend = %s\n",
+                 "backend = %s\n"
+                 "; Surechantillonnage : rendu interne a N fois la taille de la fenetre, puis reduit\n"
+                 "; (1 = desactive, 2 = image nettement plus fine mais demande plus de puissance)\n"
+                 "supersampling = %d\n"
+                 "; Langue du jeu : fr (francais), en (anglais) ou es (espagnol)\n"
+                 "langue = %s\n",
                  g_settings.fullscreen ? 1 : 0, g_settings.windowWidth, g_settings.windowHeight, g_settings.msaa,
                  g_settings.anisotropy, g_settings.alphaToCoverage ? 1 : 0, g_settings.textureMipmaps ? 1 : 0,
-                 g_settings.vsync ? 1 : 0, g_settings.backend.c_str());
+                 g_settings.vsync ? 1 : 0, g_settings.backend.c_str(), g_settings.supersampling,
+                 g_settings.language.c_str());
     std::fclose(f);
 }
 
@@ -142,4 +155,28 @@ void pc_display_configure(AuroraConfig* config, bool forceFullscreen) {
 void pc_display_apply_after_init() {
     AuroraSetAlphaToCoverage(g_settings.alphaToCoverage && g_settings.msaa > 1 ? 1 : 0);
     AuroraSetAutoMipmaps(g_settings.textureMipmaps ? 1 : 0);
+    // SMGPC_SUPERSAMPLE overrides the file (tests).
+    int supersampling = g_settings.supersampling;
+    if (const char* env = std::getenv("SMGPC_SUPERSAMPLE")) {
+        supersampling = std::atoi(env);
+    }
+    if (supersampling > 1) {
+        VISetFrameBufferSupersample(float(supersampling));
+        aurora_set_resampler(SAMPLER_AREA);  // box-filtered downsampling
+    }
+}
+
+// Game language as an SC_LANG_* value (RMGE01 has US English, US Spanish and US French).
+extern "C" unsigned char pc_settings_language() {
+    std::string language = g_settings.language;
+    if (const char* env = std::getenv("SMGPC_LANGUAGE")) {  // tests
+        language = env;
+    }
+    if (language == "en") {
+        return 1;  // SC_LANG_ENGLISH
+    }
+    if (language == "es") {
+        return 4;  // SC_LANG_SPANISH
+    }
+    return 3;  // SC_LANG_FRENCH
 }
