@@ -180,6 +180,14 @@ void JPADynamicsBlock::create(JPAEmitterWorkData* work) {
             f32 rateRndm = getRateRndm();
             JPABaseEmitter* emtr = work->mpEmtr;
             f32 newPtclCount = emtr->mRate * (rateRndm * emtr->get_r_zp() + 1.0f);
+#if TARGET_PC
+            // display.ini "particules": denser continuous emitters with a volume (one-shot or
+            // point emitters keep their count: their particles would just stack up).
+            extern f32 pc_settings_particle_density();
+            if (emtr->mMaxFrame != 1 && emtr->mVolumeSize > 0.0f) {
+                newPtclCount *= pc_settings_particle_density();
+            }
+#endif
             f32 newEmitCount = emtr->mEmitCount + newPtclCount;
             emtr->mEmitCount = newEmitCount;
             emitCount = (s32)newEmitCount;

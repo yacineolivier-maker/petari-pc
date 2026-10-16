@@ -28,7 +28,14 @@ void ClippingJudge::movement() {
     calcViewingVolume(&mFrustum, MR::getFarZ());
 
     for (u32 i = 1; i < 8; i++) {
+#if TARGET_PC
+        // display.ini "distance_affichage": objects disappear further away (the camera's far
+        // plane still bounds everything).
+        extern f32 pc_settings_draw_distance();
+        calcViewingVolume(&mClipFrustums[i], mClipDistances[i] * pc_settings_draw_distance());
+#else
         calcViewingVolume(&mClipFrustums[i], mClipDistances[i]);
+#endif
     }
 }
 

@@ -113,6 +113,12 @@ void LodCtrl::update() {
         f32 distance = calcDistanceToCamera();
         f32 lowDistance = _4;
         f32 middleDistance = _0;
+#if TARGET_PC
+        // display.ini "distance_affichage": detailed models further away.
+        extern f32 pc_settings_draw_distance();
+        lowDistance *= pc_settings_draw_distance();
+        middleDistance *= pc_settings_draw_distance();
+#endif
         if (*_28) {
             hideAllModel();
         } else if (*_1C) {

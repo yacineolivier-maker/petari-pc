@@ -68,6 +68,14 @@ void SceneFunction::initForLiveActor() {
 
 void SceneFunction::initEffectSystem(u32 a1, u32 a2) {
     MR::createSceneObj(SceneObj_EffectSystem);
+#if TARGET_PC
+    // display.ini "particules": denser emitters need a bigger particle pool.
+    extern f32 pc_settings_particle_density();
+    const f32 density = pc_settings_particle_density();
+    if (density > 1.0f) {
+        a1 = static_cast< u32 >(a1 * (density + 1.0f));
+    }
+#endif
     MR::getEffectSystem()->entry(MR::getParticleResourceHolder(), a1, a2);
 }
 

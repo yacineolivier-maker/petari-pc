@@ -24,6 +24,8 @@ struct Settings {
     bool vsync = true;
     std::string backend = "auto";
     int supersampling = 2;
+    float drawDistance = 2.0f;
+    float particleDensity = 1.5f;
     std::string language = "fr";
 };
 
@@ -76,6 +78,16 @@ void Load(FILE* f) {
             g_settings.backend = value;
         } else if (key == "supersampling" && n >= 1 && n <= 4) {
             g_settings.supersampling = n;
+        } else if (key == "distance_affichage") {
+            const float f = float(std::atof(value.c_str()));
+            if (f >= 1.0f && f <= 4.0f) {
+                g_settings.drawDistance = f;
+            }
+        } else if (key == "particules") {
+            const float f = float(std::atof(value.c_str()));
+            if (f >= 1.0f && f <= 3.0f) {
+                g_settings.particleDensity = f;
+            }
         } else if (key == "langue" && (value == "fr" || value == "en" || value == "es")) {
             g_settings.language = value;
         }
@@ -112,11 +124,18 @@ void Save(const std::string& path) {
                  "; (1 = desactive, 2 = par defaut, image nettement plus fine mais demande plus de puissance)\n"
                  "supersampling = %d\n"
                  "; Langue du jeu : fr (francais), en (anglais) ou es (espagnol)\n"
-                 "langue = %s\n",
+                 "langue = %s\n"
+                 "\n"
+                 "; --- Ameliorations ---\n"
+                 "; Distance d'affichage : multiplie les distances ou les objets passent en version\n"
+                 "; simplifiee ou disparaissent (1 = Wii, jusqu'a 4)\n"
+                 "distance_affichage = %.1f\n"
+                 "; Densite des particules (poussieres, etincelles...) : 1 = Wii, jusqu'a 3\n"
+                 "particules = %.1f\n",
                  g_settings.fullscreen ? 1 : 0, g_settings.windowWidth, g_settings.windowHeight, g_settings.msaa,
                  g_settings.anisotropy, g_settings.alphaToCoverage ? 1 : 0, g_settings.textureMipmaps ? 1 : 0,
                  g_settings.vsync ? 1 : 0, g_settings.backend.c_str(), g_settings.supersampling,
-                 g_settings.language.c_str());
+                 g_settings.language.c_str(), g_settings.drawDistance, g_settings.particleDensity);
     std::fclose(f);
 }
 
@@ -167,6 +186,19 @@ void pc_display_apply_after_init() {
 }
 
 // Game language as an SC_LANG_* value (RMGE01 has US English, US Spanish and US French).
+// Enhancements read by the game code (SMGPC_DRAW_DISTANCE / SMGPC_PARTICLES override them).
+float pc_settings_draw_distance() {
+    static const float value = std::getenv("SMGPC_DRAW_DISTANCE") ? float(std::atof(std::getenv("SMGPC_DRAW_DISTANCE")))
+                                                                 : g_settings.drawDistance;
+    return value;
+}
+
+float pc_settings_particle_density() {
+    static const float value = std::getenv("SMGPC_PARTICLES") ? float(std::atof(std::getenv("SMGPC_PARTICLES")))
+                                                             : g_settings.particleDensity;
+    return value;
+}
+
 extern "C" unsigned char pc_settings_language() {
     std::string language = g_settings.language;
     if (const char* env = std::getenv("SMGPC_LANGUAGE")) {  // tests
