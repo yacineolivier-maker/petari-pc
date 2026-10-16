@@ -138,8 +138,19 @@ namespace {
     static f32 mtx_identity[3][4] = {{1.0f, 0.0f, 0.0f, 0.0f}, {0.0f, 1.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 1.0f, 0.0f}};
 };  // namespace
 
+#if TARGET_PC
+namespace {
+    // The Wii copies a 4x4 projection from the 3x4 identity above (reading 16 bytes past it).
+    static f32 mtx_identity44[4][4] = {
+        {1.0f, 0.0f, 0.0f, 0.0f}, {0.0f, 1.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 1.0f, 0.0f}, {0.0f, 0.0f, 0.0f, 1.0f}};
+};  // namespace
+
+StarPointerTransformHolder::StarPointerTransformHolder() : mViewMtx(mtx_identity), mProjMtx(mtx_identity44) {
+}
+#else
 StarPointerTransformHolder::StarPointerTransformHolder() : mViewMtx(mtx_identity), mProjMtx(mtx_identity) {
 }
+#endif
 
 void StarPointerTransformHolder::movement() {
     f32 fovyRad = PI_180 * getFovy();

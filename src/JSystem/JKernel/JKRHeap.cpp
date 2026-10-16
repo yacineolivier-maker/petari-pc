@@ -349,12 +349,22 @@ static void jkr_free_any(void* pData) {
     if (pData == nullptr) {
         return;
     }
-    JKRHeap* heap = pc_is_wii_memory(pData) ? JKRHeap::findFromRoot(pData) : nullptr;
-    if (heap != nullptr) {
-        heap->free(pData);
-    } else {
-        _aligned_free(pData);
+    if (pc_is_wii_memory(pData)) {
+        JKRHeap* heap = JKRHeap::findFromRoot(pData);
+        if (heap != nullptr) {
+            heap->free(pData);
+        } else {
+            // Inside the emulated Wii memory but in no live heap: its heap was already destroyed
+            // (e.g. a scene heap freed before the objects in it). The memory went with the heap.
+            static int sReported = 0;
+            if (sReported < 8) {
+                sReported++;
+                fprintf(stderr, "[pc] delete of %p: its JKRHeap no longer exists (ignored)\n", pData);
+            }
+        }
+        return;
     }
+    _aligned_free(pData);
 }
 
 static void* jkr_heap_alloc(size_t size, int align, JKRHeap* pHeap) {

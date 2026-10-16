@@ -8,6 +8,9 @@
 class J3DShape;
 class J3DShapeX;
 class J3DShapePacketX;
+#if TARGET_PC
+struct DLholder;
+#endif
 
 class J3DModelX : public J3DModel {
 public:
@@ -116,4 +119,10 @@ public:
     /* 0x1E0 */ s32 _1E0;
     /* 0x1E4 */ u8 _1E4;
     /* 0x1E5 */ u8 _1E5;
+#if TARGET_PC
+    // Holders of the _1C4/_1C8 texture swap DLs (MarioActor::swapTexture), whose texture must
+    // be bound through a GX texture object on PC (see DLholder::mPCTexture).
+    const DLholder** _1C4Holder;
+    const DLholder** _1C8Holder;
+#endif
 };

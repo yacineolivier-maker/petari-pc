@@ -389,6 +389,12 @@ void loadNBTScale(J3DNBTScale& param_0);
 
 void loadTexCoordGens(u32 param_0, J3DTexCoord* param_1);
 void loadTexNo(u32 param_0, u16 const& param_1);
+#if TARGET_PC
+// While non-NULL, loadTexNo stores the texture number of each texture map here (8 entries).
+// Set by J3DMatPacket::beginTexNoRecord around the per-packet material DL builds, so each packet
+// knows which textures its own DL selected (see J3DMatPacket::callDL).
+extern u16* j3dPCTexNoRecord;
+#endif
 void patchTexNo_PtrToIdx(u32 texID, u16 const& idx);
 bool isTexNoReg(void* param_0);
 u16 getTexNoReg(void* param_0);

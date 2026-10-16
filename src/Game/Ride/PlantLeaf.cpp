@@ -118,6 +118,10 @@ void PlantLeafDrawInit::initDraw() const {
     j3dSys.mVtxNrm = pModelData->mVertexData.mVtxNrmArray;
     j3dSys.mVtxCol = pModelData->mVertexData.mVtxColorArray[0];
     mShape->sOldVcdVatCmd = 0;
+#if TARGET_PC
+    // loadSharedDL binds the material textures from the j3dSys texture (DL addresses are null on PC).
+    j3dSys.setTexture(pModelData->getTexture());
+#endif
     mMaterial->loadSharedDL();
     mShape->loadPreDrawSetting();
     mShape->loadVtxArray();

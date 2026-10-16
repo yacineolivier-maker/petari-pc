@@ -450,9 +450,19 @@ namespace {
 
             u32 msg;
             do {
+#if TARGET_PC
+                // An OSMessage is pointer-sized on PC: receive into one, then narrow.
+                OSMessage message;
+                if (!OSReceiveMessage(JUTVideo::getManager()->getMessageQueue(), &message, OS_MESSAGE_BLOCK)) {
+                    msg = dummy;
+                } else {
+                    msg = (u32)(uintptr_t)message;
+                }
+#else
                 if (!OSReceiveMessage(JUTVideo::getManager()->getMessageQueue(), (OSMessage*)&msg, OS_MESSAGE_BLOCK)) {
                     msg = dummy;
                 }
+#endif
             } while ((s32)(msg - nextCount) < 0);
             nextCount = msg + count;
         }

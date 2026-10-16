@@ -13,6 +13,24 @@
 #include <JSystem/JKernel/JKRHeap.hpp>
 #include <JSystem/JUtility/JUTVideo.hpp>
 #include <revolution/gd.h>
+#if TARGET_PC
+#include "Game/Player/DLchanger.hpp"
+#include <JSystem/JUtility/JUTTexture.hpp>
+
+namespace {
+    // Display list 6 samples the screen copy texture (GDSetTexImgPtr), whose address Aurora
+    // ignores: bind it through a texture object with the same parameters after the DL.
+    void loadScreenTexturePC() {
+        const ResTIMG* pTimg = MR::getScreenResTIMG();
+        u8* pImage = const_cast< u8* >(reinterpret_cast< const u8* >(pTimg)) + (s32)pTimg->mImageDataOffset;
+        GXTexObj texObj;
+        GXInitTexObj(&texObj, pImage, MR::getScreenWidth(), JUTVideo::getManager()->getEfbHeight(), GX_TF_RGB565, GX_REPEAT, GX_REPEAT,
+                     GX_FALSE);
+        GXInitTexObjLOD(&texObj, GX_LINEAR, GX_LINEAR, 0.0f, 0.0f, 0.0f, GX_FALSE, GX_FALSE, GX_ANISO_1);
+        GXLoadTexObj(&texObj, GX_TEXMAP0);
+    }
+}  // namespace
+#endif
 
 class J3DMtxBuffer2 : public J3DMtxBuffer {
 public:
@@ -205,9 +223,20 @@ void J3DModelX::drawIn(J3DMaterial* material, bool fog, MtxPtr base, J3DModel* m
     }
 
     for (u32 i = 0; i <= 15; i++) {
+#if TARGET_PC
+        // MWCC allocates bit-fields from the most significant bit (_0 = bit 31) and MSVC from the
+        // least significant one: display list i is selected by field _(31 - i) on the Wii.
+        if (*reinterpret_cast< u32* >(&mFlags) & (1u << (31 - i))) {
+            GXCallDisplayList(mDisplayLists[i], mDisplayListSizes[i]);
+            if (i == 6) {
+                loadScreenTexturePC();
+            }
+        }
+#else
         if (*reinterpret_cast< u32* >(&mFlags) & (1 << i)) {
             GXCallDisplayList(mDisplayLists[i], mDisplayListSizes[i]);
         }
+#endif
     }
 
     if (_1B8) {
@@ -222,9 +251,19 @@ void J3DModelX::drawIn(J3DMaterial* material, bool fog, MtxPtr base, J3DModel* m
     if (_1C8[index]) {
         _1C4[index] = _1C8[index];
         _1C8[index] = nullptr;
+#if TARGET_PC
+        _1C4Holder[index] = _1C8Holder[index];
+        _1C8Holder[index] = nullptr;
+#endif
     }
     if (_1C4[index] && _1CC[index]) {
         GXCallDisplayList(_1C4[index], _1CC[index]);
+#if TARGET_PC
+        const DLholder* pHolder = _1C4Holder[index];
+        if (pHolder != nullptr && pHolder->mPCTexture != nullptr) {
+            pHolder->mPCTexture->load(static_cast< GXTexMapID >(pHolder->mPCTexMapID));
+        }
+#endif
     }
     if (_120) {
         _120(_128, _1C0);
@@ -362,7 +401,11 @@ J3DModelX::J3DModelX(J3DModelData* data, u32 flags, u32 bufferFlags) : J3DModel(
 
     GDSetTexLookupMode(GX_TEXMAP0, GX_REPEAT, GX_REPEAT, GX_LINEAR, GX_LINEAR, 0.0f, 0.0f, 0.0f, GX_FALSE, GX_FALSE, GX_ANISO_1);
     GDSetTexImgAttr(GX_TEXMAP0, MR::getScreenWidth(), JUTVideo::getManager()->getEfbHeight(), GX_TF_RGB565);
+#if TARGET_PC
+    GDSetTexImgPtrRaw(GX_TEXMAP0, 0);  // bound by loadScreenTexturePC after the DL
+#else
     GDSetTexImgPtr(GX_TEXMAP0, const_cast< u8* >(reinterpret_cast< const u8* >(MR::getScreenResTIMG())) + MR::getScreenResTIMG()->mImageDataOffset);
+#endif
     GDSetTexCoordGen(GX_TEXCOORD0, GX_TG_MTX2x4, GX_TG_NRM, GX_TRUE, GX_IDENTITY);
     storeDisplayList(&obj, 6);
 
@@ -458,10 +501,18 @@ J3DModelX::J3DModelX(J3DModelData* data, u32 flags, u32 bufferFlags) : J3DModel(
     _1C4 = new u8*[count];
     _1C8 = new u8*[count];
     _1CC = new u16[count];
+#if TARGET_PC
+    _1C4Holder = new const DLholder*[count];
+    _1C8Holder = new const DLholder*[count];
+#endif
     for (u32 i = 0; i < count; i++) {
         _1C4[i] = nullptr;
         _1C8[i] = nullptr;
         _1CC[i] = 0;
+#if TARGET_PC
+        _1C4Holder[i] = nullptr;
+        _1C8Holder[i] = nullptr;
+#endif
     }
     _DC = 0;
 }

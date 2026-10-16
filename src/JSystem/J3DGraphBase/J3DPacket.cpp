@@ -165,6 +165,35 @@ bool J3DMatPacket::isSame(J3DMatPacket* pOther) const {
     return mDiffFlag == pOther->mDiffFlag && (mDiffFlag >> 31) == 0;
 }
 
+#if TARGET_PC
+void J3DMatPacket::callDL() const {
+    if (mpMaterial != NULL && mpMaterial->getTevBlock() != NULL) {
+        J3DTexture* pTexture = mpTexture != NULL ? mpTexture : j3dSys.getTexture();
+        mpMaterial->getTevBlock()->loadTexture(pTexture);
+        if (mpPCTexNoMaterial == mpMaterial && mpPCTexNoDLObj == mpDisplayListObj) {
+            // What this packet's own DL selected overrides the material's current numbers.
+            J3DTevBlockLoadTexture(pTexture, mPCTexNo, 8);
+        }
+    }
+    J3DDrawPacket::callDL();
+}
+
+void J3DMatPacket::beginTexNoRecord(bool reset) {
+    if (reset || mpPCTexNoMaterial != mpMaterial || mpPCTexNoDLObj != mpDisplayListObj) {
+        for (int i = 0; i < 8; i++) {
+            mPCTexNo[i] = 0xFFFF;
+        }
+        mpPCTexNoMaterial = mpMaterial;
+        mpPCTexNoDLObj = mpDisplayListObj;
+    }
+    j3dPCTexNoRecord = mPCTexNo;
+}
+
+void J3DMatPacket::endTexNoRecord() {
+    j3dPCTexNoRecord = NULL;
+}
+#endif
+
 void J3DMatPacket::draw() {
     mpMaterial->load();
     callDL();

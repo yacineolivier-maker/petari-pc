@@ -201,7 +201,13 @@ void J3DMaterial::makeDisplayList_private(J3DDisplayListObj* pDLObj) {
 void J3DMaterial::makeDisplayList() {
     if (!j3dSys.getMatPacket()->isLocked()) {
         j3dSys.getMatPacket()->mDiffFlag = mDiffFlag;
+#if TARGET_PC
+        j3dSys.getMatPacket()->beginTexNoRecord(true);
         makeDisplayList_private(j3dSys.getMatPacket()->getDisplayListObj());
+        J3DMatPacket::endTexNoRecord();
+#else
+        makeDisplayList_private(j3dSys.getMatPacket()->getDisplayListObj());
+#endif
     }
 }
 
@@ -218,6 +224,11 @@ void J3DMaterial::load() {
 
 void J3DMaterial::loadSharedDL() {
     j3dSys.setMaterialMode(mMaterialMode);
+#if TARGET_PC
+    // Game code calls loadSharedDL directly (outside J3DMatPacket::callDL): bind the textures
+    // of the current model (j3dSys texture) before the DL, which carries null addresses.
+    mTevBlock->loadTexture(j3dSys.getTexture());
+#endif
     if (!j3dSys.checkFlag(2)) {
         mSharedDLObj->callDL();
         loadNBTScale(*mTexGenBlock->getNBTScale());
@@ -227,7 +238,13 @@ void J3DMaterial::loadSharedDL() {
 void J3DMaterial::patch() {
     j3dSys.getMatPacket()->mDiffFlag = mDiffFlag;
     j3dSys.getMatPacket()->beginPatch();
+#if TARGET_PC
+    j3dSys.getMatPacket()->beginTexNoRecord(false);
     mTevBlock->patch();
+    J3DMatPacket::endTexNoRecord();
+#else
+    mTevBlock->patch();
+#endif
     mColorBlock->patch();
     mTexGenBlock->patch();
     j3dSys.getMatPacket()->endPatch();
@@ -237,7 +254,13 @@ void J3DMaterial::diff(u32 diffFlags) {
     if (j3dSys.getMatPacket()->isEnabled_Diff()) {
         j3dSys.getMatPacket()->beginDiff();
 
+#if TARGET_PC
+        j3dSys.getMatPacket()->beginTexNoRecord(false);
         mTevBlock->diff(diffFlags);
+        J3DMatPacket::endTexNoRecord();
+#else
+        mTevBlock->diff(diffFlags);
+#endif
         mIndBlock->diff(diffFlags);
         mPEBlock->diff(diffFlags);
         if (diffFlags & J3DDiffFlag_KonstColor) {
@@ -362,6 +385,11 @@ void J3DPatchedMaterial::load() {
 
 void J3DPatchedMaterial::loadSharedDL() {
     j3dSys.setMaterialMode(mMaterialMode);
+#if TARGET_PC
+    // Game code calls loadSharedDL directly (outside J3DMatPacket::callDL): bind the textures
+    // of the current model (j3dSys texture) before the DL, which carries null addresses.
+    mTevBlock->loadTexture(j3dSys.getTexture());
+#endif
     if (!j3dSys.checkFlag(0x02))
         mSharedDLObj->callDL();
 }
@@ -391,6 +419,11 @@ void J3DLockedMaterial::load() {
 
 void J3DLockedMaterial::loadSharedDL() {
     j3dSys.setMaterialMode(mMaterialMode);
+#if TARGET_PC
+    // Game code calls loadSharedDL directly (outside J3DMatPacket::callDL): bind the textures
+    // of the current model (j3dSys texture) before the DL, which carries null addresses.
+    mTevBlock->loadTexture(j3dSys.getTexture());
+#endif
     if (!j3dSys.checkFlag(0x02))
         mSharedDLObj->callDL();
 }

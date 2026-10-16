@@ -1,4 +1,10 @@
 #include "Game/NameObj/NameObjListExecutor.hpp"
+#if TARGET_PC
+// ~DrawBufferHolder deletes a DrawBufferGroup array: the type must be complete here, or MSVC skips
+// the destructors and the array cookie (heap corruption).
+#include "Game/System/DrawBufferGroup.hpp"
+#include "Game/System/DrawBufferHolder.hpp"
+#endif
 #include "Game/Scene/SceneFunction.hpp"
 
 NameObjListExecutor::NameObjListExecutor() : mBufferHolder(), mMovementList(), mCalcAnimList(), mDrawList() {

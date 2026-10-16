@@ -86,7 +86,9 @@ if (CMAKE_CXX_COMPILER_FRONTEND_VARIANT STREQUAL "MSVC")
     target_compile_options(smg_game_headers INTERFACE /FIpc_compat.h
             $<$<COMPILE_LANGUAGE:CXX>:/permissive> $<$<COMPILE_LANGUAGE:CXX>:/Zc:strictStrings->
             # Pointer truncation is a real bug on 64-bit; make it an error.
-            /we4311 /we4302 /we4312)
+            /we4311 /we4302 /we4312
+            # delete of an incomplete type skips the destructor and the array cookie (heap corruption).
+            /we4150)
 else ()
     target_compile_options(smg_game_headers INTERFACE "SHELL:-include pc_compat.h")
 endif ()

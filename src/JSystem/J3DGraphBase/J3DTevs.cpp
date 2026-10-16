@@ -271,7 +271,16 @@ u16 getTexNoReg(void* pDL) {
     return var_r31 & 0xFFFFFF;
 }
 
+#if TARGET_PC
+u16* j3dPCTexNoRecord = NULL;
+#endif
+
 void loadTexNo(u32 param_0, const u16& texNo) {
+#if TARGET_PC
+    if (j3dPCTexNoRecord != NULL && param_0 < 8) {
+        j3dPCTexNoRecord[param_0] = texNo;
+    }
+#endif
     ResTIMG* resTIMG = j3dSys.getTexture()->getResTIMG(texNo);
     J3DSys::sTexCoordScaleTable[param_0].field_0x00 = (u16)resTIMG->mWidth;
     J3DSys::sTexCoordScaleTable[param_0].field_0x02 = (u16)resTIMG->mHeight;
@@ -299,6 +308,63 @@ void loadTexNo(u32 param_0, const u16& texNo) {
         J3DGDSetTexTlut(GXTexMapID(param_0), (param_0 << 13) + 0xf0000, GXTlutFmt(resTIMG->mPaletteFormat));
     }
 }
+
+#if TARGET_PC
+J3DTexture::J3DTexture(u16 num, ResTIMG* res) : mNum(num), unk_0x2(0), mpRes(res) {
+    mpTexObj = new GXTexObj[num];
+    mpTlutObj = new GXTlutObj[num];
+    mpImgDataPtr = new u8*[num];
+    mpTlutDataPtr = new u8*[num];
+    for (u16 i = 0; i < num; i++) {
+        mpImgDataPtr[i] = (u8*)&mpRes[i] + (s32)mpRes[i].mImageDataOffset;
+        mpTlutDataPtr[i] = (u8*)&mpRes[i] + (s32)mpRes[i].mPaletteDataOffset;
+        loadGXTexObj(i);
+    }
+}
+
+J3DTexture::~J3DTexture() {
+    delete[] mpTexObj;
+    delete[] mpTlutObj;
+    delete[] mpImgDataPtr;
+    delete[] mpTlutDataPtr;
+}
+
+// Builds the GX texture object of texture idx from its ResTIMG, with the same parameters
+// loadTexNo writes into the display list. The image data stays big-endian (Aurora decodes the
+// original GX texture formats).
+void J3DTexture::loadGXTexObj(u16 idx) {
+    ResTIMG* timg = getResTIMG(idx);
+    GXTexObj& texObj = mpTexObj[idx];
+    if (timg->mPaletteName != true) {
+        GXInitTexObj(&texObj, mpImgDataPtr[idx], timg->mWidth, timg->mHeight, GXTexFmt(timg->mFormat), GXTexWrapMode(timg->mWrapS),
+                     GXTexWrapMode(timg->mWrapT), timg->mMipmap ? GX_TRUE : GX_FALSE);
+    } else {
+        GXInitTexObjCI(&texObj, mpImgDataPtr[idx], timg->mWidth, timg->mHeight, GXCITexFmt(timg->mFormat), GXTexWrapMode(timg->mWrapS),
+                       GXTexWrapMode(timg->mWrapT), timg->mMipmap ? GX_TRUE : GX_FALSE, GX_TLUT0);
+        GXInitTlutObj(&mpTlutObj[idx], mpTlutDataPtr[idx], GXTlutFmt(timg->mPaletteFormat), timg->mPaletteNum);
+    }
+    GXInitTexObjLOD(&texObj, GXTexFilter(timg->mMinType), GXTexFilter(timg->mMagType), static_cast< s8 >(timg->mMinLod) * 0.125f,
+                    static_cast< s8 >(timg->mMaxLod) * 0.125f, timg->mLodBias * 0.01f, timg->mBiasClamp, timg->mDoEdgeLod,
+                    GXAnisotropy(timg->mMaxAnisotropy));
+}
+
+// Binds texture idx to texMapID (called before the material DL, which carries a null address).
+void J3DTexture::loadGX(u16 idx, GXTexMapID texMapID) const {
+    if (idx >= mNum) {
+        return;
+    }
+    ResTIMG* timg = getResTIMG(idx);
+    if (timg->mWidth == 0 || timg->mHeight == 0) {
+        return;
+    }
+    if (timg->mPaletteName == true) {
+        // Same convention as loadTexNo: one TLUT per texture map.
+        GXLoadTlut(&mpTlutObj[idx], (GXTlut)texMapID);
+        GXInitTexObjTlut(&mpTexObj[idx], (GXTlut)texMapID);
+    }
+    GXLoadTexObj(&mpTexObj[idx], texMapID);
+}
+#endif
 
 void patchTexNo_PtrToIdx(u32 texID, const u16& idx) {
     ResTIMG* timg = j3dSys.getTexture()->getResTIMG(idx);

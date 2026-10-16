@@ -610,6 +610,11 @@ public:
     /* 0x5C */ J3DNBTScale mNBTScale;
 };  // Size: 0x6C
 
+#if TARGET_PC
+// Binds num texture numbers (0xFFFF = none) of pTexture to GX_TEXMAP0.. (see J3DTexture::loadGX).
+void J3DTevBlockLoadTexture(const J3DTexture* pTexture, const u16* texNo, u32 num);
+#endif
+
 class J3DTevBlock {
 public:
     virtual void reset(J3DTevBlock*) {
@@ -763,6 +768,16 @@ public:
         return 0;
     }
 
+#if TARGET_PC
+    // Binds this block's textures through GX texture objects before its display list is
+    // drawn (Aurora ignores the texture addresses in the DL). Blocks without their own
+    // texture numbers (null blocks of locked BDL materials) use the ones indexToPtr_private
+    // found in their display list.
+    virtual void loadTexture(const J3DTexture* pTexture) {
+        J3DTevBlockLoadTexture(pTexture, mDLTexNo, 8);
+    }
+#endif
+
     virtual u32 getTevRegOffset() const {
         return 0;
     }
@@ -781,6 +796,9 @@ protected:
     void indexToPtr_private(u32);
 
     /* 0x4 */ u32 mTexNoOffset;
+#if TARGET_PC
+    u16 mDLTexNo[8] = {0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF};
+#endif
 };
 
 class J3DColorBlockNull : public J3DColorBlock {
@@ -986,6 +1004,12 @@ public:
         return mTexNoOffset;
     }
 
+#if TARGET_PC
+    virtual void loadTexture(const J3DTexture* pTexture) {
+        J3DTevBlockLoadTexture(pTexture, mTexNo, sizeof(mTexNo) / sizeof(mTexNo[0]));
+    }
+#endif
+
     virtual u32 getTevRegOffset() const {
         return mTevRegOffset;
     }
@@ -1100,6 +1124,12 @@ public:
     virtual u32 getTexNoOffset() const {
         return mTexNoOffset;
     }
+
+#if TARGET_PC
+    virtual void loadTexture(const J3DTexture* pTexture) {
+        J3DTevBlockLoadTexture(pTexture, mTexNo, sizeof(mTexNo) / sizeof(mTexNo[0]));
+    }
+#endif
 
     virtual ~J3DTevBlock1() {
     }
@@ -1272,6 +1302,12 @@ public:
     virtual u32 getTexNoOffset() const {
         return mTexNoOffset;
     }
+
+#if TARGET_PC
+    virtual void loadTexture(const J3DTexture* pTexture) {
+        J3DTevBlockLoadTexture(pTexture, mTexNo, sizeof(mTexNo) / sizeof(mTexNo[0]));
+    }
+#endif
 
     virtual u32 getTevRegOffset() const {
         return mTevRegOffset;
@@ -1464,6 +1500,12 @@ public:
         return mTexNoOffset;
     }
 
+#if TARGET_PC
+    virtual void loadTexture(const J3DTexture* pTexture) {
+        J3DTevBlockLoadTexture(pTexture, mTexNo, sizeof(mTexNo) / sizeof(mTexNo[0]));
+    }
+#endif
+
     virtual u32 getTevRegOffset() const {
         return mTevRegOffset;
     }
@@ -1648,6 +1690,12 @@ public:
     virtual u32 getTexNoOffset() const {
         return mTexNoOffset;
     }
+
+#if TARGET_PC
+    virtual void loadTexture(const J3DTexture* pTexture) {
+        J3DTevBlockLoadTexture(pTexture, mTexNo, sizeof(mTexNo) / sizeof(mTexNo[0]));
+    }
+#endif
 
     virtual u32 getTevRegOffset() const {
         return mTevRegOffset;

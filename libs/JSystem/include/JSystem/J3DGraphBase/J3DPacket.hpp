@@ -316,6 +316,19 @@ public:
         return mpInitShapePacket->getDisplayListObj() != NULL;
     }
 
+#if TARGET_PC
+    // Hides J3DDrawPacket::callDL: binds the material's textures (J3DTevBlock::loadTexture) and
+    // then calls the material DL, whose texture addresses are null on PC. Every material DL
+    // call goes through here (J3DMatPacket::draw, J3DModelX, MR::simpleDraw).
+    void callDL() const;
+    // Records the texture numbers loadTexNo writes while this packet's material DL (or diff DL)
+    // is built: J3D builds one DL per model instance at entry time (texture pattern animations
+    // differ per instance), while the material's own texture numbers are those of the last
+    // instance that was calculated.
+    void beginTexNoRecord(bool reset);
+    static void endTexNoRecord();
+#endif
+
     virtual ~J3DMatPacket();
     virtual int entry(J3DDrawBuffer*);
     virtual void draw();
@@ -327,4 +340,10 @@ public:
     /* 0x34 */ u32 mDiffFlag;
     /* 0x38 */ J3DTexture* mpTexture;
     /* 0x3C */ J3DMaterialAnm* mpMaterialAnm;
+#if TARGET_PC
+    u16 mPCTexNo[8] = {0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF};
+    // Material and DL the recorded texture numbers belong to (game code reassigns packets).
+    const J3DMaterial* mpPCTexNoMaterial = NULL;
+    const J3DDisplayListObj* mpPCTexNoDLObj = NULL;
+#endif
 };  // Size: 0x40

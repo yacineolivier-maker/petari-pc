@@ -38,6 +38,19 @@ inline void loadAmbColors(const J3DGXColor* color) {
 }
 #endif
 
+#if TARGET_PC
+void J3DTevBlockLoadTexture(const J3DTexture* pTexture, const u16* texNo, u32 num) {
+    if (pTexture == NULL) {
+        return;
+    }
+    for (u32 i = 0; i < num; i++) {
+        if (texNo[i] != 0xFFFF) {
+            pTexture->loadGX(texNo[i], GXTexMapID(GX_TEXMAP0 + i));
+        }
+    }
+}
+#endif
+
 inline void loadTevColor(u32 reg, const J3DGXColorS10& color) {
     J3DGDSetTevColorS10(GXTevRegID(reg + 1), color);
 }
@@ -1321,6 +1334,12 @@ void J3DTevBlock::indexToPtr_private(u32 offs) {
         }
 
         u16 texNoReg = getTexNoReg(pDL);
+#if TARGET_PC
+        // loadTexNo overwrites the index with a null address: remember it for loadTexture.
+        if (i < ARRAY_SIZE(mDLTexNo)) {
+            mDLTexNo[i] = texNoReg;
+        }
+#endif
         loadTexNo(i, texNoReg);
     }
 

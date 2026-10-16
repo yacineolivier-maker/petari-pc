@@ -131,9 +131,17 @@ namespace {
 LayoutManager::LayoutManager(const char* pLayoutName, bool useArchiveNamePrefix, u32 rootPaneAnimLayerNum, u32 textBoxBufferLength)
     : mLayoutHolder(), mLayout(), mAnimTransList(), mDrawInfo(), mIsScreenHidden(), _61(true), mIndDummyTexMap(), mPaneCount(), mPaneInfoList(),
       mGroupCtrlCount(), mGroupCtrlList(), mLayoutName() {
+#if TARGET_PC
+    // pLayoutName may point into fileNameWithoutExtension below and is used after the block:
+    // keep the buffers alive for the whole constructor (the Wii got away with it).
+    char fileNameWithoutExtension[0x60];
+    char fileNameFromPrefix[0x80];
+    if (useArchiveNamePrefix) {
+#else
     if (useArchiveNamePrefix) {
         char fileNameWithoutExtension[0x60];
         char fileNameFromPrefix[0x80];
+#endif
         MR::makeLayoutArchiveFileNameFromPrefix(fileNameFromPrefix, sizeof(fileNameFromPrefix), pLayoutName, true);
         MR::removeExtensionString(fileNameWithoutExtension, sizeof(fileNameWithoutExtension), fileNameFromPrefix);
         pLayoutName = MR::getBasename(fileNameWithoutExtension);

@@ -5,10 +5,20 @@
 
 class J3DModelX;
 
+#if TARGET_PC
+class JUTTexture;
+#endif
+
 struct DLholder {
     /* 0x00 */ u8* mDL;
     /* 0x04 */ u16 mSize;
     /* 0x06 */ u16 _6;
+#if TARGET_PC
+    // Texture swap DLs (MarioActor::createTextureDL) carry a texture address Aurora ignores:
+    // J3DModelX binds this texture object to mPCTexMapID when it calls the DL.
+    JUTTexture* mPCTexture = nullptr;
+    u16 mPCTexMapID = 0;
+#endif
 };
 
 class DLchanger {

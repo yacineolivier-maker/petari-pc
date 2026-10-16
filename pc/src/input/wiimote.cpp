@@ -19,7 +19,11 @@
 #include <dolphin/pad.h>
 
 #include <cmath>
+#include <cstdio>
+#include <cstdlib>
 #include <cstring>
+#include <string>
+#include <vector>
 
 namespace {
 
@@ -88,7 +92,82 @@ u32 MapButtons(const PADStatus& pad, bool& shakeButton) {
     return b;
 }
 
+// SMGPC_INPUT: scripted input for automated tests, e.g. "A@300,A@420+5,SHAKE@900,STICKUP@1000+60".
+// Each entry presses a button at a frame (KPADRead frames of channel 0) for a number of frames
+// (default 3). Buttons: A B PLUS MINUS HOME 1 2 UP DOWN LEFT RIGHT Z C SHAKE, and STICKUP/DOWN/
+// LEFT/RIGHT (Nunchuk stick).
+struct ScriptEntry {
+    u32 buttons;
+    bool shake;
+    f32 stickX, stickY;
+    u32 start, end;
+};
+std::vector<ScriptEntry> sScript;
+bool sScriptLoaded = false;
+
+void LoadScript() {
+    sScriptLoaded = true;
+    const char* env = std::getenv("SMGPC_INPUT");
+    if (env == nullptr) {
+        return;
+    }
+    std::string text = env;
+    size_t pos = 0;
+    while (pos < text.size()) {
+        size_t comma = text.find(',', pos);
+        std::string item = text.substr(pos, comma == std::string::npos ? std::string::npos : comma - pos);
+        pos = comma == std::string::npos ? text.size() : comma + 1;
+        size_t at = item.find('@');
+        if (at == std::string::npos) {
+            continue;
+        }
+        std::string name = item.substr(0, at);
+        u32 start = (u32)std::strtoul(item.c_str() + at + 1, nullptr, 10);
+        u32 dur = 3;
+        size_t plus = item.find('+', at);
+        if (plus != std::string::npos) {
+            dur = (u32)std::strtoul(item.c_str() + plus + 1, nullptr, 10);
+        }
+        ScriptEntry e{0, false, 0.0f, 0.0f, start, start + dur};
+        static const struct { const char* name; u32 bit; } kButtons[] = {
+            {"A", WPAD_BUTTON_A}, {"B", WPAD_BUTTON_B}, {"PLUS", WPAD_BUTTON_PLUS}, {"MINUS", WPAD_BUTTON_MINUS},
+            {"HOME", WPAD_BUTTON_HOME}, {"1", WPAD_BUTTON_1}, {"2", WPAD_BUTTON_2}, {"UP", WPAD_BUTTON_UP},
+            {"DOWN", WPAD_BUTTON_DOWN}, {"LEFT", WPAD_BUTTON_LEFT}, {"RIGHT", WPAD_BUTTON_RIGHT},
+            {"Z", WPAD_BUTTON_Z}, {"C", WPAD_BUTTON_C},
+        };
+        for (const auto& b : kButtons) {
+            if (name == b.name) {
+                e.buttons = b.bit;
+            }
+        }
+        if (name == "SHAKE") e.shake = true;
+        if (name == "STICKUP") e.stickY = 1.0f;
+        if (name == "STICKDOWN") e.stickY = -1.0f;
+        if (name == "STICKLEFT") e.stickX = -1.0f;
+        if (name == "STICKRIGHT") e.stickX = 1.0f;
+        sScript.push_back(e);
+    }
+    std::fprintf(stderr, "[pc] scripted input: %zu entries\n", sScript.size());
+}
+
+// Applies the script to the frame's state (on top of the real gamepad).
+void ApplyScript(u32 frame, u32& hold, bool& shake, f32& stickX, f32& stickY) {
+    if (!sScriptLoaded) {
+        LoadScript();
+    }
+    for (const ScriptEntry& e : sScript) {
+        if (frame >= e.start && frame < e.end) {
+            hold |= e.buttons;
+            shake = shake || e.shake;
+            if (e.stickX != 0.0f) stickX = e.stickX;
+            if (e.stickY != 0.0f) stickY = e.stickY;
+        }
+    }
+}
+
 }  // namespace
+
+extern "C" u32 pc_input_frame(void) { return sFrame; }
 
 extern "C" {
 
@@ -140,7 +219,12 @@ s32 KPADRead(s32 chan, KPADStatus status[], u32 count) {
     }
 
     bool shakeButton = false;
-    const u32 hold = MapButtons(pad, shakeButton);
+    u32 hold = MapButtons(pad, shakeButton);
+    f32 stickX = StickAxis(pad.stickX);
+    f32 stickY = StickAxis(pad.stickY);
+    if (chan == 0) {
+        ApplyScript(sFrame, hold, shakeButton, stickX, stickY);
+    }
     s.hold = hold;
     s.trig = hold & ~ch.prevHold;
     s.release = ch.prevHold & ~hold;
@@ -187,8 +271,8 @@ s32 KPADRead(s32 chan, KPADStatus status[], u32 count) {
     s.dev_type = WPAD_DEV_FREESTYLE;
     s.wpad_err = WPAD_ERR_NONE;
     s.data_format = 0;
-    s.ex_status.fs.stick.x = StickAxis(pad.stickX);
-    s.ex_status.fs.stick.y = StickAxis(pad.stickY);
+    s.ex_status.fs.stick.x = stickX;
+    s.ex_status.fs.stick.y = stickY;
     s.ex_status.fs.acc.x = 0.0f;
     s.ex_status.fs.acc.y = -1.0f;
     s.ex_status.fs.acc.z = 0.0f;

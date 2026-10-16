@@ -24,6 +24,10 @@ void SimpleJ3DModelDrawer::initDraw() const {
     j3dSys.mVtxNrm = data->getVtxNrmArray();
     j3dSys.mVtxCol = data->getVtxColorArray(0);
     J3DShape::sOldVcdVatCmd = 0;
+#if TARGET_PC
+    // loadSharedDL binds the material textures from the j3dSys texture (DL addresses are null on PC).
+    j3dSys.setTexture(data->getTexture());
+#endif
     mMaterial->loadSharedDL();
     mShape->loadPreDrawSetting();
     mShape->loadVtxArray();

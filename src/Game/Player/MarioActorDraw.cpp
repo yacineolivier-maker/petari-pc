@@ -42,6 +42,9 @@ namespace MR {
 
 extern "C" {
 void GDSetTexImgPtr(GXTexMapID, void*);
+#if TARGET_PC
+void GDSetTexImgPtrRaw(GXTexMapID, u32);
+#endif
 }
 
 class JetTurtleShadow : public LiveActor {
@@ -957,7 +960,15 @@ void MarioActor::createTextureDL(DLholder* pHolder, u16 texMapID, u16 texIndex) 
     __GDCurrentDL = &obj;
 
     ResTIMG* texture = _B64[texIndex];
+#if TARGET_PC
+    // Aurora ignores the address in the DL: J3DModelX binds this texture object when it calls
+    // the DL (the command is kept so the DL is unchanged otherwise).
+    GDSetTexImgPtrRaw(static_cast< GXTexMapID >(texMapID), 0);
+    pHolder->mPCTexture = new JUTTexture(texture, 0);
+    pHolder->mPCTexMapID = texMapID;
+#else
     GDSetTexImgPtr(static_cast< GXTexMapID >(texMapID), reinterpret_cast< u8* >(texture) + texture->mImageDataOffset);
+#endif
 
     GDPadCurr32();
 
@@ -1006,6 +1017,9 @@ void MarioActor::swapTexture(const char* pMaterialName, u8 texNo) const {
 
     model->_1C8[materialNo] = dl;
     model->_1CC[materialNo] = dlSize;
+#if TARGET_PC
+    model->_1C8Holder[materialNo] = &holder[texNo];
+#endif
 }
 
 void MarioActor::copyMaterial(J3DModel* pModel, u16 materialNo, s32 packetIndex) {

@@ -106,6 +106,19 @@ static void pc_abort_handler(int) {
     TerminateProcess(process, 3);
 }
 
+// Prints the calling thread's stack (for diagnostics, e.g. when the game asks to exit).
+void pc_print_current_stack(const char* why) {
+    HANDLE process = GetCurrentProcess();
+    SymSetOptions(SYMOPT_LOAD_LINES | SYMOPT_UNDNAME | SYMOPT_DEFERRED_LOADS);
+    SymInitialize(process, pc_symbol_path(), TRUE);
+    CONTEXT ctx{};
+    RtlCaptureContext(&ctx);
+    std::fflush(stdout);
+    std::fprintf(stderr, "\n=== %s ===\n", why);
+    pc_print_stack(process, GetCurrentThread(), ctx);
+    std::fflush(stderr);
+}
+
 void pc_install_crash_handler() {
     SetUnhandledExceptionFilter(pc_unhandled_exception);
     std::signal(SIGABRT, pc_abort_handler);
@@ -212,5 +225,6 @@ static struct PcCrashHandlerInstaller {
 } s_pcCrashHandlerInstaller;
 #else
 void pc_install_crash_handler() {}
+void pc_print_current_stack(const char*) {}
 void pc_watchdog_tick() {}
 #endif

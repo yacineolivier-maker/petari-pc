@@ -339,7 +339,14 @@ void J3DGDSetTexImgAttr(GXTexMapID id, u16 width, u16 height, GXTexFmt format) {
 }
 
 void J3DGDSetTexImgPtr(GXTexMapID id, void* image_ptr) {
+#if TARGET_PC
+    // Host pointers don't fit the 24-bit TMEM address field. Textures are bound through GX
+    // texture objects instead (J3DTexture::loadGX from J3DTevBlock::loadTexture); keep the
+    // command so the DL layout (and the patch offsets computed from it) stays identical.
+    J3DGDWriteBPCmd(BP_IMAGE_PTR(0, J3DGDTexImage3Ids[id]));
+#else
     J3DGDWriteBPCmd(BP_IMAGE_PTR(OSCachedToPhysical(image_ptr) >> 5, J3DGDTexImage3Ids[id]));
+#endif
 }
 
 void J3DGDSetTexImgPtrRaw(GXTexMapID id, u32 image_ptr_raw) {
@@ -354,7 +361,12 @@ void J3DGDSetTexTlut(GXTexMapID id, u32 tmem_addr, GXTlutFmt format) {
 void J3DGDLoadTlut(void* tlut_ptr, u32 tmem_addr, GXTlutSize size) {
     J3DGDWriteBPCmd(0xFEFFFF00);
     J3DGDWriteBPCmd(0xF000000);
+#if TARGET_PC
+    // See J3DGDSetTexImgPtr: the TLUT itself is loaded through GXLoadTlut by J3DTexture::loadGX.
+    J3DGDWriteBPCmd(BP_LOAD_TLUT0(0, 0x64));
+#else
     J3DGDWriteBPCmd(BP_LOAD_TLUT0(OSCachedToPhysical(tlut_ptr) >> 5, 0x64));
+#endif
     J3DGDWriteBPCmd(BP_LOAD_TLUT1((tmem_addr - 0x80000) >> 9, size, 0x65));
     J3DGDWriteBPCmd(0xFEFFFF00);
     J3DGDWriteBPCmd(0xF000000);

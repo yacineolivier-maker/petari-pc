@@ -20,6 +20,8 @@
 #include <cstring>
 #include <thread>
 
+#include "pc/crash_handler.h"
+
 // The DSP task list globals are declared with C++ linkage by revolution/dsp.h.
 DSPTaskInfo* __DSP_first_task = nullptr;
 DSPTaskInfo* __DSP_curr_task = nullptr;
@@ -71,10 +73,22 @@ OSPowerCallback OSSetPowerCallback(OSPowerCallback callback) {
     return old;
 }
 // Leaving the game (Wii Menu, reset, power off) quits the PC game.
-void OSRestart(u32) { std::exit(0); }
-void OSReturnToMenu(void) { std::exit(0); }
-void OSRebootSystem(void) { std::exit(0); }
-void OSShutdownSystem(void) { std::exit(0); }
+void OSRestart(u32) {
+    pc_print_current_stack("OSRestart: the game asked to leave");
+    std::exit(0);
+}
+void OSReturnToMenu(void) {
+    pc_print_current_stack("OSReturnToMenu: the game asked to leave");
+    std::exit(0);
+}
+void OSRebootSystem(void) {
+    pc_print_current_stack("OSRebootSystem: the game asked to leave");
+    std::exit(0);
+}
+void OSShutdownSystem(void) {
+    pc_print_current_stack("OSShutdownSystem: the game asked to leave");
+    std::exit(0);
+}
 void OSSleepTicks(OSTime ticks) {
     std::this_thread::sleep_for(std::chrono::microseconds(OSTicksToMicroseconds(ticks)));
 }
