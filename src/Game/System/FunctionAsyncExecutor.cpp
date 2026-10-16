@@ -75,7 +75,13 @@ FunctionAsyncExecutor::FunctionAsyncExecutor() : mMainThreadExec(nullptr), mHold
     }
 
     mMainThreadExec = new FunctionAsyncExecutorOnMainThread(OSGetCurrentThread());
+#if TARGET_PC
+    // One unit per FunctionAsyncExecInfo (0x34 bytes on the Wii, bigger with 64-bit pointers).
+    const u32 unitSize = (sizeof(FunctionAsyncExecInfo) + 7) & ~7;
+    _410 = JKRUnitHeap::create(unitSize, unitSize * (0x34A8 / 0x34) + 0x400, 8, MR::getCurrentHeap(), false);
+#else
     _410 = JKRUnitHeap::create(0x34, 0x34A8, 4, MR::getCurrentHeap(), false);
+#endif
     _414 = JKRExpHeap::create(0x2800, MR::getCurrentHeap(), false);
 }
 
@@ -157,11 +163,20 @@ bool FunctionAsyncExecutor::isEnd(const char* pName) const {
     // task). Treat an unknown task as finished.
     if (cur == lst) {
         OSUnlockMutex(&MR::MutexHolder< 2 >::sMutex);
+        OSReport("[pc] FunctionAsyncExecutor::isEnd: unknown task '%s' (%ld tasks)\n", pName, (long)mHolders.size());
         return true;
     }
 #endif
     FunctionAsyncExecInfo* info = *cur;
     OSUnlockMutex(&MR::MutexHolder< 2 >::sMutex);
+#if TARGET_PC
+    // SMGPC_DEBUG_ASYNC=1: show which task the game keeps waiting for.
+    static const bool sDebugAsync = getenv("SMGPC_DEBUG_ASYNC") != nullptr;
+    static u32 sWaitCalls = 0;
+    if (sDebugAsync && !info->mIsEnd && (sWaitCalls++ % 120) == 0) {
+        OSReport("[pc] waiting for task '%s' (priority %d)\n", pName, info->mPriority);
+    }
+#endif
     return info->mIsEnd;
 }
 

@@ -4,6 +4,15 @@
 
 static const u8 bitTable[] = {0x80, 0x40, 0x20, 0x10, 0x08, 0x04, 0x02, 0x01};
 
+#if TARGET_PC
+#include <stdlib.h>
+// The block table is written a byte at a time (unit 0 = 0x80 of byte 0) but scanned 32 bits at a
+// time with unit 0 as the word's top bit: read the words big-endian like the Wii.
+#define BAT_WORD(p) _byteswap_ulong(*(p))
+#else
+#define BAT_WORD(p) (*(p))
+#endif
+
 #pragma push
 #pragma optimization_level 3
 JKRUnitHeap* JKRUnitHeap::create(u32 unitSize, u32 size, u32 alignment, JKRHeap* parent, bool errorFlag) {
@@ -105,7 +114,7 @@ s32 JKRUnitHeap::find1FreeBlock(int direction) {
         u32 word;
         u32* words = reinterpret_cast< u32* >(mBat);
         for (u32 index = 0; index < wordCount; ++index, ++words) {
-            word = *words;
+            word = BAT_WORD(words);
             if (word != 0xFFFFFFFF) {
                 for (int bit = 0; bit < 32; ++bit) {
                     if (!(word & (0x80000000 >> bit))) {
@@ -118,7 +127,7 @@ s32 JKRUnitHeap::find1FreeBlock(int direction) {
         u32 word;
         u32* words = reinterpret_cast< u32* >(mBat + ALIGN_NEXT(mUnitCount, 32) / 8) - 1;
         for (int index = (mUnitCount + 31) / 32 - 1; index >= 0; --index, --words) {
-            word = *words;
+            word = BAT_WORD(words);
             if (word != 0xFFFFFFFF) {
                 for (int bit = 31; bit >= 0; --bit) {
                     if (!(word & (0x80000000 >> bit))) {
@@ -153,7 +162,7 @@ s32 JKRUnitHeap::findFreeBlock_fromHead(u32 count) {
     u32* end = begin + (mUnitCount + 31) / 32;
 
     for (u32* words = begin; words <= end; ++words) {
-        u32 word = words != end ? *words : 0xFFFFFFFF;
+        u32 word = words != end ? BAT_WORD(words) : 0xFFFFFFFF;
         if (word == 0) {
             if (!inFreeRun) {
                 runStart = (words - reinterpret_cast< u32* >(mBat)) * 32;
@@ -212,7 +221,7 @@ s32 JKRUnitHeap::findFreeBlock_fromTail(u32 count) {
     s32 bestLength = 0xFFFF;
 
     for (u32* words = begin + (mUnitCount + 31) / 32 - 1; words >= end; --words) {
-        u32 word = words != end ? *words : 0xFFFFFFFF;
+        u32 word = words != end ? BAT_WORD(words) : 0xFFFFFFFF;
         if (word == 0) {
             if (!inFreeRun) {
                 runStart = (words - reinterpret_cast< u32* >(mBat)) * 32 + 31;

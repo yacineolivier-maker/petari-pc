@@ -380,6 +380,9 @@ void GameSystemSceneController::exeInitializeScene() {
 
     if (MR::tryEndFunctionAsyncExecute("シーン初期化")) {
         mSceneInitializeState = SceneInitializeState_End;
+#if TARGET_PC
+        OSReport("[pc] scene initialized\n");
+#endif
 
         requestChangeNerve(GET_NERVE(GameSystemSceneController, GameSystemSceneControllerInvalidateSystemWipe));
     }
@@ -464,6 +467,10 @@ void GameSystemSceneController::updateSceneControlInfo() {
     mCurrSceneControlInfo.mScenarioNo = mNextSceneControlInfo.mScenarioNo;
     mCurrSceneControlInfo.mSelectedScenarioNo = mNextSceneControlInfo.mSelectedScenarioNo;
     mCurrSceneControlInfo.setStartIdInfo(*mNextSceneControlInfo.mStartIdInfo);
+#if TARGET_PC
+    OSReport("[pc] scene '%s' stage '%s' scenario %ld (selected %ld)\n", mCurrSceneControlInfo.mScene, mCurrSceneControlInfo.mStage,
+             mCurrSceneControlInfo.mScenarioNo, mCurrSceneControlInfo.mSelectedScenarioNo);
+#endif
 
     mNextSceneControlInfo.mScene[0] = '\0';
     mNextSceneControlInfo.mStage[0] = '\0';

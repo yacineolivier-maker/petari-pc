@@ -89,6 +89,17 @@ void PlacementInfoOrdered::initPlacement() {
     for (s32 i = 0; i < count; i++) {
         pSet = mOrderedSetArray[i];
         CreationFuncPtr creator = ::getCreator(*pSet);
+#if TARGET_PC
+        // SMGPC_LOG_PLACEMENT=1: list the placed object kinds of the stage.
+        static const bool sLogPlacement = getenv("SMGPC_LOG_PLACEMENT") != nullptr;
+        if (sLogPlacement) {
+            u32 n = 0;
+            for (link = pSet->mList.mHead; link != nullptr; link = link->mNextLink) {
+                n++;
+            }
+            OSReport("[pc] placement '%s' x%u%s\n", pSet->mName, n, creator != nullptr ? "" : " (no creator)");
+        }
+#endif
         if (creator != nullptr) {
             const char* pName = MR::getJapaneseObjectName(pSet->mName);
             for (link = pSet->mList.mHead; link != nullptr; link = link->mNextLink) {
