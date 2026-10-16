@@ -41,8 +41,15 @@ void* FunctionAsyncExecutorThread::run() {
         mName = info->mName;
         mIsSuspended = true;
         info->execute();
+#if TARGET_PC
+        // waitForEnd deletes the info as soon as it gets the message: mark it finished first
+        // (the threads run in parallel on PC).
+        info->mIsEnd = true;
+        OSSendMessage(&info->mQueue, nullptr, OS_MESSAGE_NOBLOCK);
+#else
         OSSendMessage(&info->mQueue, nullptr, OS_MESSAGE_NOBLOCK);
         info->mIsEnd = true;
+#endif
     }
 }
 

@@ -33,8 +33,15 @@ void FileHolderFileEntry::setContext(void* pContext, JKRHeap* pHeap) {
     mContext = pContext;
     mHeap = pHeap;
 
+#if TARGET_PC
+    // The loader thread runs in parallel with the waiter on PC: set the state before waking it,
+    // otherwise this store can overwrite the waiter's DONE and the next waitReadDone blocks forever.
+    mState = FILE_HOLDER_STATE_READING;
+    OSSendMessage(&mQueue, nullptr, OS_MESSAGE_NOBLOCK);
+#else
     OSSendMessage(&mQueue, nullptr, OS_MESSAGE_NOBLOCK);
     mState = FILE_HOLDER_STATE_READING;
+#endif
 }
 
 FileHolder::FileHolder() {
