@@ -9,6 +9,7 @@
 #include <dbghelp.h>
 #include <tlhelp32.h>
 
+#include <cstdint>
 #include <cstdio>
 #include <csignal>
 #include <cstdlib>
@@ -148,7 +149,74 @@ void pc_print_current_stack(const char* why) {
     std::fflush(stderr);
 }
 
+// Integer division by zero: the Wii's divw/divwu don't trap (the quotient is 0, or -1 for a
+// negative dividend with divw, so the remainder the code then computes is the dividend). Some game
+// code relies on it (e.g. FallOutFieldDraw). Emulate that for the faulting x86 div/idiv and skip it.
+static int pc_div_insn_length(const uint8_t* p, bool* is64, bool* isSigned, bool* is8) {
+    int len = 0;
+    *is64 = false;
+    if (p[len] == 0x66) {
+        len++;
+    }
+    if ((p[len] & 0xF0) == 0x40) {  // REX
+        *is64 = (p[len] & 0x08) != 0;
+        len++;
+    }
+    if (p[len] != 0xF7 && p[len] != 0xF6) {
+        return 0;
+    }
+    *is8 = p[len] == 0xF6;
+    len++;
+    const uint8_t modrm = p[len++];
+    const int mod = modrm >> 6, reg = (modrm >> 3) & 7, rm = modrm & 7;
+    if (reg != 6 && reg != 7) {  // /6 div, /7 idiv
+        return 0;
+    }
+    *isSigned = reg == 7;
+    if (mod != 3 && rm == 4) {
+        const uint8_t sib = p[len++];
+        if (mod == 0 && (sib & 7) == 5) {
+            len += 4;
+        }
+    }
+    if (mod == 1) {
+        len += 1;
+    } else if (mod == 2 || (mod == 0 && rm == 5)) {
+        len += 4;
+    }
+    return len;
+}
+
+static LONG WINAPI pc_divide_by_zero_handler(EXCEPTION_POINTERS* info) {
+    if (info->ExceptionRecord->ExceptionCode != EXCEPTION_INT_DIVIDE_BY_ZERO) {
+        return EXCEPTION_CONTINUE_SEARCH;
+    }
+    CONTEXT* ctx = info->ContextRecord;
+    bool is64 = false, isSigned = false, is8 = false;
+    const int len = pc_div_insn_length(reinterpret_cast<const uint8_t*>(ctx->Rip), &is64, &isSigned, &is8);
+    if (len == 0 || is8) {
+        return EXCEPTION_CONTINUE_SEARCH;
+    }
+    static volatile LONG sReports = 0;
+    if (InterlockedIncrement(&sReports) <= 5) {
+        std::fprintf(stderr, "[pc] integer division by zero at smgpc.exe+%llx: Wii result emulated\n",
+                     (unsigned long long)(ctx->Rip - (DWORD64)GetModuleHandleW(nullptr)));
+    }
+    if (is64) {
+        const int64_t dividend = (int64_t)ctx->Rax;
+        ctx->Rdx = ctx->Rax;
+        ctx->Rax = (isSigned && dividend < 0) ? (DWORD64)-1 : 0;
+    } else {
+        const int32_t dividend = (int32_t)(uint32_t)ctx->Rax;
+        ctx->Rdx = (uint32_t)ctx->Rax;
+        ctx->Rax = (isSigned && dividend < 0) ? 0xFFFFFFFFull : 0;
+    }
+    ctx->Rip += len;
+    return EXCEPTION_CONTINUE_EXECUTION;
+}
+
 void pc_install_crash_handler() {
+    AddVectoredExceptionHandler(1, pc_divide_by_zero_handler);
     SetUnhandledExceptionFilter(pc_unhandled_exception);
     std::signal(SIGABRT, pc_abort_handler);
 }
