@@ -3,6 +3,7 @@
 #include "pc/platform.h"
 
 #include "pc/crash_handler.h"
+#include "pc/display.h"
 #include "pc/main.h"
 #include "pc/os.h"
 #include "pc/user_files.h"
@@ -104,6 +105,7 @@ extern "C" void pc_platform_init(int argc, char* argv[]) {
     config.startFullscreen = startFullscreen;
     config.mem1Size = 256 * 1024 * 1024;  // Emulated MEM1 (the Wii has 24 MB).
     config.mem2Size = 16 * 1024 * 1024;   // Aurora's ARAM; the Wii's MEM2 is pc/src/os/wii_arena.cpp.
+    pc_display_configure(&config, startFullscreen);  // display.ini: window, MSAA, anisotropy...
     static std::vector<uint8_t> sIcon;
     uint32_t iconSize = 0;
     if (pc_load_window_icon(sIcon, iconSize)) {
@@ -112,6 +114,7 @@ extern "C" void pc_platform_init(int argc, char* argv[]) {
         config.iconHeight = iconSize;
     }
     aurora_initialize(argc, argv, &config);
+    pc_display_apply_after_init();
 
     OSInit();
     OSPCAdoptCurrentThread(&sMainThread);

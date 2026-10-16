@@ -136,6 +136,7 @@ set_source_files_properties(src/Game/Screen/THPDraw.c PROPERTIES LANGUAGE CXX)
 # gamepad, NAND saves, system settings, MEM2) and the Aurora bring-up.
 smg_add_lib(smg_pc
         pc/src/platform.cpp
+        pc/src/display.cpp
         pc/src/sdk_stubs.cpp
         pc/src/crash_handler.cpp
         pc/src/game_missing.cpp
