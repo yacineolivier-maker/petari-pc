@@ -71,3 +71,24 @@ python tools/gen_pc_files.py                            # regenerate files.cmake
 - bool functions cast to int-returning callbacks return garbage on x64; inline asm needs C fallbacks;
   3-vertex GX_QUADS must become triangles; ATTRIBUTE_ALIGN/NO_INLINE are empty on MSVC.
 - NonMatching objects' C++ was never verified on hardware: suspect it first when behaviour is odd.
+- Big-endian traps found so far: `#ifdef __MWERKS__` asm blocks with no `#else` (code vanishes on PC),
+  u32 <-> RGBA color reinterpretation (must be 0xRRGGBBAA), bitmaps/octrees written as u16 and read
+  as u32 (JKRUnitHeap, KCL), layouts that only worked because the Wii heap placed two `new`s next to
+  each other, va_list copies (`va_copy`), worker/waiter races (the Wii is single-core with strict
+  priorities: set state before waking the other thread).
+- The PPC's integer division by zero doesn't trap: pc/src/crash_handler.cpp emulates it (quotient 0).
+
+## Testing (PC)
+
+- `SMGPC_INPUT` scripted input (pc/src/input/wiimote.cpp): `A@300,A@900+5,SHAKE@1200,STICKUP@1300+60,
+  PTR-0.25:0.05@2500+700` (frames of KPADRead channel 0, optional +duration, PTR<x>:<y> places the
+  pointer, -1..1). `SMGPC_START_STAGE=<Galaxy>[:scenario]` jumps there after loading a file.
+- Diagnostics: `SMGPC_CONSOLE`, `SMGPC_LOG_FRAMES` (fps), `SMGPC_LOG_STATE`, `SMGPC_WATCHDOG=N`,
+  `SMGPC_DUMP_THREADS=N`, `SMGPC_LOG_PLACEMENT`, `SMGPC_DEBUG_MTX`, `SMGPC_DEBUG_ASYNC`,
+  `SMGPC_DEBUG_SPIN`, `SMGPC_TEST_MESSAGES`, `SMGPC_AUDIO_DUMP=out.wav`, `SMGPC_NO_AUDIO`,
+  `SMGPC_NO_MOUSE`, `SMGPC_WII_ICONS`, `SMGPC_WINDOW_TITLE`; Aurora: `AURORA_DEBUG_NOCULL`,
+  `AURORA_DEBUG_NODEPTH` (patch 0003).
+- Local helper scripts (not in git) live in `D:\SUPER_MARIO_GALAXY\Outils_Claude`: `shots.ps1`
+  (screenshots of a frozen copy of the build, without taking the focus), `sweep.ps1` (loads every
+  galaxy and records crashes), `install.ps1` (copies the build to `..\Jeu` + desktop shortcut),
+  `dolphin_shots.ps1` (reference renders with the portable Dolphin in `Outils_Claude\Dolphin`).
