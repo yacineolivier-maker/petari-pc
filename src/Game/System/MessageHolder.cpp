@@ -5,6 +5,11 @@
 #include "Game/Util/FileUtil.hpp"
 #include "Game/Util/SystemUtil.hpp"
 #include <JSystem/JKernel/JKRArchive.hpp>
+#if TARGET_PC
+#include "Game/Screen/MessageTagSkipTagProcessor.hpp"
+#include <cstring>
+#include <string>
+#endif
 
 #define SYSTEMMESSAGE_ARC "/Memory/SystemMessage.arc"
 #define MESSAGE_ARC "/MessageData/Message.arc"
@@ -44,11 +49,42 @@ namespace {
     }
 };  // namespace
 
+#if TARGET_PC
+namespace {
+    // Texts changed by the PC port (the controls differ from the Wii's). Built once from the
+    // original message so its control tags (button icons) are kept.
+    const wchar_t* pcOverrideMessage(const char* pId, const wchar_t* pOriginal) {
+        // Title screen: A alone starts on PC ("Appuyez en même temps sur [A] et [B]." on the Wii).
+        if (std::strcmp(pId, "Layout_PressStartPressAB") == 0) {
+            static std::wstring sText;
+            if (sText.empty()) {
+                const wchar_t* pTag = pOriginal;
+                while (*pTag != 0 && *pTag != 0x1A) {
+                    pTag++;
+                }
+                if (*pTag == 0) {
+                    return pOriginal;
+                }
+                MessageEditorMessageTag tag(pTag + 1);
+                sText = L"Appuyez sur ";
+                sText.append(pTag, tag.getSkipLength() + 1);
+                sText += L".";
+            }
+            return sText.c_str();
+        }
+        return pOriginal;
+    }
+}  // namespace
+#endif
+
 bool MessageData::getMessageDirect(TalkMessageInfo* pMessageInfo, const char* pMessage) const {
     s32 messageIndex = findMessageIndex(pMessage);
 
     if (messageIndex >= 0 && messageIndex < mInfoBlock->mItemCount) {
         getMessage(pMessageInfo, 0, messageIndex);
+#if TARGET_PC
+        pMessageInfo->_0 = (u8*)pcOverrideMessage(pMessage, reinterpret_cast< const wchar_t* >(pMessageInfo->_0));
+#endif
 
         return true;
     }
