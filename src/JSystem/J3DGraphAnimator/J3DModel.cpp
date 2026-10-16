@@ -239,14 +239,56 @@ void J3DModel::calcDiffTexMtx() {
     }
 }
 
+#if TARGET_PC
+#include <typeinfo>
+extern "C++" void pc_print_current_stack(const char* why);
+#endif
+
 void J3DModel::calcAnmMtx() {
     j3dSys.setModel(this);
+#if TARGET_PC
+    // SMGPC_DEBUG_MTX=1: show who drives a model whose base matrix isn't finite (first few models).
+    static const bool sDebugMtx = getenv("SMGPC_DEBUG_MTX") != nullptr;
+    static int sReports = 0;
+    if (sDebugMtx && sReports < 6 && getModelData()->getDrawMtxNum() > 1 && !(mBaseTransformMtx[0][3] == mBaseTransformMtx[0][3])) {
+        sReports++;
+        fprintf(stderr, "[pc] J3DModel %p (%u draw mtx) has a NaN base matrix\n", (void*)this,
+                (u32)getModelData()->getDrawMtxNum());
+        pc_print_current_stack("NaN base matrix");
+    }
+#endif
 
     if (checkFlag(J3DMdlFlag_UseDefaultJ3D)) {
         getModelData()->getJointTree().calc(mMtxBuffer, j3dDefaultScale, j3dDefaultMtx);
     } else {
         getModelData()->getJointTree().calc(mMtxBuffer, mBaseScale, mBaseTransformMtx);
     }
+#if TARGET_PC
+    static int sJointReports = 0;
+    if (sDebugMtx && sJointReports < 8) {
+        u16 jointNum = getModelData()->getJointNum();
+        for (u16 i = 0; i < jointNum; i++) {
+            MtxPtr m = mMtxBuffer->getAnmMtx(i);
+            if (!(m[0][0] == m[0][0] && m[0][3] == m[0][3] && m[1][3] == m[1][3] && m[2][3] == m[2][3])) {
+                sJointReports++;
+                J3DJoint* joint = getModelData()->getJointNodePointer(i);
+                const J3DTransformInfo& t = joint->getTransformInfo();
+                fprintf(stderr,
+                        "[pc] J3DModel %p: joint %u/%u NaN (mtxCalc %p %s, base calc %p) S %g %g %g R %d %d %d T %g %g %g "
+                        "baseS %g %g %g baseT %g %g %g\n",
+                        (void*)this, i, jointNum, (void*)joint->getMtxCalc(), joint->getMtxCalc() ? typeid(*joint->getMtxCalc()).name() : "-",
+                        (void*)getModelData()->getJointTree().getBasicMtxCalc(), t.mScale.x, t.mScale.y, t.mScale.z,
+                        t.mRotation.x, t.mRotation.y, t.mRotation.z, t.mTranslate.x, t.mTranslate.y, t.mTranslate.z,
+                        mBaseScale.x, mBaseScale.y, mBaseScale.z, mBaseTransformMtx[0][3], mBaseTransformMtx[1][3],
+                        mBaseTransformMtx[2][3]);
+                if (sJointReports <= 2) {
+                    pc_print_current_stack("NaN joint matrix");
+                }
+                break;
+            }
+        }
+    }
+#endif
 }
 
 void J3DModel::calcWeightEnvelopeMtx() {

@@ -25,6 +25,16 @@ void J3DTexMtxInfo::setEffectMtx(Mtx param_0) {
     ;
     mEffectMtx[3][2] = kIdentityZero;
     mEffectMtx[3][3] = kIdentityW;
+#else
+    for (int i = 0; i < 3; i++) {
+        for (int j = 0; j < 4; j++) {
+            mEffectMtx[i][j] = param_0[i][j];
+        }
+    }
+    mEffectMtx[3][0] = 0.0f;
+    mEffectMtx[3][1] = 0.0f;
+    mEffectMtx[3][2] = 0.0f;
+    mEffectMtx[3][3] = 1.0f;
 #endif
 }
 

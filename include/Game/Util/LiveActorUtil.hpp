@@ -100,6 +100,9 @@ namespace MR {
     bool isClipped(const LiveActor*);
     bool isInvalidClipping(const LiveActor*);
 
+#if TARGET_PC
+    void pcCheckBaseMtx(LiveActor*, MtxPtr);
+#endif
     void setBaseTRMtx(LiveActor*, MtxPtr);
     void setBaseTRMtx(LiveActor*, const TPos3f&);
     void setBaseTRMtx(LiveActor*, const TQuat4f&);

@@ -747,17 +747,51 @@ namespace MR {
         return pActor->mFlag.mIsInvalidClipping;
     }
 
+#if TARGET_PC
+    // SMGPC_DEBUG_MTX=1: report actors whose base matrix isn't finite (a few times).
+    void pcCheckBaseMtx(LiveActor* pActor, MtxPtr pMtx) {
+        static const bool sDebug = getenv("SMGPC_DEBUG_MTX") != nullptr;
+        static int sReports = 0;
+        static const char* sSeen[64];
+        if (!sDebug || sReports >= 64) {
+            return;
+        }
+        for (int i = 0; i < sReports; i++) {
+            if (sSeen[i] == pActor->mName) {
+                return;
+            }
+        }
+        for (int i = 0; i < 12; i++) {
+            if (!(pMtx[i / 4][i % 4] == pMtx[i / 4][i % 4])) {
+                sSeen[sReports++] = pActor->mName;
+                OSReport("[pc] NaN base mtx: actor '%s' pos %g %g %g rot %g %g %g\n", pActor->mName, pActor->mPosition.x,
+                         pActor->mPosition.y, pActor->mPosition.z, pActor->mRotation.x, pActor->mRotation.y, pActor->mRotation.z);
+                return;
+            }
+        }
+    }
+#endif
+
     void setBaseTRMtx(LiveActor* pActor, MtxPtr pMtx) {
+#if TARGET_PC
+        pcCheckBaseMtx(pActor, pMtx);
+#endif
         PSMTXCopy(pMtx, (MtxPtr)&getJ3DModel(pActor)->mBaseTransformMtx);
     }
 
     void setBaseTRMtx(LiveActor* pActor, const TPos3f& rMtx) {
+#if TARGET_PC
+        pcCheckBaseMtx(pActor, (MtxPtr)rMtx.mMtx);
+#endif
         PSMTXCopy((MtxPtr)rMtx.mMtx, (MtxPtr)&getJ3DModel(pActor)->mBaseTransformMtx);
     }
 
     void setBaseTRMtx(LiveActor* pActor, const TQuat4f& rQuat) {
         TPos3f mtx;
         mtx.setQT(rQuat, pActor->mPosition);
+#if TARGET_PC
+        pcCheckBaseMtx(pActor, (MtxPtr)mtx.mMtx);
+#endif
 
         PSMTXCopy((MtxPtr)mtx.mMtx, (MtxPtr)&getJ3DModel(pActor)->mBaseTransformMtx);
     }

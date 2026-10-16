@@ -176,6 +176,9 @@ void LiveActor::calcAnmMtx() {
 
     MR::getJ3DModel(this)->setBaseScale(mScale);
     calcAndSetBaseMtx();
+#if TARGET_PC
+    MR::pcCheckBaseMtx(this, (MtxPtr)&MR::getJ3DModel(this)->mBaseTransformMtx);
+#endif
     mModelManager->calcAnim();
 }
 

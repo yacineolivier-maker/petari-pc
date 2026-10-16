@@ -354,6 +354,15 @@ void J3DSys::reinitPixelProc() {
 #include "JSystem/J3DGraphAnimator/J3DModel.hpp"
 
 u32 J3DSys::pcModelMtxCount() {
+    // SMGPC_DEBUG_MTX=1: print the first draw matrix of the model being drawn now and then.
+    static const bool sDebugMtx = getenv("SMGPC_DEBUG_MTX") != nullptr;
+    static u32 sCalls = 0;
+    if (sDebugMtx && (sCalls++ % 2000) == 0 && mModelDrawMtx != nullptr) {
+        const f32(*m)[4] = mModelDrawMtx[0];
+        fprintf(stderr, "[pc] drawMtx[0] %g %g %g %g | %g %g %g %g | %g %g %g %g (model %p, %u mtx)\n", m[0][0], m[0][1],
+                m[0][2], m[0][3], m[1][0], m[1][1], m[1][2], m[1][3], m[2][0], m[2][1], m[2][2], m[2][3], (void*)mModel,
+                mModel && mModel->getModelData() ? (u32)mModel->getModelData()->getDrawMtxNum() : 0u);
+    }
     u32 count = 10;
     if (mModel != nullptr && mModel->getModelData() != nullptr) {
         u32 drawMtxNum = mModel->getModelData()->getDrawMtxNum();

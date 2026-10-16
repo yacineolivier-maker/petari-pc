@@ -551,6 +551,12 @@ void J3DPSMtx33Copy(Mtx3P src, Mtx3P dst) {
         psq_st fr1, 0x18(destination), 0, 0
         stfs fr0, 0x20(destination)
     }
+#else
+    for (int i = 0; i < 3; i++) {
+        for (int j = 0; j < 3; j++) {
+            dst[i][j] = src[i][j];
+        }
+    }
 #endif
 }
 
@@ -570,6 +576,12 @@ void J3DPSMtx33CopyFrom34(__REGISTER MtxPtr src, __REGISTER Mtx3P dst) {
         stfs w, 20(dst)
         psq_st u, 24(dst), 0, 0
         stfs v, 32(dst)
+    }
+#else
+    for (int i = 0; i < 3; i++) {
+        for (int j = 0; j < 3; j++) {
+            dst[i][j] = src[i][j];
+        }
     }
 #endif
 }

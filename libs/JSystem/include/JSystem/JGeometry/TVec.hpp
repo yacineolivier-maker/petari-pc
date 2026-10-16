@@ -438,6 +438,10 @@ namespace JGeometry {
             stfs b_x, 8(v_b)
             }
             ;
+#else
+            x = vec.x;
+            y = vec.y;
+            z = vec.z;
 #endif
         }
 

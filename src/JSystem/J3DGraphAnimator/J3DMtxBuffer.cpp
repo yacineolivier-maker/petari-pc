@@ -348,6 +348,20 @@ void J3DMtxBuffer::calcDrawMtx(u32 mdlFlag, Vec const& param_1, Mtx const& param
     Mtx viewBaseMtx;
     u16 fullWgtNum;
 
+#if TARGET_PC
+    static const bool sDebugMtx = getenv("SMGPC_DEBUG_MTX") != nullptr;
+    static u32 sCalls = 0;
+    if (sDebugMtx && (sCalls++ % 3000) == 0) {
+        MtxPtr v = j3dSys.getViewMtx();
+        MtxPtr a = mpAnmMtx[0];
+        fprintf(stderr, "[pc] calcDrawMtx flag %u view %g %g %g %g | %g %g %g %g | %g %g %g %g\n", mdlFlag, v[0][0], v[0][1],
+                v[0][2], v[0][3], v[1][0], v[1][1], v[1][2], v[1][3], v[2][0], v[2][1], v[2][2], v[2][3]);
+        fprintf(stderr, "[pc]   anm0 %g %g %g %g | %g %g %g %g | %g %g %g %g  base t %g %g %g scale %g %g %g\n", a[0][0],
+                a[0][1], a[0][2], a[0][3], a[1][0], a[1][1], a[1][2], a[1][3], a[2][0], a[2][1], a[2][2], a[2][3], param_2[0][3],
+                param_2[1][3], param_2[2][3], param_1.x, param_1.y, param_1.z);
+    }
+#endif
+
     switch (mdlFlag) {
     case 0:
         viewMtx = j3dSys.getViewMtx();
