@@ -40,6 +40,7 @@ constexpr COLORREF kYellow = RGB(250, 190, 20);
 const IconSpec kIcons[] = {
     {'0', Shape::Circle, L"A", kGreen, L"Segoe UI"},
     {'1', Shape::Pill, L"RT", kWhite, L"Segoe UI"},
+    {'?', Shape::Pill, L"RT", kWhite, L"Segoe UI"},  // B trigger seen from above (e.g. "Retour")
     {'2', Shape::Pill, L"LB", kWhite, L"Segoe UI"},
     {'3', Shape::Circle, L"B", kRed, L"Segoe UI"},
     {'4', Shape::Circle, L"L", kWhite, L"Segoe UI"},
