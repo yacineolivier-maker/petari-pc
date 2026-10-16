@@ -109,7 +109,7 @@ void Save(const std::string& path) {
                  "; API graphique : auto, d3d12, vulkan ou d3d11\n"
                  "backend = %s\n"
                  "; Surechantillonnage : rendu interne a N fois la taille de la fenetre, puis reduit\n"
-                 "; (1 = desactive, 2 = image nettement plus fine mais demande plus de puissance)\n"
+                 "; (1 = desactive, 2 = par defaut, image nettement plus fine mais demande plus de puissance)\n"
                  "supersampling = %d\n"
                  "; Langue du jeu : fr (francais), en (anglais) ou es (espagnol)\n"
                  "langue = %s\n",
