@@ -123,6 +123,10 @@ namespace ReplaceTagProcessor {
             }
         }
 
+#if TARGET_PC
+        // Tag payloads stay big-endian (MessageEditorMessageTag::getTag reads them that way).
+        tag.mTag = static_cast< u16 >(((tag.mTag & 0xFF) << 8) | (tag.mTag >> 8));
+#endif
         *pDst++ = 0x1A;
         MR::copyMemory(pDst, &tag, rTag.getTagLength());
         return rTag.getTagLength() / 2 + 1;

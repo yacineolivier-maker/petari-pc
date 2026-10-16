@@ -149,7 +149,12 @@ namespace MR {
         pTag->_0 = 26;
         pTag->mDataSize = sizeof(Tag);
         pTag->_3 = 3;
+#if TARGET_PC
+        // Tag payloads stay big-endian (MessageEditorMessageTag::getTag reads them that way).
+        pTag->mBuffer[0] = static_cast< wchar_t >((((tag - '0') & 0xFF) << 8) | (((tag - '0') >> 8) & 0xFF));
+#else
         pTag->mBuffer[0] = tag - '0';
+#endif
         pTag->mBuffer[1] = '\0';
 
         return &pTag->mBuffer[1];
@@ -277,7 +282,13 @@ namespace MR {
     bool isMessageEditorNextTag(const wchar_t* pStr) {
         const Tag* pTag = reinterpret_cast< const Tag* >(pStr);
         u8 v1 = pTag->_3;
+#if TARGET_PC
+        // Big-endian tag id (tag payloads are not converted with the text).
+        const u8* pId = reinterpret_cast< const u8* >(pTag->mBuffer);
+        wchar_t v2 = static_cast< wchar_t >((pId[0] << 8) | pId[1]);
+#else
         wchar_t v2 = pTag->mBuffer[0];
+#endif
 
         return v1 == 1 && v2 == 1;
     }
