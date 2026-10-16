@@ -1,0 +1,62 @@
+diff --git a/lib/gx/gx.cpp b/lib/gx/gx.cpp
+index 1fec701..7ae8388 100644
+--- a/lib/gx/gx.cpp
++++ b/lib/gx/gx.cpp
+@@ -1,3 +1,4 @@
++#include <cstdlib>
+ #include "gx.hpp"
+ 
+ #include "pipeline.hpp"
+@@ -202,6 +203,11 @@ wgpu::ColorWriteMask to_write_mask(bool colorUpdate, bool alphaUpdate) {
+ }
+ 
+ wgpu::PrimitiveState to_primitive_state(GXCullMode gx_cullMode) {
++  // Debugging aid (SMG PC port): AURORA_DEBUG_NOCULL=1 disables face culling.
++  static const bool sNoCull = std::getenv("AURORA_DEBUG_NOCULL") != nullptr;
++  if (sNoCull) {
++    gx_cullMode = GX_CULL_NONE;
++  }
+   auto cullMode = wgpu::CullMode::None;
+   switch (gx_cullMode) {
+     DEFAULT_FATAL("unsupported cull mode {}", underlying(gx_cullMode));
+@@ -333,11 +339,13 @@ wgpu::RenderPipeline build_pipeline(const PipelineConfig& config, const gfx::Ren
+   const float depthBias = (UseReversedZ ? -1.0f : 1.0f) * std::bit_cast<float>(config.polygonOffsetBits);
+   const float depthBiasSlopeScale = (UseReversedZ ? -1.0f : 1.0f) * std::bit_cast<float>(config.polygonOffsetScaleBits);
+   const float depthBiasClamp = webgpu::g_hasCoreFeatures ? std::bit_cast<float>(config.polygonOffsetClampBits) : 0.0f;
+-  const bool writesDepth = config.depthCompare && options.depthUpdate;
++  // Debugging aid (SMG PC port): AURORA_DEBUG_NODEPTH=1 disables depth testing.
++  static const bool sNoDepth = std::getenv("AURORA_DEBUG_NODEPTH") != nullptr;
++  const bool writesDepth = !sNoDepth && config.depthCompare && options.depthUpdate;
+   const wgpu::DepthStencilState depthStencil{
+       .format = layout.depthStencilFormat,
+       .depthWriteEnabled = writesDepth,
+-      .depthCompare = config.depthCompare ? to_compare_function(config.depthFunc) : wgpu::CompareFunction::Always,
++      .depthCompare = (config.depthCompare && !sNoDepth) ? to_compare_function(config.depthFunc) : wgpu::CompareFunction::Always,
+       .depthBias = round_away_from_zero<int32_t>(depthBias),
+       .depthBiasSlopeScale = depthBiasSlopeScale,
+       .depthBiasClamp = depthBiasClamp,
+diff --git a/lib/gx/texture.cpp b/lib/gx/texture.cpp
+index a56709a..d0a1d0c 100644
+--- a/lib/gx/texture.cpp
++++ b/lib/gx/texture.cpp
+@@ -1,3 +1,5 @@
++#include <cstdio>
++#include <cstdlib>
+ #include "texture.hpp"
+ 
+ #include "../gfx/recording.hpp"
+@@ -872,6 +874,14 @@ void resolve_sampled_textures(const ShaderInfo& info) noexcept {
+       handle = texture::resolve_static_texture(obj);
+     }
+ 
++    {
++      static const bool sDbg = std::getenv("SMGPC_DEBUG_TEX1024") != nullptr;
++      static int sCount = 0;
++      if (sDbg && obj.width() == 1024 && sCount++ < 8) {
++        std::fprintf(stderr, "[aurora] bind map %u data %p fmt %u %ux%u id %u copy %d mips %u\n", i, obj.data, obj.format(),
++                     obj.width(), obj.height(), obj.texObjId, copyRef != nullptr, obj.mip_count());
++      }
++    }
+     obj.mFormat = resolved_format_for_handle(handle);
+     textureBind = gfx::TextureBind{obj, std::move(handle), s_bindGeneration};
+   }
