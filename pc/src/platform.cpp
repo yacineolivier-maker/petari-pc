@@ -22,6 +22,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <chrono>
 #include <filesystem>
 #include <vector>
 
@@ -170,10 +171,16 @@ extern "C" int pc_platform_begin_frame(void) {
     static u32 sFrameCount = 0;
     sFrameCount++;
     if (sLogFrames && (sFrameCount <= 10 || sFrameCount % 60 == 0)) {
+        // Frames per second over the last 60 frames.
+        static auto sLastTime = std::chrono::steady_clock::now();
+        const auto now = std::chrono::steady_clock::now();
+        const double seconds = std::chrono::duration<double>(now - sLastTime).count();
+        sLastTime = now;
         const AuroraStats* stats = aurora_get_stats();
-        std::fprintf(stderr, "[pc] frame %u: %u draws (%u merged), %u pipelines created, %u queued\n", sFrameCount,
-                     stats ? stats->drawCallCount : 0, stats ? stats->mergedDrawCallCount : 0,
-                     stats ? stats->createdPipelines : 0, stats ? stats->queuedPipelines : 0);
+        std::fprintf(stderr, "[pc] frame %u: %.1f fps, %u draws (%u merged), %u pipelines created, %u queued\n", sFrameCount,
+                     sFrameCount % 60 == 0 && seconds > 0.0 ? 60.0 / seconds : 0.0, stats ? stats->drawCallCount : 0,
+                     stats ? stats->mergedDrawCallCount : 0, stats ? stats->createdPipelines : 0,
+                     stats ? stats->queuedPipelines : 0);
     }
     // Drives the VI retrace callbacks once per frame, like the Wii's VI interrupt: JUTVideo's
     // post-retrace callback posts the message MainLoopFramework::waitForRetrace waits for.
