@@ -42,6 +42,113 @@ CShader::~CShader() {
     delete mIndexArray;
 }
 
+#if TARGET_PC
+namespace {
+    // The model's own vertex arrays are big-endian file data; the transformed position buffers
+    // the fur writes (and reads back on the next frame) are in host order, like every array J3D
+    // hands to Aurora as little-endian (see J3DShape::loadVtxArray).
+    inline f32 furReadF32(const void* pBase, u32 index, bool bigEndian) {
+        u32 v;
+        memcpy(&v, static_cast< const u8* >(pBase) + index * 4, 4);
+        if (bigEndian) {
+            v = _byteswap_ulong(v);
+        }
+        f32 f;
+        memcpy(&f, &v, 4);
+        return f;
+    }
+
+    inline s16 furReadS16(const void* pBase, u32 index, bool bigEndian) {
+        u16 v;
+        memcpy(&v, static_cast< const u8* >(pBase) + index * 2, 2);
+        if (bigEndian) {
+            v = _byteswap_ushort(v);
+        }
+        return s16(v);
+    }
+
+    // Component `c` of element `index` (`n` components) of a vertex array of type `type` (GX_S16
+    // with `frac` bits, or GX_F32).
+    inline f32 furReadComp(const void* pBase, u32 index, u32 n, u32 c, u32 type, u8 frac, bool bigEndian) {
+        if (type == GX_S16) {
+            return f32(furReadS16(pBase, index * n + c, bigEndian)) / f32(1 << frac);
+        }
+        return furReadF32(pBase, index * n + c, bigEndian);
+    }
+}  // namespace
+
+void CShader::calc(J3DModel* pModel) {
+    pModel->mVertexBuffer.swapTransformedVtxPos();
+    J3DVertexData* pData = pModel->mVertexBuffer.getVertexData();
+    const void* pPositions = pModel->mVertexBuffer.mCurrentVtxPos;
+    const u32 count = pData->mVtxNum;
+    const void* pNormals = pModel->mVertexBuffer.mCurrentVtxNrm;
+    const void* pTexCoords = pData->mVtxTexCoordArray[0];
+    void* pOutput = pModel->mVertexBuffer.mTransformedVtxPosArray[0];
+    const bool posBE = pPositions == pData->mVtxPosArray;
+    const bool nrmBE = pNormals == pData->mVtxNrmArray;
+    f32 maxV = 0.0f, maxU = 0.0f, minV = 0.0f, minU = 0.0f;
+
+    for (u32 i = 0; i < count; i++) {
+        u16 index = mIndexArray[i]._2;
+        if (index != 0xFFFF) {
+            const f32 u = furReadComp(pTexCoords, index, 2, 0, _23, _20, true);
+            const f32 v = furReadComp(pTexCoords, index, 2, 1, _23, _20, true);
+            maxU = u > maxU ? u : maxU;
+            minU = u < minU ? u : minU;
+            maxV = v > maxV ? v : maxV;
+            minV = v < minV ? v : minV;
+        }
+    }
+
+    s32 spanU = 0.45f + (maxU - minU);
+    s32 spanV = 0.45f + (maxV - minV);
+
+    for (u32 i = 0; i < count; i++) {
+        u16 normalIndex = mIndexArray[i]._0;
+        u16 texCoordIndex = mIndexArray[i]._2;
+        if (normalIndex == 0xFFFF || texCoordIndex == 0xFFFF) {
+            continue;
+        }
+
+        f32 length;
+        f32 u = furReadComp(pTexCoords, texCoordIndex, 2, 0, _23, _20, true);
+        f32 v = furReadComp(pTexCoords, texCoordIndex, 2, 1, _23, _20, true);
+        if (_23 == GX_S16) {
+            u = u / f32(spanU);
+            v = v / f32(spanV);
+            if (u < 0.0f) {
+                u += 1.0f;
+            }
+            if (v < 0.0f) {
+                v += 1.0f;
+            }
+        }
+        length = mLengthMap.refer(u, v);
+
+        TVec3f normal(furReadComp(pNormals, normalIndex, 3, 0, _25, _22, nrmBE), furReadComp(pNormals, normalIndex, 3, 1, _25, _22, nrmBE),
+                      furReadComp(pNormals, normalIndex, 3, 2, _25, _22, nrmBE));
+        MR::normalize(&normal);
+        TVec3f position(furReadComp(pPositions, i, 3, 0, _24, _21, posBE), furReadComp(pPositions, i, 3, 1, _24, _21, posBE),
+                        furReadComp(pPositions, i, 3, 2, _24, _21, posBE));
+
+        TVec3f result;
+        if (length == 0.0f) {
+            result = position + normal * -1.0f;
+        } else {
+            result = position + normal * (_1C * length);
+        }
+
+        if (_24 == GX_S16) {
+            MR::floatToFixed16(reinterpret_cast< TVec3s* >(static_cast< s16* >(pOutput) + i * 3), result, _21);
+        } else {
+            *reinterpret_cast< TVec3f* >(static_cast< f32* >(pOutput) + i * 3) = result;
+        }
+    }
+
+    pModel->mVertexBuffer.setCurrentVtxPos(pOutput);
+}
+#else
 void CShader::calc(J3DModel* pModel) {
     pModel->mVertexBuffer.swapTransformedVtxPos();
     J3DVertexData* pData = pModel->mVertexBuffer.getVertexData();
@@ -203,13 +310,24 @@ void CShader::calc(J3DModel* pModel) {
 
     pModel->mVertexBuffer.setCurrentVtxPos(pOutput);
 }
+#endif
 
 void CShader::setup(J3DModelData* pData) {
 }
 
 namespace {
+#if TARGET_PC
+    // Display lists are big-endian: vertex counts and attribute indices are read BE.
+    inline u16 furReadU16(const u8* p) {
+        return u16((p[0] << 8) | p[1]);
+    }
+#define FUR_DL_U16(p) furReadU16(p)
+#else
+#define FUR_DL_U16(p) (*reinterpret_cast< u16* >(p))
+#endif
+
     inline s32 getCount(u8* pRead) {
-        return *reinterpret_cast< u16* >(pRead + 1);
+        return FUR_DL_U16(pRead + 1);
     }
 };  // namespace
 
@@ -266,9 +384,9 @@ void CShader::makeIndexData(J3DShape* pShape) const {
 
             for (s32 i = 0; i < count; i++) {
                 u8* pVertex = pRead + 3 + stride * i;
-                u16 pos = *reinterpret_cast< u16* >(pVertex + posOffset);
-                u16 nrm = *reinterpret_cast< u16* >(pVertex + nrmOffset);
-                u16 tex = *reinterpret_cast< u16* >(pVertex + texOffset);
+                u16 pos = FUR_DL_U16(pVertex + posOffset);
+                u16 nrm = FUR_DL_U16(pVertex + nrmOffset);
+                u16 tex = FUR_DL_U16(pVertex + texOffset);
                 mIndexArray[pos]._0 = nrm;
                 mIndexArray[pos]._2 = tex;
             }
@@ -323,10 +441,10 @@ void CShader::checkBorderVtx(J3DModelData* pData, u32 shapeIndex) {
                     break;
                 }
 
-                s32 count = *reinterpret_cast< u16* >(pRead + 1);
+                s32 count = FUR_DL_U16(pRead + 1);
 
                 for (s32 i = 0; i < count; i++) {
-                    u16 pos = *reinterpret_cast< u16* >((pRead + stride * i) + (posOffset + 3));
+                    u16 pos = FUR_DL_U16((pRead + stride * i) + (posOffset + 3));
                     mIndexArray[pos]._0 = 0xFFFF;
                     mIndexArray[pos]._2 = 0xFFFF;
                 }

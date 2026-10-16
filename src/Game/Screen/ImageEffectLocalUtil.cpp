@@ -26,6 +26,14 @@ void MR::connectToSceneImageEffectMovement(NameObj* pObj) {
 }
 
 void ImageEffectLocalUtil::capture(JUTTexture* pTexture, s32 divisions, s32 tile, GXTexFmt format, bool clear, u8 filter) {
+#if TARGET_PC
+    // FallOutFieldDraw passes divisions = 0. The Wii's divw by zero doesn't trap (it yields 0 for
+    // a positive dividend), so the capture lands at (0, 0); x86 would raise an exception.
+    if (divisions == 0) {
+        pTexture->capture(0, 0, format, clear, filter);
+        return;
+    }
+#endif
     pTexture->capture((tile % divisions) * MR::getFrameBufferWidth() / divisions, (tile / divisions) * MR::getFrameBufferHeight() / divisions, format,
                       clear, filter);
 }

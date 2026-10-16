@@ -271,8 +271,14 @@ void FurDrawer::createFurMap() {
     pPixels = reinterpret_cast< u16* >(mFurTexture->mImage);
     count = height * width;
 
+#if TARGET_PC
+    // IA8 texels are big-endian (alpha byte first) for GX: store the u16 values byte-swapped.
+#define FUR_TEXEL(v) u16((u16(v) >> 8) | (u16(v) << 8))
+#else
+#define FUR_TEXEL(v) (v)
+#endif
     for (u32 i = 0; i < count; i++) {
-        pPixels[i] = 255;
+        pPixels[i] = FUR_TEXEL(255);
     }
 
     for (u32 type = 0; type < 4; type++) {
@@ -290,7 +296,7 @@ void FurDrawer::createFurMap() {
                 x = s32(width) - 1;
             }
 
-            pPixels[x + width * y] = (u16(255.0f * mThickness[type]) << 8) | u16(255 - mLengthMap[type]);
+            pPixels[x + width * y] = FUR_TEXEL((u16(255.0f * mThickness[type]) << 8) | u16(255 - mLengthMap[type]));
         }
     }
 
