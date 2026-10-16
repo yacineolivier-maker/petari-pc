@@ -83,6 +83,23 @@ void J3DTexMtx::calcTexMtx(const Mtx param_0) {
         PSMTXConcat(mtx2, qMtx, mtx2);
         J3DMtxProjConcat(mtx2, mTexMtxInfo.mEffectMtx, mtx1);
         PSMTXConcat(mtx1, param_0, mMtx);
+#if TARGET_PC
+        {
+            static const bool sDebug = getenv("SMGPC_DEBUG_TEXMTX") != nullptr;
+            static u32 sCalls = 0;
+            if (sDebug && (sCalls++ % 500) == 0) {
+                const J3DTextureSRTInfo& s = mTexMtxInfo.mSRT;
+                fprintf(stderr,
+                        "[pc] texmtx mode %u proj %u srt S %g %g R %d T %g %g | eff %g %g %g %g / %g %g %g %g | in %g %g %g %g | out "
+                        "%g %g %g %g / %g %g %g %g\n",
+                        r28, mTexMtxInfo.mProjection, s.mScaleX, s.mScaleY, s.mRotation, s.mTranslationX, s.mTranslationY,
+                        mTexMtxInfo.mEffectMtx[0][0], mTexMtxInfo.mEffectMtx[0][1], mTexMtxInfo.mEffectMtx[0][2],
+                        mTexMtxInfo.mEffectMtx[0][3], mTexMtxInfo.mEffectMtx[1][0], mTexMtxInfo.mEffectMtx[1][1],
+                        mTexMtxInfo.mEffectMtx[1][2], mTexMtxInfo.mEffectMtx[1][3], param_0[0][0], param_0[0][1], param_0[0][2],
+                        param_0[0][3], mMtx[0][0], mMtx[0][1], mMtx[0][2], mMtx[0][3], mMtx[1][0], mMtx[1][1], mMtx[1][2], mMtx[1][3]);
+            }
+        }
+#endif
         break;
     case 7:
         if (r30 == 0) {

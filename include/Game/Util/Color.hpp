@@ -17,7 +17,12 @@ public:
     }
 
     Color8(u32 color) {
+#if TARGET_PC
+        // 0xRRGGBBAA, the big-endian layout of r, g, b, a (mColor itself is in host order on PC).
+        set(u8(color >> 24), u8(color >> 16), u8(color >> 8), u8(color));
+#else
         mColor = color;
+#endif
     }
 
     inline operator GXColor() const {
@@ -25,7 +30,11 @@ public:
     }
 
     inline operator u32() const {
+#if TARGET_PC
+        return (u32(r) << 24) | (u32(g) << 16) | (u32(b) << 8) | u32(a);
+#else
         return mColor;
+#endif
     }
 
     inline const Color8& operator=(const GXColor& rOther) {

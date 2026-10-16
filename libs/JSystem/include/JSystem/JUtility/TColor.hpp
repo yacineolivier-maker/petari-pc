@@ -29,7 +29,12 @@ namespace JUtility {
         }
 
         void set(u32 u32Color) {
+#if TARGET_PC
+            // 0xRRGGBBAA, the big-endian layout of r, g, b, a.
+            set(u8(u32Color >> 24), u8(u32Color >> 16), u8(u32Color >> 8), u8(u32Color));
+#else
             *reinterpret_cast< u32* >(&r) = u32Color;
+#endif
         }
 
         operator u32() const {
@@ -37,7 +42,11 @@ namespace JUtility {
         }
 
         u32 toUInt32() const {
+#if TARGET_PC
+            return (u32(r) << 24) | (u32(g) << 16) | (u32(b) << 8) | u32(a);
+#else
             return *reinterpret_cast< const u32* >(&r);
+#endif
         }
 
         void set(GXColor gxColor) {

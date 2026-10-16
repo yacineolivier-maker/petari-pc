@@ -761,6 +761,40 @@ namespace nw4r {
                 }
             }
 
+#if TARGET_PC
+            // SMGPC_DEBUG_LYTMAT=<material name prefix>: dump that material's setup once.
+            {
+                static const char* sDbg = getenv("SMGPC_DEBUG_LYTMAT");
+                static int sDumped = 0;
+                if (sDbg != nullptr && sDumped < 12 && strncmp(GetName(), sDbg, strlen(sDbg)) == 0) {
+                    sDumped++;
+                    OSReport("[pc] lytmat '%s' texMap %d texSRT %d tcg %d tev %d ind %d chanCtrl %d matCol %d swap %d blend %d alphaCmp %d\n",
+                             GetName(), mGXMemNum.texMap, mGXMemNum.texSRT, mGXMemNum.texCoordGen, mGXMemNum.tevStage,
+                             mGXMemNum.indStage, IsChanCtrlCap(), IsMatColorCap(), IsTevSwapCap(), IsBlendModeCap(),
+                             IsAlphaCompareCap());
+                    for (int i = 0; i < 3; i++) {
+                        OSReport("[pc]   tevcol%d %d %d %d %d\n", i, mTevCols[i].r, mTevCols[i].g, mTevCols[i].b, mTevCols[i].a);
+                    }
+                    for (int i = 0; i < 4; i++) {
+                        OSReport("[pc]   kcol%d %d %d %d %d\n", i, mTevKCols[i].r, mTevKCols[i].g, mTevKCols[i].b, mTevKCols[i].a);
+                    }
+                    const TexMap* pTM = GetTexMapAry();
+                    for (int i = 0; i < mGXMemNum.texMap; i++) {
+                        OSReport("[pc]   tex%d fmt %d %ux%u img %p\n", i, pTM[i].GetTexelFormat(), pTM[i].mWidth, pTM[i].mHeight,
+                                 pTM[i].mImage);
+                    }
+                    const TevStage* pTS = GetTevStageAry();
+                    for (int i = 0; i < mGXMemNum.tevStage; i++) {
+                        OSReport("[pc]   tev%d order tc%d map%d ch%d colIn %d %d %d %d op %d out %d ksel %d | alpIn %d %d %d %d op %d out %d ksel %d\n",
+                                 i, pTS[i].GetTexCoordGen(), pTS[i].GetTexMap(), pTS[i].GetColorChan(), pTS[i].GetColorInA(),
+                                 pTS[i].GetColorInB(), pTS[i].GetColorInC(), pTS[i].GetColorInD(), pTS[i].GetColorOp(),
+                                 pTS[i].GetColorOutReg(), pTS[i].GetKColorSel(), pTS[i].GetAlphaInA(), pTS[i].GetAlphaInB(),
+                                 pTS[i].GetAlphaInC(), pTS[i].GetAlphaInD(), pTS[i].GetAlphaOp(), pTS[i].GetAlphaOutReg(),
+                                 pTS[i].GetKAlphaSel());
+                    }
+                }
+            }
+#endif
             GXSetTevColorS10(GX_TEVREG0, mTevCols[0]);
             GXSetTevColorS10(GX_TEVREG1, mTevCols[1]);
             GXSetTevColorS10(GX_TEVREG2, mTevCols[2]);
