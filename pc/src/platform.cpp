@@ -16,6 +16,7 @@
 #include <SDL3/SDL_keyboard.h>
 #include <SDL3/SDL_messagebox.h>
 #include <SDL3/SDL_stdinc.h>
+#include <SDL3/SDL_timer.h>
 #include <SDL3/SDL_video.h>
 
 #include <revolution/os.h>
@@ -139,7 +140,59 @@ extern "C" void pc_platform_init(int argc, char* argv[]) {
     std::printf("[pc] disc: %s\n", disc);
 }
 
+namespace {
+
+// The game advances one tick per frame, timed by the Wii's 60 Hz retrace. With vsync on a 60 Hz
+// display, presenting already paces the frames; on a faster display or without vsync, wait here.
+bool NeedsFrameLimiter() {
+    static int sCheckFrames = 0;
+    static bool sNeeded = false;
+    if (sCheckFrames-- > 0) {
+        return sNeeded;
+    }
+    sCheckFrames = 120;  // the window may move to another display or toggle fullscreen
+    sNeeded = !pc_display_vsync();
+    int count = 0;
+    if (SDL_Window** windows = SDL_GetWindows(&count)) {
+        if (count > 0) {
+            const SDL_DisplayMode* mode = SDL_GetCurrentDisplayMode(SDL_GetDisplayForWindow(windows[0]));
+            if (mode != nullptr && mode->refresh_rate > 61.0f) {
+                sNeeded = true;
+            }
+        }
+        SDL_free(windows);
+    }
+    return sNeeded;
+}
+
+void LimitFrameRate() {
+    using Clock = std::chrono::steady_clock;
+    constexpr auto kFrame = std::chrono::nanoseconds(1'000'000'000LL * 1001 / 60000);  // NTSC 59.94 Hz
+    static Clock::time_point sNext = Clock::now();
+    if (!NeedsFrameLimiter()) {
+        sNext = Clock::now();
+        return;
+    }
+    auto now = Clock::now();
+    if (now < sNext) {
+        // Sleep most of the wait, spin the last 2 ms (Sleep granularity).
+        const auto sleep = std::chrono::duration_cast< std::chrono::milliseconds >(sNext - now) - std::chrono::milliseconds(2);
+        if (sleep.count() > 0) {
+            SDL_Delay(static_cast< Uint32 >(sleep.count()));
+        }
+        while (Clock::now() < sNext) {
+        }
+        sNext += kFrame;
+    } else {
+        // Late (loading, hitch): don't try to catch up.
+        sNext = now + kFrame;
+    }
+}
+
+}  // namespace
+
 extern "C" int pc_platform_begin_frame(void) {
+    LimitFrameRate();
     // aurora_begin_frame fails while the window can't be drawn to (e.g. minimized): keep pumping.
     while (true) {
         const AuroraEvent* event = aurora_update();

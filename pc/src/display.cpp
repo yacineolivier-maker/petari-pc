@@ -158,6 +158,9 @@ void pc_display_configure(AuroraConfig* config, bool forceFullscreen) {
         std::fclose(f);
     }
     Save(path);  // rewrites it with any new keys and the current values
+    if (const char* env = std::getenv("SMGPC_VSYNC")) {  // tests (not saved)
+        g_settings.vsync = ParseBool(env);
+    }
     config->startFullscreen = g_settings.fullscreen || forceFullscreen;
     config->windowWidth = uint32_t(g_settings.windowWidth);
     config->windowHeight = uint32_t(g_settings.windowHeight);
@@ -227,4 +230,8 @@ extern "C" unsigned char pc_settings_language() {
         return 4;  // SC_LANG_SPANISH
     }
     return 3;  // SC_LANG_FRENCH
+}
+
+bool pc_display_vsync() {
+    return g_settings.vsync;
 }

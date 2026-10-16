@@ -7,3 +7,6 @@ void pc_display_configure(AuroraConfig* config, bool forceFullscreen);
 
 // Settings that are applied once Aurora is initialized (alpha to coverage, texture mipmaps).
 void pc_display_apply_after_init();
+
+// Whether vsync is on (display.ini "vsync").
+bool pc_display_vsync();
