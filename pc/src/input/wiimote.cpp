@@ -34,6 +34,7 @@
 namespace {
 
 constexpr int kNumChannels = 4;
+constexpr int kShakeFrames = 80;  // length of a synthetic shake (see the accelerometer below)
 
 // Mouse state for the first remote: pointer position (-1..1) when the mouse moved over the
 // window this frame, and the A/B buttons from its left/right buttons.
@@ -342,16 +343,21 @@ s32 KPADRead(s32 chan, KPADStatus status[], u32 count) {
 
     // Accelerometer: remote held still, pointing at the screen; a shake on the shake button.
     if (shakeButton && !ch.prevShakeButton) {
-        ch.shakeFrames = 8;
+        ch.shakeFrames = kShakeFrames;
     }
     ch.prevShakeButton = shakeButton;
     s.acc.x = 0.0f;
     s.acc.y = -1.0f;
     s.acc.z = 0.0f;
     if (ch.shakeFrames > 0) {
-        const f32 amp = 2.5f;
-        s.acc.x = (ch.shakeFrames & 1) ? amp : -amp;
-        s.acc.z = (ch.shakeFrames & 1) ? -amp * 0.5f : amp * 0.5f;
+        // One swing. WPadHVSwing compares the acceleration with the one 20 frames earlier
+        // (threshold 1.0): a sharp jump followed by a slow return to rest reads as exactly one
+        // swing (a short pulse would echo 20 frames later, an oscillation reads as several). The
+        // vertical part feeds the underwater spin (WPadHVSwing::updateCentrifugal).
+        const f32 e = f32(ch.shakeFrames) / kShakeFrames;
+        s.acc.x = 2.5f * e;
+        s.acc.y = -1.0f + 1.5f * e;
+        s.acc.z = -1.25f * e;
         ch.shakeFrames--;
     }
     s.acc_value = std::sqrt(s.acc.x * s.acc.x + s.acc.y * s.acc.y + s.acc.z * s.acc.z);

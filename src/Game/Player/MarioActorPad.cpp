@@ -295,6 +295,11 @@ void MarioActor::updateControllerSwing() {
         _F1C--;
     } else if (isCorePadSwing && F20 == 0) {
         _F00 = true;
+#if TARGET_PC
+        if (getenv("SMGPC_DEBUG_SPIN") != nullptr) {
+            OSReport("[pc] Wii Remote swing detected (spin)\n");
+        }
+#endif
     }
 
     if (isCorePadSwing && _946 > 10 && _F1C < 8) {
