@@ -32,6 +32,8 @@
 #include <vector>
 
 bool pc_settings_co_star();
+bool pc_settings_menu_open();
+void pc_settings_menu_toggle();
 
 namespace {
 
@@ -50,7 +52,7 @@ MouseInput ReadMouse() {
     static const bool sDisabled = std::getenv("SMGPC_NO_MOUSE") != nullptr;
     static f32 sLastX = -1.0f, sLastY = -1.0f;
     MouseInput m;
-    if (sDisabled) {
+    if (sDisabled || pc_settings_menu_open()) {
         return m;
     }
     SDL_Window* window = SDL_GetMouseFocus();
@@ -121,6 +123,27 @@ void ReadPads() {
     PADStatus raw[PAD_MAX_CONTROLLERS];
     PADRead(raw);
     PADClamp(raw);
+    // View + Menu on any gamepad opens/closes the settings menu; the game gets no input while
+    // it is open (nor on the frame the buttons are released).
+    static bool sComboHeld = false;
+    bool combo = false;
+    for (const PADStatus& p : raw) {
+        if (p.err == PAD_ERR_NONE && (p.button & PAD_BUTTON_START) && (p.extButton & PAD_BUTTON_BACK)) {
+            combo = true;
+        }
+    }
+    if (combo && !sComboHeld) {
+        pc_settings_menu_toggle();
+    }
+    const bool suppress = combo || sComboHeld || pc_settings_menu_open();
+    sComboHeld = combo;
+    if (suppress) {
+        for (PADStatus& p : raw) {
+            const s8 err = p.err;
+            p = {};
+            p.err = err;
+        }
+    }
     // Co-star (display.ini "deux_joueurs"): with two gamepads, the second one is the second Wii
     // Remote (the co-star's Star Pointer).
     if (pc_settings_co_star()) {

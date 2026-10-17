@@ -6,6 +6,7 @@
 #include "pc/display.h"
 #include "pc/main.h"
 #include "pc/os.h"
+#include "pc/settings_menu.h"
 #include "pc/user_files.h"
 
 #include <aurora/aurora.h>
@@ -131,6 +132,7 @@ extern "C" void pc_platform_init(int argc, char* argv[]) {
     config.allowTextureDumps = std::getenv("SMGPC_DUMP_TEXTURES") != nullptr;
     aurora_initialize(argc, argv, &config);
     pc_display_apply_after_init();
+    pc_settings_menu_init();
     // HD texture packs: Dolphin-format replacements (tex1_<w>x<h>[_m]_<hash>[_<tlut>]_<fmt>.dds|png,
     // same hashes as Dolphin's for RMGE01) in the "textures" folder next to the executable.
     if (const char* base = SDL_GetBasePath()) {
@@ -219,6 +221,11 @@ extern "C" int pc_platform_begin_frame(void) {
             if (event->type == AURORA_EXIT) {
                 pc_platform_exit(0);
             }
+            // F1: settings menu.
+            if (event->type == AURORA_SDL_EVENT && event->sdl.type == SDL_EVENT_KEY_DOWN && !event->sdl.key.repeat &&
+                event->sdl.key.key == SDLK_F1) {
+                pc_settings_menu_toggle();
+            }
             // F11 or Alt+Enter: toggle fullscreen.
             if (event->type == AURORA_SDL_EVENT && event->sdl.type == SDL_EVENT_KEY_DOWN && !event->sdl.key.repeat &&
                 (event->sdl.key.key == SDLK_F11 || (event->sdl.key.key == SDLK_RETURN && (event->sdl.key.mod & SDL_KMOD_ALT)))) {
@@ -275,6 +282,16 @@ extern "C" int pc_platform_begin_frame(void) {
     if (sTraceHostNew && sFrameCount == sTraceDump) {
         pc_trace_host_new_dump(sTraceFirst, sTraceLast);
     }
+    // SMGPC_SETTINGS_MENU=<frame>: open the settings menu then (tests); SMGPC_SUPERSAMPLE_LIVE=N
+    // also switches the supersampling at that frame.
+    static const u32 sMenuFrame = std::getenv("SMGPC_SETTINGS_MENU") ? u32(std::atoi(std::getenv("SMGPC_SETTINGS_MENU"))) : 0;
+    if (sMenuFrame != 0 && sFrameCount == sMenuFrame) {
+        pc_settings_menu_toggle();
+        if (const char* env = std::getenv("SMGPC_SUPERSAMPLE_LIVE")) {
+            pc_settings().supersampling = std::atoi(env);
+            pc_settings_apply_supersampling();
+        }
+    }
     if (sLogFrames && (sFrameCount <= 10 || sFrameCount % 60 == 0)) {
         // Frames per second over the last 60 frames.
         static auto sLastTime = std::chrono::steady_clock::now();
@@ -295,6 +312,7 @@ extern "C" int pc_platform_begin_frame(void) {
 
 extern "C" void pc_platform_end_frame(void) {
     if (sFrameStarted) {
+        pc_settings_menu_draw();
         aurora_end_frame();
         sFrameStarted = false;
     }

@@ -13,25 +13,8 @@
 
 namespace {
 
-struct Settings {
-    bool fullscreen = false;
-    int windowWidth = 1280;
-    int windowHeight = 720;
-    int msaa = 4;
-    int anisotropy = 16;
-    bool alphaToCoverage = true;
-    bool textureMipmaps = true;
-    bool vsync = true;
-    std::string backend = "auto";
-    int supersampling = 2;
-    float drawDistance = 2.0f;
-    float particleDensity = 1.5f;
-    float godRays = 0.6f;
-    bool coStar = false;
-    std::string language = "fr";
-};
-
-Settings g_settings;
+PcSettings g_settings;
+std::string g_path;
 
 std::string Trim(const std::string& s) {
     const size_t b = s.find_first_not_of(" \t\r\n");
@@ -165,8 +148,28 @@ void pc_display_configure(AuroraConfig* config, bool forceFullscreen) {
         std::fclose(f);
     }
     Save(path);  // rewrites it with any new keys and the current values
-    if (const char* env = std::getenv("SMGPC_VSYNC")) {  // tests (not saved)
+    g_path = path;
+    // Test overrides (not saved, unless the settings menu saves them).
+    if (const char* env = std::getenv("SMGPC_VSYNC")) {
         g_settings.vsync = ParseBool(env);
+    }
+    if (const char* env = std::getenv("SMGPC_SUPERSAMPLE")) {
+        g_settings.supersampling = std::atoi(env);
+    }
+    if (const char* env = std::getenv("SMGPC_DRAW_DISTANCE")) {
+        g_settings.drawDistance = float(std::atof(env));
+    }
+    if (const char* env = std::getenv("SMGPC_PARTICLES")) {
+        g_settings.particleDensity = float(std::atof(env));
+    }
+    if (const char* env = std::getenv("SMGPC_GOD_RAYS")) {
+        g_settings.godRays = float(std::atof(env));
+    }
+    if (const char* env = std::getenv("SMGPC_CO_STAR")) {
+        g_settings.coStar = ParseBool(env);
+    }
+    if (const char* env = std::getenv("SMGPC_LANGUAGE")) {
+        g_settings.language = env;
     }
     config->startFullscreen = g_settings.fullscreen || forceFullscreen;
     config->windowWidth = uint32_t(g_settings.windowWidth);
@@ -194,46 +197,44 @@ void pc_display_configure(AuroraConfig* config, bool forceFullscreen) {
 void pc_display_apply_after_init() {
     AuroraSetAlphaToCoverage(g_settings.alphaToCoverage && g_settings.msaa > 1 ? 1 : 0);
     AuroraSetAutoMipmaps(g_settings.textureMipmaps ? 1 : 0);
-    // SMGPC_SUPERSAMPLE overrides the file (tests).
-    int supersampling = g_settings.supersampling;
-    if (const char* env = std::getenv("SMGPC_SUPERSAMPLE")) {
-        supersampling = std::atoi(env);
-    }
-    if (supersampling > 1) {
-        VISetFrameBufferSupersample(float(supersampling));
-        aurora_set_resampler(SAMPLER_AREA);  // box-filtered downsampling
+    pc_settings_apply_supersampling();
+}
+
+void pc_settings_apply_supersampling() {
+    const int n = g_settings.supersampling;
+    VISetFrameBufferSupersample(float(n > 1 ? n : 1));
+    aurora_set_resampler(n > 1 ? SAMPLER_AREA : SAMPLER_BILINEAR);  // box-filtered downsampling
+}
+
+PcSettings& pc_settings() {
+    return g_settings;
+}
+
+void pc_settings_save() {
+    if (!g_path.empty()) {
+        Save(g_path);
     }
 }
 
-// Game language as an SC_LANG_* value (RMGE01 has US English, US Spanish and US French).
-// Enhancements read by the game code (SMGPC_DRAW_DISTANCE / SMGPC_PARTICLES override them).
+// Enhancements read by the game code.
 float pc_settings_draw_distance() {
-    static const float value = std::getenv("SMGPC_DRAW_DISTANCE") ? float(std::atof(std::getenv("SMGPC_DRAW_DISTANCE")))
-                                                                 : g_settings.drawDistance;
-    return value;
+    return g_settings.drawDistance;
 }
 
 float pc_settings_particle_density() {
-    static const float value = std::getenv("SMGPC_PARTICLES") ? float(std::atof(std::getenv("SMGPC_PARTICLES")))
-                                                             : g_settings.particleDensity;
-    return value;
+    return g_settings.particleDensity;
 }
 
 float pc_settings_god_rays() {
-    static const float value = std::getenv("SMGPC_GOD_RAYS") ? float(std::atof(std::getenv("SMGPC_GOD_RAYS")))
-                                                            : g_settings.godRays;
-    return value;
+    return g_settings.godRays;
 }
 
+// Game language as an SC_LANG_* value (RMGE01 has US English, US Spanish and US French).
 extern "C" unsigned char pc_settings_language() {
-    std::string language = g_settings.language;
-    if (const char* env = std::getenv("SMGPC_LANGUAGE")) {  // tests
-        language = env;
-    }
-    if (language == "en") {
+    if (g_settings.language == "en") {
         return 1;  // SC_LANG_ENGLISH
     }
-    if (language == "es") {
+    if (g_settings.language == "es") {
         return 4;  // SC_LANG_SPANISH
     }
     return 3;  // SC_LANG_FRENCH
@@ -244,6 +245,5 @@ bool pc_display_vsync() {
 }
 
 bool pc_settings_co_star() {
-    static const bool value = std::getenv("SMGPC_CO_STAR") ? ParseBool(std::getenv("SMGPC_CO_STAR")) : g_settings.coStar;
-    return value;
+    return g_settings.coStar;
 }

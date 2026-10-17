@@ -158,6 +158,7 @@ smg_add_lib(smg_pc
         pc/src/ui/xbox_glyphs.cpp
         pc/src/ui/xbox_glyphs_gdi.cpp
         pc/src/ui/window_icon.cpp
+        pc/src/ui/settings_menu.cpp
         pc/src/fx/god_rays.cpp)
 if (WIN32)
     target_link_libraries(smg_pc PUBLIC dbghelp psapi)
