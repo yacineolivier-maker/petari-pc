@@ -127,6 +127,8 @@ set(SMG_GAME_LIBS Animation AreaObj AudioLib Boss Camera Demo Effect Enemy GameA
 set(SMG_PC_LIBS ${SMG_JSYSTEM_LIBS} ${SMG_NW4R_LIBS} ${SMG_GAME_LIBS})
 foreach (lib IN LISTS SMG_PC_LIBS)
     smg_add_lib(smg_${lib} ${LIB_${lib}_FILES})
+    # Game code section (pc/include/pc_compat.h).
+    target_compile_definitions(smg_${lib} PRIVATE SMGPC_GAME_CODE=1)
 endforeach ()
 
 # THPDraw.c uses Aurora's GD helpers, which are C++-only.
@@ -186,6 +188,9 @@ target_link_libraries(smgpc PRIVATE smg_game_headers ${SMG_GAME_TARGETS}
 if (MSVC)
     # The game libraries reference each other in every direction.
     target_link_options(smgpc PRIVATE /OPT:REF)
+    # No identical-code folding: a host function folded into its twin in the game code section
+    # would have its plain `new` sent to a JKRHeap (pc/include/pc_compat.h).
+    target_link_options(smgpc PRIVATE /OPT:NOICF)
     # JKRHeap.cpp replaces the global operator new/delete on PC. Pull it in before the CRT's
     # versions get picked to resolve the first reference.
     target_link_options(smgpc PRIVATE

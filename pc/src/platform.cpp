@@ -12,7 +12,10 @@
 #include <aurora/dvd.h>
 #include <aurora/event.h>
 #include <aurora/gfx.h>
+#include <dolphin/gx.h>  // GXTexObj, used by aurora/texture.hpp
+#include <aurora/texture.hpp>
 
+#include <SDL3/SDL_filesystem.h>
 #include <SDL3/SDL_keyboard.h>
 #include <SDL3/SDL_messagebox.h>
 #include <SDL3/SDL_stdinc.h>
@@ -31,6 +34,15 @@
 
 bool pc_load_window_icon(std::vector<uint8_t>& rgba, uint32_t& size);
 extern "C" unsigned long long pc_private_bytes(void);
+void pc_trace_host_new_dump(unsigned first, unsigned last);
+
+namespace {
+u32 sFrameCount = 0;
+}
+
+extern "C" unsigned int pc_frame_count(void) {
+    return sFrameCount;
+}
 
 namespace pc {
 bool IsShuttingDown = false;
@@ -115,8 +127,15 @@ extern "C" void pc_platform_init(int argc, char* argv[]) {
         config.iconWidth = iconSize;
         config.iconHeight = iconSize;
     }
+    // SMGPC_DUMP_TEXTURES=1: write the textures the game uses to <user cache>/texture_dumps.
+    config.allowTextureDumps = std::getenv("SMGPC_DUMP_TEXTURES") != nullptr;
     aurora_initialize(argc, argv, &config);
     pc_display_apply_after_init();
+    // HD texture packs: Dolphin-format replacements (tex1_<w>x<h>[_m]_<hash>[_<tlut>]_<fmt>.dds|png,
+    // same hashes as Dolphin's for RMGE01) in the "textures" folder next to the executable.
+    if (const char* base = SDL_GetBasePath()) {
+        aurora::texture::load_replacement_directory(std::filesystem::path(base) / "textures");
+    }
 
     OSInit();
     OSPCAdoptCurrentThread(&sMainThread);
@@ -246,8 +265,16 @@ extern "C" int pc_platform_begin_frame(void) {
     }
     // SMGPC_LOG_FRAMES=1: print the frame number (first 10 frames, then every 60).
     static const bool sLogFrames = std::getenv("SMGPC_LOG_FRAMES") != nullptr;
-    static u32 sFrameCount = 0;
     sFrameCount++;
+    // SMGPC_TRACE_HOST_NEW=<first>:<last>:<dump> (pc/src/crash_handler.cpp).
+    static unsigned sTraceFirst = 0, sTraceLast = 0, sTraceDump = 0;
+    static const bool sTraceHostNew = [] {
+        const char* env = std::getenv("SMGPC_TRACE_HOST_NEW");
+        return env != nullptr && std::sscanf(env, "%u:%u:%u", &sTraceFirst, &sTraceLast, &sTraceDump) == 3;
+    }();
+    if (sTraceHostNew && sFrameCount == sTraceDump) {
+        pc_trace_host_new_dump(sTraceFirst, sTraceLast);
+    }
     if (sLogFrames && (sFrameCount <= 10 || sFrameCount % 60 == 0)) {
         // Frames per second over the last 60 frames.
         static auto sLastTime = std::chrono::steady_clock::now();

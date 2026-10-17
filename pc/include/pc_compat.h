@@ -121,3 +121,19 @@ using ::tanf;
 
 // MSL C++ <functional>/<algorithm> extensions (binder2nd<F, T>, mem_fun, for_each_array, ...).
 #include "pc_msl_cpp.h"
+
+// The game libraries' code goes to its own section, between two markers in JKRHeap.cpp, so the
+// global operator new can tell the game's plain `new` (which, like on the Wii, must allocate from
+// the current JKRHeap and go away with it) from host code. Template instantiations aren't
+// affected by code_seg and stay in .text.
+#if defined(SMGPC_GAME_CODE) && defined(_MSC_VER)
+#pragma code_seg(".text$gb")
+#endif
+#ifdef __cplusplus
+// Inside this scope the game's plain `new` uses host memory instead of the current JKRHeap: for
+// PC-only data that outlives the heap (e.g. caches held by long-lived objects).
+struct PcHostNewScope {
+    PcHostNewScope();
+    ~PcHostNewScope();
+};
+#endif

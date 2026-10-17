@@ -84,6 +84,7 @@ namespace {
         static std::mutex sMutex;
         static std::unordered_map< const wchar_t*, std::wstring > sCache;
         std::lock_guard< std::mutex > lock(sMutex);
+        PcHostNewScope hostNew;  // the cache lives as long as the game
         auto it = sCache.find(pOriginal);
         if (it != sCache.end()) {
             return it->second.empty() ? pOriginal : it->second.c_str();
@@ -151,6 +152,7 @@ namespace {
         if (std::strcmp(pId, "Layout_PressStartPressAB") == 0) {
             static std::wstring sText;
             if (sText.empty()) {
+                PcHostNewScope hostNew;  // lives as long as the game
                 const wchar_t* pTag = pOriginal;
                 while (*pTag != 0 && *pTag != 0x1A) {
                     pTag++;

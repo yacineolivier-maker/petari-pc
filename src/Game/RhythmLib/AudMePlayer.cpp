@@ -397,6 +397,7 @@ void AudMePlayingParamsHolder::setResource(void* pRes) {
     mParams = (AudMePlayingParams*)((u8*)pRes + entryOff);
 
     const BE(u32)* nameOffsets = (const BE(u32)*)((u8*)pRes + namesOff);
+    PcHostNewScope hostNew;  // outlives the current heap; freed by the next init
     const char** names = new const char*[numEntries];
     for (u32 i = 0; i < numEntries; i++) {
         names[i] = (const char*)pRes + nameOffsets[i];

@@ -64,6 +64,11 @@ python tools/gen_pc_files.py                            # regenerate files.cmake
   0006 = GXPeekZ depth snapshot taken where the game peeks, not at the end of the frame), applied at
   configure time. `GXSetArray` on PC takes `(attr, data, size, stride, little_endian)`.
 - `OPNEW_SIZE_T` = size type of operator new/delete (u32 on Wii, size_t on PC).
+- Memory: plain `new` from the game libraries (code placed in section `.text$gb` by pc_compat.h,
+  told apart by the return address in JKRHeap.cpp) allocates from the current JKRHeap like on the
+  Wii, so objects go away with their scene heap; host code, template instantiations and threads
+  without a heap get host memory. PC-only data that must outlive the current heap (caches,
+  side tables freed on the next init) is allocated inside a `PcHostNewScope`. No `/OPT:ICF`.
 
 ## Porting rules (learned on Wind Waker, see its memory/CLAUDE.md)
 
@@ -89,7 +94,9 @@ python tools/gen_pc_files.py                            # regenerate files.cmake
   `SMGPC_DUMP_THREADS=N`, `SMGPC_LOG_PLACEMENT`, `SMGPC_DEBUG_MTX`, `SMGPC_DEBUG_ASYNC`,
   `SMGPC_DEBUG_SPIN`, `SMGPC_TEST_MESSAGES`, `SMGPC_AUDIO_DUMP=out.wav`, `SMGPC_NO_AUDIO`,
   `SMGPC_NO_MOUSE`, `SMGPC_WII_ICONS`, `SMGPC_WINDOW_TITLE`, `SMGPC_LOG_MEMORY` (committed
-  memory), `SMGPC_TRACE_BIG_ALLOC=<MB>` (stack of big malloc/realloc), `SMGPC_BACKEND=d3d12|vulkan|d3d11`,
+  memory), `SMGPC_TRACE_BIG_ALLOC=<MB>` (stack of big malloc/realloc), `SMGPC_TRACE_HOST_NEW=<first>:<last>:<dump>`
+  (game `new`s left in host memory and still alive), `SMGPC_HOST_NEW` (all plain `new` on the host), `SMGPC_DUMP_TEXTURES` (dumps to <user cache>/texture_dumps;
+  Dolphin-format HD packs load from `textures/` next to the exe, same hashes as Dolphin), `SMGPC_BACKEND=d3d12|vulkan|d3d11`,
   `SMGPC_SUPERSAMPLE=N`, `SMGPC_LANGUAGE=fr|en|es` (display.ini: supersampling, langue); Aurora: `AURORA_DEBUG_NOCULL`,
   `AURORA_DEBUG_NODEPTH` (patch 0003).
 - Local helper scripts (not in git) live in `D:\SUPER_MARIO_GALAXY\Outils_Claude`: `shots.ps1`

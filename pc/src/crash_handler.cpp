@@ -408,3 +408,129 @@ struct BigAllocTracer {
 } s_bigAllocTracer;
 }  // namespace
 #endif
+
+#if defined(_WIN32)
+// SMGPC_TRACE_HOST_NEW=<first>:<last>:<dump>: records the plain `new` calls made while a JKRHeap
+// is current (game code; they get host memory on PC), and at frame <dump> prints the call sites of
+// those made between frames <first> and <last> that are still alive (leaks across scenes).
+namespace {
+struct HostNewEntry {
+    void* ptr;  // nullptr: empty; kTombstone: removed
+    size_t size;
+    unsigned frame;
+    void* callers[3];
+};
+constexpr size_t kHostNewCapacity = size_t(1) << 21;
+void* const kTombstone = reinterpret_cast<void*>(1);
+HostNewEntry* s_hostNew;
+SRWLOCK s_hostNewLock = SRWLOCK_INIT;
+
+size_t HostNewSlot(const void* p) {
+    return (reinterpret_cast<uintptr_t>(p) >> 4) * 0x9E3779B97F4A7C15ull >> (64 - 21);
+}
+}  // namespace
+
+extern "C" unsigned int pc_frame_count(void);
+
+bool pc_trace_host_new_enabled() {
+    static const bool enabled = [] {
+        if (std::getenv("SMGPC_TRACE_HOST_NEW") == nullptr) {
+            return false;
+        }
+        s_hostNew = static_cast<HostNewEntry*>(
+            VirtualAlloc(nullptr, kHostNewCapacity * sizeof(HostNewEntry), MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE));
+        return s_hostNew != nullptr;
+    }();
+    return enabled;
+}
+
+void pc_trace_host_new_add(void* p, size_t size) {
+    HostNewEntry e = {p, size, pc_frame_count(), {}};
+    RtlCaptureStackBackTrace(2, 3, e.callers, nullptr);  // skip this function and operator new
+    AcquireSRWLockExclusive(&s_hostNewLock);
+    for (size_t i = HostNewSlot(p);; i = (i + 1) & (kHostNewCapacity - 1)) {
+        if (s_hostNew[i].ptr == nullptr || s_hostNew[i].ptr == kTombstone) {
+            s_hostNew[i] = e;
+            break;
+        }
+    }
+    ReleaseSRWLockExclusive(&s_hostNewLock);
+}
+
+void pc_trace_host_new_remove(void* p) {
+    AcquireSRWLockExclusive(&s_hostNewLock);
+    for (size_t i = HostNewSlot(p); s_hostNew[i].ptr != nullptr; i = (i + 1) & (kHostNewCapacity - 1)) {
+        if (s_hostNew[i].ptr == p) {
+            s_hostNew[i].ptr = kTombstone;
+            break;
+        }
+    }
+    ReleaseSRWLockExclusive(&s_hostNewLock);
+}
+
+void pc_trace_host_new_dump(unsigned first, unsigned last) {
+    struct Site {
+        void* callers[3];
+        size_t bytes;
+        size_t count;
+    };
+    constexpr size_t kMaxSites = 1 << 16;
+    auto* sites = static_cast<Site*>(VirtualAlloc(nullptr, kMaxSites * sizeof(Site), MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE));
+    size_t numSites = 0;
+    size_t total = 0;
+    size_t totalCount = 0;
+    AcquireSRWLockExclusive(&s_hostNewLock);
+    for (size_t i = 0; i < kHostNewCapacity; i++) {
+        const HostNewEntry& e = s_hostNew[i];
+        if (e.ptr == nullptr || e.ptr == kTombstone || e.frame < first || e.frame > last) {
+            continue;
+        }
+        total += e.size;
+        totalCount++;
+        size_t s = 0;
+        while (s < numSites && std::memcmp(sites[s].callers, e.callers, sizeof(e.callers)) != 0) {
+            s++;
+        }
+        if (s == numSites) {
+            if (numSites == kMaxSites) {
+                continue;
+            }
+            std::memcpy(sites[s].callers, e.callers, sizeof(e.callers));
+            sites[s].bytes = 0;
+            sites[s].count = 0;
+            numSites++;
+        }
+        sites[s].bytes += e.size;
+        sites[s].count++;
+    }
+    ReleaseSRWLockExclusive(&s_hostNewLock);
+    std::fprintf(stderr, "[pc] host new still alive from frames %u-%u: %zu KB in %zu blocks, %zu sites\n", first, last,
+                 total >> 10, totalCount, numSites);
+    HANDLE process = GetCurrentProcess();
+    SymSetOptions(SYMOPT_LOAD_LINES | SYMOPT_UNDNAME | SYMOPT_DEFERRED_LOADS);
+    SymInitialize(process, pc_symbol_path(), TRUE);
+    alignas(SYMBOL_INFO) char symbuf[sizeof(SYMBOL_INFO) + 512];
+    for (int n = 0; n < 60 && numSites > 0; n++) {
+        size_t best = 0;
+        for (size_t s = 1; s < numSites; s++) {
+            if (sites[s].bytes > sites[best].bytes) {
+                best = s;
+            }
+        }
+        if (sites[best].bytes == 0) {
+            break;
+        }
+        std::fprintf(stderr, "  %6zu KB %6zu x", sites[best].bytes >> 10, sites[best].count);
+        for (void* addr : sites[best].callers) {
+            auto* sym = (SYMBOL_INFO*)symbuf;
+            sym->SizeOfStruct = sizeof(SYMBOL_INFO);
+            sym->MaxNameLen = 511;
+            DWORD64 disp = 0;
+            std::fprintf(stderr, "  %s", SymFromAddr(process, (DWORD64)addr, &disp, sym) ? sym->Name : "?");
+        }
+        std::fprintf(stderr, "\n");
+        sites[best].bytes = 0;
+    }
+    VirtualFree(sites, 0, MEM_RELEASE);
+}
+#endif

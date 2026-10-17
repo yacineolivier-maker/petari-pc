@@ -331,11 +331,55 @@ JKRErrorHandler JKRHeap::setErrorHandler(JKRErrorHandler errorHandler) {
 
 #if TARGET_PC
 // On PC the global allocation functions are also used by Aurora, SDL and the C++ library, from
-// before main() and from other threads: plain new/delete use host memory (like the Wind Waker
-// port). The game's heap-directed forms (new (align) / new (heap, align)) still go to the
-// JKRHeaps, and delete accepts pointers from either.
-// TODO(pc): plain `new T` in game code no longer lands in the current JKRHeap, so it isn't
-// freed with its scene heap (leaks across scene changes until it's converted).
+// before main() and from other threads: their plain new/delete use host memory (like the Wind
+// Waker port). The game's own plain `new`, recognized by its return address in the game code
+// section (pc/include/pc_compat.h), allocates from the current JKRHeap like on the Wii, so the
+// objects go away with their scene heap (on the host they leaked, ~10 MB per galaxy). Its
+// heap-directed forms (new (align) / new (heap, align)) always go to the JKRHeaps, and delete
+// accepts pointers from either. Template instantiations aren't in the game section and still
+// use host memory. SMGPC_HOST_NEW=1 sends all plain `new` to host memory (debugging).
+#include <intrin.h>
+
+__declspec(code_seg(".text$ga")) __declspec(noinline) void pc_game_code_begin() {
+    static volatile int sMarker;
+    sMarker = 1;
+}
+
+__declspec(code_seg(".text$gc")) __declspec(noinline) void pc_game_code_end() {
+    static volatile int sMarker;
+    sMarker = 2;
+}
+
+static thread_local int sHostNewScopes;
+
+PcHostNewScope::PcHostNewScope() {
+    sHostNewScopes++;
+}
+
+PcHostNewScope::~PcHostNewScope() {
+    sHostNewScopes--;
+}
+
+static bool jkr_is_game_caller(const void* pReturnAddress) {
+    static const bool sHostNew = getenv("SMGPC_HOST_NEW") != nullptr;
+    return !sHostNew && sHostNewScopes == 0 && pReturnAddress > reinterpret_cast< const void* >(&pc_game_code_begin) &&
+           pReturnAddress < reinterpret_cast< const void* >(&pc_game_code_end);
+}
+
+static void* jkr_game_new(size_t size) {
+    JKRHeap* heap = JKRHeap::getCurrentHeap();
+    if (heap == nullptr || size >= 0x10000000) {
+        return nullptr;
+    }
+    // Fall back to host memory instead of the heap's out-of-memory handler: on the host,
+    // pointers make the objects bigger than the heaps were sized for.
+    const bool errorFlag = heap->mErrorFlag;
+    heap->mErrorFlag = false;
+    void* mem = heap->alloc(u32(size == 0 ? 1 : size), 16);
+    heap->mErrorFlag = errorFlag;
+    return mem;
+}
+
 static void* jkr_host_alloc(size_t size, size_t align) {
     if (align < 16) {
         align = 16;
@@ -344,6 +388,9 @@ static void* jkr_host_alloc(size_t size, size_t align) {
 }
 
 extern "C" bool pc_is_wii_memory(const void* p);
+bool pc_trace_host_new_enabled();
+void pc_trace_host_new_add(void* p, size_t size);
+void pc_trace_host_new_remove(void* p);
 
 static void jkr_free_any(void* pData) {
     if (pData == nullptr) {
@@ -364,6 +411,9 @@ static void jkr_free_any(void* pData) {
         }
         return;
     }
+    if (pc_trace_host_new_enabled()) {
+        pc_trace_host_new_remove(pData);
+    }
     _aligned_free(pData);
 }
 
@@ -375,17 +425,33 @@ static void* jkr_heap_alloc(size_t size, int align, JKRHeap* pHeap) {
 }
 
 void* operator new(size_t size) {
+    if (jkr_is_game_caller(_ReturnAddress())) {
+        if (void* mem = jkr_game_new(size)) {
+            return mem;
+        }
+    }
     void* mem = jkr_host_alloc(size, 0);
     if (mem == nullptr) {
         throw std::bad_alloc();
+    }
+    if (pc_trace_host_new_enabled() && JKRHeap::getCurrentHeap() != nullptr) {
+        pc_trace_host_new_add(mem, size);
     }
     return mem;
 }
 
 void* operator new[](size_t size) {
+    if (jkr_is_game_caller(_ReturnAddress())) {
+        if (void* mem = jkr_game_new(size)) {
+            return mem;
+        }
+    }
     void* mem = jkr_host_alloc(size, 0);
     if (mem == nullptr) {
         throw std::bad_alloc();
+    }
+    if (pc_trace_host_new_enabled() && JKRHeap::getCurrentHeap() != nullptr) {
+        pc_trace_host_new_add(mem, size);
     }
     return mem;
 }

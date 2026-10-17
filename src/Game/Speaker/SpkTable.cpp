@@ -38,6 +38,7 @@ void SpkTable::setResource(void* pRes) {
     mParameters = (SpkParameters*)((u8*)pRes + entryOff);
 
     const BE(u32)* nameOffsets = (const BE(u32)*)((u8*)pRes + dataOffsetsStartOff);
+    PcHostNewScope hostNew;  // outlives the current heap; freed by the next init
     const char** names = new const char*[mResourceCount];
     for (s32 i = 0; i < mResourceCount; i++) {
         names[i] = (const char*)pRes + nameOffsets[i];
