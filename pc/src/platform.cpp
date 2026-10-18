@@ -335,6 +335,9 @@ extern "C" void pc_platform_end_frame(void) {
         pc_settings_menu_draw();
         aurora_end_frame();
         sFrameStarted = false;
+        if (pc_settings_menu_quit_requested()) {
+            pc_platform_exit(0);
+        }
     }
 }
 

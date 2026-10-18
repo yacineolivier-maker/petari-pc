@@ -234,8 +234,19 @@ s32 NANDMove(const char* path, const char* destDir) {
     }
     fs::path dst = HostPath(destDir) / src.filename();
     fs::create_directories(dst.parent_path(), ec);
-    fs::remove(dst, ec);
+    // Keep the save being replaced in <user dir>/sauvegarde_precedente (outside the NAND tree).
+    if (fs::is_regular_file(dst, ec)) {
+        const fs::path backupDir = fs::path(pc_user_dir()) / "sauvegarde_precedente";
+        fs::create_directories(backupDir, ec);
+        fs::copy_file(dst, backupDir / dst.filename(), fs::copy_options::overwrite_existing, ec);
+    }
+    // Replaces the old file in one step (MoveFileEx with MOVEFILE_REPLACE_EXISTING): a crash or
+    // the window closing never leaves the save missing or half written.
     fs::rename(src, dst, ec);
+    if (ec) {
+        fs::remove_all(dst, ec);
+        fs::rename(src, dst, ec);
+    }
     return ec ? NAND_RESULT_ACCESS : NAND_RESULT_OK;
 }
 

@@ -10,5 +10,8 @@ bool pc_settings_menu_open();
 
 void pc_settings_menu_toggle();
 
+// The player chose "Quitter le jeu" (the platform exits after the frame).
+bool pc_settings_menu_quit_requested();
+
 // Between aurora_begin_frame and aurora_end_frame.
 void pc_settings_menu_draw();

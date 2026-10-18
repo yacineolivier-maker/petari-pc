@@ -19,6 +19,7 @@ namespace {
 bool sOpen = false;
 bool sDirty = false;
 bool sFocusFirst = false;
+bool sQuit = false;  // "Quitter le jeu" confirmed: exits at the end of the frame
 PcSettings sAtLaunch;  // to tell which restart-only settings changed
 
 SDL_Window* GameWindow() {
@@ -95,6 +96,10 @@ bool pc_settings_menu_open() {
     return sOpen;
 }
 
+bool pc_settings_menu_quit_requested() {
+    return sQuit;
+}
+
 void pc_settings_menu_toggle() {
     if (sOpen) {
         Close();
@@ -117,6 +122,8 @@ void pc_settings_menu_draw() {
     const float scale = io.FontGlobalScale;
     ImGui::SetNextWindowPos(ImVec2(io.DisplaySize.x * 0.5f, io.DisplaySize.y * 0.5f), ImGuiCond_Always, ImVec2(0.5f, 0.5f));
     ImGui::SetNextWindowSize(ImVec2(900.0f * scale, 0.0f), ImGuiCond_Always);
+    // Fits its content, but scrolls instead of going past the bottom of a small window.
+    ImGui::SetNextWindowSizeConstraints(ImVec2(900.0f * scale, 0.0f), ImVec2(900.0f * scale, io.DisplaySize.y * 0.94f));
     bool open = true;
     if (!ImGui::Begin(T("Réglages  (F1 ou Affichage + Menu pour fermer)"), &open,
                       ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove |
@@ -224,9 +231,31 @@ void pc_settings_menu_draw() {
         open = false;
     }
     ImGui::SameLine();
+    if (ImGui::Button(T("Quitter le jeu"), ImVec2(240.0f * scale, 0.0f))) {
+        ImGui::OpenPopup("quit");
+    }
     ImGui::TextDisabled(T("Les réglages sont enregistrés dans display.ini."));
-    // Gamepad B / Escape close the menu.
-    if (ImGui::IsKeyPressed(ImGuiKey_GamepadFaceRight, false) || ImGui::IsKeyPressed(ImGuiKey_Escape, false)) {
+    bool popupOpen = false;
+    if (ImGui::BeginPopupModal("quit", nullptr, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoTitleBar)) {
+        popupOpen = true;
+        ImGui::TextUnformatted(T("Quitter Super Mario Galaxy ?"));
+        ImGui::TextDisabled(T("La progression non sauvegardée sera perdue."));
+        ImGui::Spacing();
+        if (ImGui::Button(T("Non"), ImVec2(160.0f * scale, 0.0f)) || ImGui::IsKeyPressed(ImGuiKey_GamepadFaceRight, false) ||
+            ImGui::IsKeyPressed(ImGuiKey_Escape, false)) {
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::SetItemDefaultFocus();
+        ImGui::SameLine();
+        if (ImGui::Button(T("Oui, quitter"), ImVec2(200.0f * scale, 0.0f))) {
+            sQuit = true;
+            open = false;
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::EndPopup();
+    }
+    // Gamepad B / Escape close the menu (or only the confirmation above).
+    if (!popupOpen && (ImGui::IsKeyPressed(ImGuiKey_GamepadFaceRight, false) || ImGui::IsKeyPressed(ImGuiKey_Escape, false))) {
         open = false;
     }
     ImGui::End();
