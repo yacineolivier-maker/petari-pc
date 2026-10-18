@@ -195,6 +195,110 @@ namespace {
         return changed;
     }
 
+    // Other French sentences with the Wii Remote picture (shown as the spin button on PC): pointing
+    // is done with the right stick, and the remote as a device is "la manette". Each rule is a
+    // list of words (kRemote = the Wii Remote picture) matched across blanks and control tags;
+    // the color/size tags inside the match are kept after the replacement.
+    const wchar_t kRemote[] = L"\x1";
+    const wchar_t* const kPointOnScreen[] = {L"Pointe", L"la", kRemote, L"sur", L"l'", L"\u00e9cran", nullptr};
+    const wchar_t* const kPointTowardsScreen[] = {L"pointer", L"la", kRemote, L"vers", L"l'", L"\u00e9cran", nullptr};
+    const wchar_t* const kPointTowardsTv[] = {L"pointe", L"la", kRemote, L"vers", L"le", L"t\u00e9l\u00e9viseur", nullptr};
+    const wchar_t* const kPointYou[] = {L"pointez", kRemote, L"sur", L"l'", L"\u00e9cran", nullptr};
+    const wchar_t* const kWithRemote[] = {L"l'", L"\u00e9cran", L"avec", L"la", kRemote, nullptr};
+    const wchar_t* const kTwoRemotes[] = {L"deux", kRemote, nullptr};
+    const wchar_t* const kTheRemote[] = {L"la", kRemote, nullptr};
+    const struct {
+        const wchar_t* const* words;
+        const wchar_t* replacement;
+    } kPhraseRules[] = {
+        {kPointOnScreen, L"Vise avec le stick droit"},
+        {kPointTowardsScreen, L"viser avec le stick droit"},
+        {kPointTowardsTv, L"vise avec le stick droit"},
+        {kPointYou, L"visez avec le stick droit"},
+        {kWithRemote, L"l'\u00e9cran avec le stick droit"},
+        {kTwoRemotes, L"deux manettes"},
+        {kTheRemote, L"la manette"},
+    };
+
+    // Matches `words` at p (a word start); returns the end of the match or nullptr.
+    const wchar_t* pcMatchPhrase(const wchar_t* p, const wchar_t* const* words) {
+        for (const wchar_t* const* w = words; *w != nullptr; w++) {
+            if (w != words) {
+                p = pcSkipTagsAndBlanks(p);
+            }
+            if (*w == kRemote) {
+                if (!pcIsPicture(p, 3)) {
+                    return nullptr;
+                }
+                p += 3;
+                continue;
+            }
+            const size_t n = wcslen(*w);
+            // ("l'" may be followed by a color tag, then the next word)
+            if (wcsncmp(p, *w, n) != 0 || (pcIsLetter((*w)[n - 1]) && pcIsLetter(p[n]))) {
+                return nullptr;
+            }
+            p += n;
+        }
+        return p;
+    }
+
+    bool pcRewriteRemotePhrases(std::wstring& text) {
+        std::wstring out;
+        bool changed = false;
+        const wchar_t* const begin = text.c_str();
+        const wchar_t* p = begin;
+        while (*p != 0) {
+            if (*p == 0x1A) {
+                const size_t len = pcTagLength(p);
+                out.append(p, len);
+                p += len;
+                continue;
+            }
+            const wchar_t* end = nullptr;
+            const wchar_t* replacement = nullptr;
+            if (p == begin || !pcIsLetter(p[-1])) {
+                for (const auto& rule : kPhraseRules) {
+                    if ((end = pcMatchPhrase(p, rule.words)) != nullptr) {
+                        replacement = rule.replacement;
+                        break;
+                    }
+                }
+            }
+            if (replacement == nullptr) {
+                out += *p++;
+                continue;
+            }
+            out += replacement;
+            bool lineBreak = false;
+            for (const wchar_t* t = p; t < end;) {
+                if (*t == 0x1A) {
+                    const size_t len = pcTagLength(t);
+                    if (!pcIsPictureTag(t)) {
+                        out.append(t, len);
+                    }
+                    t += len;
+                } else {
+                    lineBreak |= *t == L'\n';
+                    t++;
+                }
+            }
+            p = end;
+            if (lineBreak) {
+                // Keep the line break (the text boxes don't wrap), instead of the next space.
+                out += L'\n';
+                if (*p == L' ') {
+                    p++;
+                }
+            }
+            changed = true;
+        }
+        if (changed) {
+            text = std::move(out);
+        }
+        return changed;
+    }
+
     // The French texts tell to shake the Wii Remote with its icon: "Secoue la [Wii Remote]". On PC
     // the icon is the gamepad's spin button (see pc/src/ui/xbox_glyphs_gdi.cpp), so the sentence
     // becomes "Appuie sur [B]" (same for "Secouez"/"secouer"). Control tags are kept as they are.
@@ -257,6 +361,9 @@ namespace {
             }
         }
         if (pc_settings_language() == 3 && pcRewriteTiltMessage(out)) {
+            changed = true;
+        }
+        if (pc_settings_language() == 3 && pcRewriteRemotePhrases(out)) {
             changed = true;
         }
         std::wstring& entry = sCache[pOriginal];
