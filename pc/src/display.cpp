@@ -74,6 +74,11 @@ void Load(FILE* f) {
             if (f >= 1.0f && f <= 3.0f) {
                 g_settings.particleDensity = f;
             }
+        } else if (key == "vitesse_pointeur") {
+            const float f = float(std::atof(value.c_str()));
+            if (f >= 0.5f && f <= 2.0f) {
+                g_settings.pointerSpeed = f;
+            }
         } else if (key == "deux_joueurs") {
             g_settings.coStar = ParseBool(value);
         } else if (key == "rayons_soleil") {
@@ -153,13 +158,15 @@ void Save(const std::string& path) {
                  "\n"
                  "; Mode deux joueurs (co-star) : avec deux manettes, la deuxieme pilote le pointeur\n"
                  "; etoile du second joueur (1 = active)\n"
-                 "deux_joueurs = %d\n",
+                 "deux_joueurs = %d\n"
+                 "; Vitesse du pointeur etoile au stick droit : 0.5 a 2 (1 = normale)\n"
+                 "vitesse_pointeur = %.2f\n",
                  g_settings.fullscreen ? 1 : 0, g_settings.windowWidth, g_settings.windowHeight, g_settings.msaa,
                  g_settings.anisotropy, g_settings.alphaToCoverage ? 1 : 0, g_settings.textureMipmaps ? 1 : 0,
                  g_settings.vsync ? 1 : 0, g_settings.backend.c_str(), g_settings.supersampling,
                  g_settings.language.c_str(), g_settings.drawDistance, g_settings.particleDensity,
                  g_settings.godRays, g_settings.pixelLighting ? 1 : 0, g_settings.fxaa ? 1 : 0, g_settings.sharpen,
-                 g_settings.vibrance, g_settings.coStar ? 1 : 0);
+                 g_settings.vibrance, g_settings.coStar ? 1 : 0, g_settings.pointerSpeed);
     std::fclose(f);
 }
 
@@ -292,4 +299,8 @@ bool pc_display_vsync() {
 
 bool pc_settings_co_star() {
     return g_settings.coStar;
+}
+
+float pc_settings_pointer_speed() {
+    return g_settings.pointerSpeed;
 }

@@ -213,6 +213,10 @@ void pc_settings_menu_draw() {
         sDirty = true;
     }
     Hint(T("Avec deux manettes, la deuxième pilote le pointeur étoile du second joueur."));
+    if (SliderStep(T("Vitesse du pointeur"), &s.pointerSpeed, 0.5f, 2.0f, 0.1f, "x%.1f")) {
+        sDirty = true;
+    }
+    Hint(T("Vitesse du pointeur étoile déplacé au stick droit."));
     static const char* const kLanguages[] = {"fr", "en", "es"};
     static const char* const kLanguageNames[] = {T("Français"), T("English"), T("Español")};
     int lang = s.language == "en" ? 1 : s.language == "es" ? 2 : 0;

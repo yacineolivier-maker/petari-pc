@@ -25,6 +25,7 @@ struct PcSettings {
     float sharpen = 0.3f;     // contrast-adaptive sharpening, 0-1
     float vibrance = 0.1f;    // saturation boost of dull colors, -1-1
     bool coStar = false;
+    float pointerSpeed = 1.0f;  // right stick Star Pointer speed, 0.5-2
     std::string language = "fr";
 };
 

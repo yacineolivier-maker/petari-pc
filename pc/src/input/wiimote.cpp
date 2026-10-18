@@ -32,6 +32,7 @@
 #include <vector>
 
 bool pc_settings_co_star();
+float pc_settings_pointer_speed();
 bool pc_settings_menu_open();
 void pc_settings_menu_toggle();
 
@@ -379,7 +380,7 @@ s32 KPADRead(s32 chan, KPADStatus status[], u32 count) {
         if (std::fabs(stickY) > std::fabs(ry)) ry = stickY;
         stickX = stickY = 0.0f;
     }
-    const f32 speed = 0.035f;
+    const f32 speed = 0.035f * pc_settings_pointer_speed();
     ch.pointerX += rx * std::fabs(rx) * speed * 1.6f + rx * speed * 0.4f;
     ch.pointerY -= ry * std::fabs(ry) * speed * 1.6f + ry * speed * 0.4f;
     if (pad.extButton & PAD_BUTTON_RIGHT_STICK) {
