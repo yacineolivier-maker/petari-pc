@@ -62,4 +62,7 @@ namespace SpkSpeakerCtrl {
     bool isEnable(s32);
     void extensionProcess(s32, s32);
     f32 getDeviceVolume(s32);
+#if TARGET_PC
+    bool renderForPc(s16* pOut);
+#endif
 };  // namespace SpkSpeakerCtrl

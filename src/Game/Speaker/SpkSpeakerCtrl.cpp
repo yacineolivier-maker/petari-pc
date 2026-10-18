@@ -7,6 +7,10 @@
 #include <revolution/wenc.h>
 #include <revolution/wpad.h>
 
+#if TARGET_PC
+bool pc_wpad_announced_connected(s32 chan);  // pc/src/input/wiimote.cpp
+#endif
+
 OSAlarm sSpeakerAlarm;
 SpeakerInfo sSpeakerInfo[WPAD_MAX_CONTROLLERS];
 SpkSoundHandle sAdjustSoundHandle[WPAD_MAX_CONTROLLERS];
@@ -39,9 +43,48 @@ void SpkSpeakerCtrl::setup() {
         memset(&sSpeakerInfo[i].mWENCInfo, 0, sizeof(WENCInfo));
     }
 
+#if TARGET_PC
+    // No alarm: the PC audio callback calls renderForPc at the same rate (see below).
+    // The audio system is created on a worker thread, maybe after the remotes were announced.
+    for (int i = 0; i < WPAD_MAX_CONTROLLERS; i++) {
+        if (pc_wpad_announced_connected(i)) {
+            SpkSpeakerCtrl::connect(i);
+        }
+    }
+#else
     OSCreateAlarm(&sSpeakerAlarm);
     OSSetPeriodicAlarm(&sSpeakerAlarm, OSGetTime(), OSNanosecondsToTicks(6666667), SpkSpeakerCtrl::updateSpeaker);
+#endif
 }
+
+#if TARGET_PC
+// PC: there's no Wii Remote speaker, so its sounds (Star Bits, spins, menu clicks...) are played
+// with the rest of the audio. The audio callback calls this every 6.67 ms of output, with the
+// JAudio lock held (like the Wii's alarm, which ran with interrupts disabled), and gets the 40
+// mixed samples (6 kHz) the remote would have played. Returns false when nothing is playing.
+bool SpkSpeakerCtrl::renderForPc(s16* pOut) {
+    memset(pOut, 0, 40 * sizeof(s16));
+    if (sMixingBuffer == nullptr) {
+        return false;
+    }
+    bool any = false;
+    for (s32 i = 0; i < WPAD_MAX_CONTROLLERS; i++) {
+        SpeakerInfo& inf = ::getSpeakerInfo(i);
+        if (!inf.mIsPlaying || inf.mIsMuted) {
+            continue;
+        }
+        if (sMixingBuffer->update(i)) {
+            const s16* samples = sMixingBuffer->getSamples(i);
+            for (s32 k = 0; k < 40; k++) {
+                const s32 v = pOut[k] + samples[k];
+                pOut[k] = s16(v > 32767 ? 32767 : v < -32768 ? -32768 : v);
+            }
+            any = true;
+        }
+    }
+    return any;
+}
+#endif
 
 void SpkSpeakerCtrl::connect(s32 padChannel) {
     JASCriticalSection crit;

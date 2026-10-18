@@ -33,6 +33,7 @@
 
 bool pc_settings_co_star();
 float pc_settings_pointer_speed();
+float pc_settings_speaker_volume();
 bool pc_settings_menu_open();
 void pc_settings_menu_toggle();
 
@@ -455,16 +456,18 @@ s32 WPADGetInfoAsync(s32 chan, WPADInfo* info, WPADCallback callback) {
     return WPAD_ERR_NONE;
 }
 
-BOOL WPADIsSpeakerEnabled(s32) { return FALSE; }
+// The first remote's speaker is played on the PC's audio output (SpkSpeakerCtrl::renderForPc);
+// with display.ini sons_wiimote = 0 it is off and the game plays its TV fallbacks instead.
+BOOL WPADIsSpeakerEnabled(s32 chan) { return chan == 0 && pc_settings_speaker_volume() > 0.0f; }
 s32 WPADControlSpeaker(s32 chan, u32, WPADCallback callback) {
     if (callback != nullptr) {
         callback(chan, WPAD_ERR_NONE);
     }
     return WPAD_ERR_NONE;
 }
-u8 WPADGetSpeakerVolume(void) { return 0; }
+u8 WPADGetSpeakerVolume(void) { return pc_settings_speaker_volume() > 0.0f ? 127 : 0; }
 s32 WPADSendStreamData(s32, void*, u16) { return WPAD_ERR_NONE; }
-BOOL WPADCanSendStreamData(s32) { return FALSE; }
+BOOL WPADCanSendStreamData(s32) { return FALSE; }  // the speaker stream doesn't go through WPAD on PC
 
 void WPADControlMotor(s32 chan, u32 command) {
     if (chan >= 0 && chan < PAD_MAX_CONTROLLERS && sPadPort[chan] >= 0) {  // co-star mode
@@ -481,6 +484,15 @@ void WPADControlMotor(s32 chan, u32 command) {
 
 void WPADSetAutoSleepTime(u8) {}
 u8 WPADGetSensorBarPosition(void) { return 0; }
+
+}  // extern "C"
+
+// Whether the game was already told this channel is connected (for SpkSpeakerCtrl::setup).
+bool pc_wpad_announced_connected(s32 chan) {
+    return chan >= 0 && chan < kNumChannels && sChannels[chan].announced && sChannels[chan].connected;
+}
+
+extern "C" {
 
 s32 WPADProbe(s32 chan, u32* type) {
     ReadPads();

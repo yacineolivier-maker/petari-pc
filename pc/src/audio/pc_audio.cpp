@@ -23,6 +23,7 @@
 #include "JSystem/JAudio2/JASDSPInterface.hpp"
 #include "JSystem/JAudio2/JASDriverIF.hpp"
 #include "JSystem/JAudio2/JASHeapCtrl.hpp"
+#include "Game/Speaker/SpkSpeakerCtrl.hpp"
 
 #include <SDL3/SDL_audio.h>
 #include <SDL3/SDL_init.h>
@@ -159,6 +160,48 @@ void MixExternal(f32* interleaved) {
     sExt.available -= kSubframeSize;
 }
 
+// --- Wii Remote speaker -----------------------------------------------------------------------
+// 40 samples at 6 kHz every 320 output frames (4 subframes, 6.67 ms), linearly upsampled x8 and
+// mixed in the center at display.ini's sons_wiimote volume.
+constexpr int kSpeakerSamples = 40;
+constexpr int kSpeakerUpsample = 8;
+struct {
+    s16 samples[kSpeakerSamples] = {};
+    bool active = false;
+    int pos = 0;      // output frame within the current block
+    f32 last = 0.0f;  // last sample of the previous block
+} sSpeaker;
+
+}  // namespace
+}  // namespace smgpc::audio
+
+float pc_settings_speaker_volume();
+
+namespace smgpc::audio {
+namespace {
+
+void MixSpeaker(f32* interleaved) {
+    const f32 gain = pc_settings_speaker_volume() / 32768.0f;
+    for (int i = 0; i < kSubframeSize; i++) {
+        if (sSpeaker.pos == 0) {
+            sSpeaker.last = sSpeaker.active ? sSpeaker.samples[kSpeakerSamples - 1] : 0.0f;
+            sSpeaker.active = SpkSpeakerCtrl::renderForPc(sSpeaker.samples);
+        }
+        const int k = sSpeaker.pos / kSpeakerUpsample;
+        const f32 t = f32(sSpeaker.pos % kSpeakerUpsample) / kSpeakerUpsample;
+        if (sSpeaker.active || sSpeaker.last != 0.0f) {
+            const f32 a = k == 0 ? sSpeaker.last : sSpeaker.samples[k - 1];
+            const f32 b = sSpeaker.active ? sSpeaker.samples[k] : 0.0f;
+            const f32 v = (a + (b - a) * t) * gain;
+            interleaved[i * 2 + 0] += v;
+            interleaved[i * 2 + 1] += v;
+        }
+        if (++sSpeaker.pos == kSpeakerSamples * kSpeakerUpsample) {
+            sSpeaker.pos = 0;
+        }
+    }
+}
+
 // --- Rendering ------------------------------------------------------------------------------
 StereoSubframe sSubframe;
 
@@ -174,6 +217,7 @@ void RenderSubframe(f32* interleaved) {
         interleaved[i * 2 + 1] = sSubframe.r[i] * master;
     }
     MixExternal(interleaved);
+    MixSpeaker(interleaved);
 }
 
 // Renders a whole audio frame (getSubFrames() subframes, like one DSP sync). Returns bytes written.

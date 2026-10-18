@@ -103,9 +103,10 @@ python tools/gen_pc_files.py                            # regenerate files.cmake
   memory), `SMGPC_TRACE_BIG_ALLOC=<MB>` (stack of big malloc/realloc), `SMGPC_TRACE_HOST_NEW=<first>:<last>:<dump>`
   (game `new`s left in host memory and still alive), `SMGPC_HOST_NEW` (all plain `new` on the host), `SMGPC_DUMP_TEXTURES` (dumps to <user cache>/texture_dumps;
   Dolphin-format HD packs load from `textures/` next to the exe, same hashes as Dolphin), `SMGPC_BACKEND=d3d12|vulkan|d3d11`,
-  `SMGPC_SUPERSAMPLE=N`, `SMGPC_SETTINGS_MENU=<frame>` (opens the F1 settings menu, pc/src/ui/settings_menu.cpp; `SMGPC_SUPERSAMPLE_LIVE=N` switches supersampling then), `SMGPC_LANGUAGE=fr|en|es`, `SMGPC_PIXEL_LIGHTING`, `SMGPC_FXAA`, `SMGPC_SHARPEN`, `SMGPC_VIBRANCE`, `SMGPC_WINDOW_SIZE=<w>x<h>` (display.ini: supersampling, langue, eclairage_par_pixel, fxaa, nettete, couleurs_vives); Aurora: `AURORA_DEBUG_NOCULL`,
+  `SMGPC_SUPERSAMPLE=N`, `SMGPC_SETTINGS_MENU=<frame>` (opens the F1 settings menu, pc/src/ui/settings_menu.cpp; `SMGPC_SUPERSAMPLE_LIVE=N` switches supersampling then), `SMGPC_LANGUAGE=fr|en|es`, `SMGPC_PIXEL_LIGHTING`, `SMGPC_FXAA`, `SMGPC_SHARPEN`, `SMGPC_VIBRANCE`, `SMGPC_WINDOW_SIZE=<w>x<h>`, `SMGPC_SPEAKER=<0-1>` (Wii Remote speaker sounds, SpkSpeakerCtrl::renderForPc mixed by pc_audio.cpp) (display.ini: supersampling, langue, eclairage_par_pixel, fxaa, nettete, couleurs_vives); Aurora: `AURORA_DEBUG_NOCULL`,
   `AURORA_DEBUG_NODEPTH` (patch 0003).
 - Local helper scripts (not in git) live in `D:\SUPER_MARIO_GALAXY\Outils_Claude`: `shots.ps1`
   (screenshots of a frozen copy of the build, without taking the focus), `sweep.ps1` (loads every
   galaxy and records crashes), `install.ps1` (copies the build to `..\Jeu` + desktop shortcut),
-  `dolphin_shots.ps1` (reference renders with the portable Dolphin in `Outils_Claude\Dolphin`).
+  `dolphin_shots.ps1` (reference renders with the portable Dolphin in `Outils_Claude\Dolphin`),
+  `verif.ps1` (post-process / window aspect / F1 menu captures on Good Egg).
