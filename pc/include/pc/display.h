@@ -21,6 +21,9 @@ struct PcSettings {
     float particleDensity = 1.5f;
     float godRays = 0.6f;
     bool pixelLighting = true;
+    bool fxaa = false;        // final image anti-aliasing (useful without supersampling/MSAA)
+    float sharpen = 0.3f;     // contrast-adaptive sharpening, 0-1
+    float vibrance = 0.1f;    // saturation boost of dull colors, -1-1
     bool coStar = false;
     std::string language = "fr";
 };
@@ -35,6 +38,9 @@ void pc_settings_apply_supersampling();
 
 // Applies the lighting mode (per pixel or per vertex) now.
 void pc_settings_apply_lighting();
+
+// Applies the final post-process pass (FXAA, sharpening, vibrance) now.
+void pc_settings_apply_post_process();
 
 // Reads <user dir>/display.ini (creating it with the defaults) into the Aurora configuration.
 void pc_display_configure(AuroraConfig* config, bool forceFullscreen);

@@ -185,6 +185,21 @@ void pc_settings_menu_draw() {
         sDirty = true;
     }
     Hint(T("Rayons autour du soleil dans les galaxies où le jeu affiche un reflet du soleil."));
+    if (SliderStep(T("Netteté"), &s.sharpen, 0.0f, 1.0f, 0.05f, s.sharpen == 0.0f ? T("désactivée") : "%.2f")) {
+        pc_settings_apply_post_process();
+        sDirty = true;
+    }
+    Hint(T("Accentue les détails de l'image finale sans créer de halos."));
+    if (SliderStep(T("Couleurs vives"), &s.vibrance, -0.5f, 1.0f, 0.05f, s.vibrance == 0.0f ? T("comme sur Wii") : "%.2f")) {
+        pc_settings_apply_post_process();
+        sDirty = true;
+    }
+    Hint(T("Ravive les couleurs ternes sans saturer celles qui sont déjà vives."));
+    if (ImGui::Checkbox(T("Anticrénelage FXAA"), &s.fxaa)) {
+        pc_settings_apply_post_process();
+        sDirty = true;
+    }
+    Hint(T("Lisse les bords de l'image finale. Utile surtout sans suréchantillonnage ni MSAA."));
 
     ImGui::SeparatorText(T("Jeu"));
     if (ImGui::Checkbox(T("Mode deux joueurs (co-star)"), &s.coStar)) {

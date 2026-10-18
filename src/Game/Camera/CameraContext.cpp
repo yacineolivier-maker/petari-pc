@@ -3,6 +3,10 @@
 #include "Game/Util/ScreenUtil.hpp"
 #include "Game/Util/SystemUtil.hpp"
 
+#if TARGET_PC
+f32 pc_display_wide_aspect();
+#endif
+
 CameraContext::~CameraContext() {
 }
 
@@ -38,6 +42,12 @@ const TPos3f& CameraContext::getInvViewMtx() const {
 
 f32 CameraContext::getAspect() const {
     if (MR::isScreen16Per9()) {
+#if TARGET_PC
+        // Window that isn't 16:9 (ultrawide, 16:10): match the 3D view to it instead of stretching.
+        if (const f32 aspect = pc_display_wide_aspect(); aspect > 0.0f) {
+            return aspect;
+        }
+#endif
         return 16.0f / 9.0f;
     } else {
         return static_cast< f32 >(MR::getScreenWidth()) / MR::getScreenHeight();

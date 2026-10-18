@@ -195,11 +195,21 @@ void LayoutManager::movement() {
     }
 }
 
+#if TARGET_PC
+f32 pc_display_wide_aspect();
+#endif
+
 void LayoutManager::calcAnim() {
     if (MR::isScreen16Per9()) {
         nw4r::math::VEC2 scale;
         scale.x = 0.75f;
         scale.y = 1.0f;
+#if TARGET_PC
+        // Window that isn't 16:9: keep the HUD undistorted, laid out like on a 16:9 screen.
+        if (const f32 aspect = pc_display_wide_aspect(); aspect > 0.0f) {
+            scale.x = (4.0f / 3.0f) / aspect;
+        }
+#endif
         mDrawInfo.SetLocationAdjustScale(scale);
     } else {
         nw4r::math::VEC2 scale;

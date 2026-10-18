@@ -26,6 +26,7 @@
 #include <revolution/os.h>
 #include <revolution/vi.h>
 
+#include <cmath>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -53,6 +54,7 @@ namespace {
 
 OSThread sMainThread;
 bool sFrameStarted = false;
+SDL_Window* sWindow = nullptr;  // the game window (Aurora's)
 
 void AuroraLog(AuroraLogLevel level, const char* module, const char* message, unsigned int len) {
     static const char* names[] = {"DEBUG", "INFO", "WARNING", "ERROR", "FATAL"};
@@ -130,7 +132,7 @@ extern "C" void pc_platform_init(int argc, char* argv[]) {
     }
     // SMGPC_DUMP_TEXTURES=1: write the textures the game uses to <user cache>/texture_dumps.
     config.allowTextureDumps = std::getenv("SMGPC_DUMP_TEXTURES") != nullptr;
-    aurora_initialize(argc, argv, &config);
+    sWindow = aurora_initialize(argc, argv, &config).window;
     pc_display_apply_after_init();
     pc_settings_menu_init();
     // HD texture packs: Dolphin-format replacements (tex1_<w>x<h>[_m]_<hash>[_<tlut>]_<fmt>.dds|png,
@@ -162,6 +164,18 @@ extern "C" void pc_platform_init(int argc, char* argv[]) {
 }
 
 namespace {
+
+float sWideAspect = 0.0f;
+
+// The window's aspect ratio when it isn't 16:9 (ultrawide, 16:10...), else 0.
+void UpdateWideAspect() {
+    int w = 0, h = 0;
+    if (sWindow == nullptr || !SDL_GetWindowSizeInPixels(sWindow, &w, &h) || w <= 0 || h <= 0) {
+        return;
+    }
+    const float aspect = float(w) / float(h);
+    sWideAspect = std::fabs(aspect * (9.0f / 16.0f) - 1.0f) < 0.01f ? 0.0f : aspect;
+}
 
 // The game advances one tick per frame, timed by the Wii's 60 Hz retrace. With vsync on a 60 Hz
 // display, presenting already paces the frames; on a faster display or without vsync, wait here.
@@ -212,6 +226,11 @@ void LimitFrameRate() {
 
 }  // namespace
 
+// Aspect ratio for the 3D projection when the window isn't 16:9 (0 = the game's 16:9).
+float pc_display_wide_aspect() {
+    return sWideAspect;
+}
+
 extern "C" int pc_platform_begin_frame(void) {
     LimitFrameRate();
     // aurora_begin_frame fails while the window can't be drawn to (e.g. minimized): keep pumping.
@@ -244,6 +263,7 @@ extern "C" int pc_platform_begin_frame(void) {
         }
     }
     sFrameStarted = true;
+    UpdateWideAspect();
     pc_watchdog_tick();
     // SMGPC_LOG_MEMORY=1: committed private memory, whenever it changed by 64 MB.
     static const bool sLogMemory = std::getenv("SMGPC_LOG_MEMORY") != nullptr;

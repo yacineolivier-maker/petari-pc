@@ -6,6 +6,7 @@
 // about the sun), then added back to the frame. The sun position and visibility come from the
 // game's LensFlareDirector (BrightSun's occlusion test), so the shafts fade with the flare.
 
+#include "Game/Util/CameraUtil.hpp"
 #include "Game/Util/DrawUtil.hpp"
 #include "Game/Util/ScreenUtil.hpp"
 
@@ -206,7 +207,8 @@ void pc_god_rays_draw() {
         GXLoadTexObj(&gradient, GX_TEXMAP1);
         // Screen UV -> gradient UV: a circle of radius 0.45 screen width around the sun.
         const f32 radius = 0.45f;
-        const f32 aspect = static_cast< f32 >(height) / static_cast< f32 >(MR::getScreenWidth());
+        // (corrected for windows that aren't 16:9, see CameraContext::getAspect)
+        const f32 aspect = static_cast< f32 >(height) / static_cast< f32 >(MR::getScreenWidth()) * (16.0f / 9.0f) / MR::getAspect();
         Mtx m;
         PSMTXIdentity(m);
         m[0][0] = 0.5f / radius;

@@ -1,0 +1,302 @@
+diff --git a/include/aurora/aurora.h b/include/aurora/aurora.h
+--- a/include/aurora/aurora.h
++++ b/include/aurora/aurora.h
+@@ -136,6 +136,8 @@
+ void aurora_set_pause_on_focus_lost(bool value);
+ void aurora_set_background_input(bool value);
+ void aurora_set_resampler(AuroraSampler sampler);
++/** Final post-process pass at output resolution: FXAA, contrast-adaptive sharpening (0-1) and vibrance (-1-1). */
++void aurora_set_post_process(bool fxaa, float sharpen, float vibrance);
+ /** Sets the clock timescale. Default 1.0f. 0.0f is paused. Range 0.0f-16.0f. */
+ void aurora_set_timescale(float scale);
+ 
+diff --git a/lib/aurora.cpp b/lib/aurora.cpp
+--- a/lib/aurora.cpp
++++ b/lib/aurora.cpp
+@@ -474,5 +474,14 @@
+   (void)sampler;
+ #endif
+ }
++void aurora_set_post_process(bool fxaa, float sharpen, float vibrance) {
++#ifdef AURORA_ENABLE_GX
++  aurora::webgpu::set_post_process(fxaa, sharpen, vibrance);
++#else
++  (void)fxaa;
++  (void)sharpen;
++  (void)vibrance;
++#endif
++}
+ void aurora_set_timescale(float scale) { aurora::time::set_scale(scale); }
+ float aurora_get_timescale() { return aurora::time::scale(); }
+diff --git a/lib/webgpu/gpu.hpp b/lib/webgpu/gpu.hpp
+--- a/lib/webgpu/gpu.hpp
++++ b/lib/webgpu/gpu.hpp
+@@ -73,6 +73,7 @@
+ wgpu::BindGroup create_copy_bind_group(const TextureWithSampler& source);
+ void set_resampler(AuroraSampler sampler) noexcept;
+ AuroraSampler get_resampler() noexcept;
++void set_post_process(bool fxaa, float sharpen, float vibrance) noexcept;
+ Viewport calculate_present_viewport(uint32_t surface_width, uint32_t surface_height, uint32_t content_width,
+                                     uint32_t content_height) noexcept;
+ const TextureWithSampler& resample_present_source(const wgpu::CommandEncoder& encoder, const Viewport& viewport);
+diff --git a/lib/webgpu/gpu.cpp b/lib/webgpu/gpu.cpp
+--- a/lib/webgpu/gpu.cpp
++++ b/lib/webgpu/gpu.cpp
+@@ -60,6 +60,13 @@
+ static wgpu::RenderPipeline g_ResamplePipeline;
+ static wgpu::Buffer g_ResampleUniformBuffer;
+ static TextureWithSampler g_resampledFrameBuffer;
++// Optional post-process pass (FXAA / sharpening / vibrance) on the resampled image
++static wgpu::RenderPipeline g_PostPipeline;
++static wgpu::Buffer g_PostUniformBuffer;
++static TextureWithSampler g_postFrameBuffer;
++static std::atomic_bool g_postFxaa = false;
++static std::atomic<float> g_postSharpen = 0.f;
++static std::atomic<float> g_postVibrance = 0.f;
+ 
+ static wgpu::Adapter g_adapter;
+ wgpu::Instance g_instance;
+@@ -98,6 +105,9 @@
+   uint32_t samplerMode = 0;
+   float frameWidth = 0.f;
+   float frameHeight = 0.f;
++  uint32_t postFlags = 0;
++  float sharpen = 0.f;
++  float vibrance = 0.f;
+ };
+ 
+ constexpr std::string_view resampleShaderSource = R"(
+@@ -105,6 +115,9 @@
+     sampler_mode: u32,
+     frame_width: f32,
+     frame_height: f32,
++    post_flags: u32,
++    sharpen: f32,
++    vibrance: f32,
+ };
+ 
+ struct VertexOutput {
+@@ -192,6 +205,89 @@
+     }
+     return vec4(color.rgb, 1.0);
+ }
++
++// BEGIN POST-PROCESS REGION (source = resampled image, same size as the target)
++
++fn luma(c: vec3<f32>) -> f32 {
++    return dot(c, vec3<f32>(0.299, 0.587, 0.114));
++}
++
++fn load_rgb(p: vec2<i32>) -> vec3<f32> {
++    return sample_by_pixel(p).rgb;
++}
++
++fn sample_rgb(uv: vec2<f32>) -> vec3<f32> {
++    return textureSampleLevel(t, s, uv, 0.0).rgb;
++}
++
++// FXAA (Lottes' PC/console variant): alpha = 1 where an edge was smoothed.
++fn fxaa(uv: vec2<f32>, rcp: vec2<f32>, center: vec3<f32>) -> vec4<f32> {
++    let rgb_nw = sample_rgb(uv + vec2<f32>(-0.5, -0.5) * rcp);
++    let rgb_ne = sample_rgb(uv + vec2<f32>(0.5, -0.5) * rcp);
++    let rgb_sw = sample_rgb(uv + vec2<f32>(-0.5, 0.5) * rcp);
++    let rgb_se = sample_rgb(uv + vec2<f32>(0.5, 0.5) * rcp);
++    let l_nw = luma(rgb_nw);
++    let l_ne = luma(rgb_ne);
++    let l_sw = luma(rgb_sw);
++    let l_se = luma(rgb_se);
++    let l_m = luma(center);
++    let l_min = min(l_m, min(min(l_nw, l_ne), min(l_sw, l_se)));
++    let l_max = max(l_m, max(max(l_nw, l_ne), max(l_sw, l_se)));
++    if (l_max - l_min < max(0.0312, l_max * 0.125)) {
++        return vec4<f32>(center, 0.0);
++    }
++    var dir = vec2<f32>(-((l_nw + l_ne) - (l_sw + l_se)), (l_nw + l_sw) - (l_ne + l_se));
++    let dir_reduce = max((l_nw + l_ne + l_sw + l_se) * (0.25 * 0.125), 1.0 / 128.0);
++    let rcp_dir_min = 1.0 / (min(abs(dir.x), abs(dir.y)) + dir_reduce);
++    dir = clamp(dir * rcp_dir_min, vec2<f32>(-8.0, -8.0), vec2<f32>(8.0, 8.0)) * rcp;
++    let rgb_a = 0.5 * (sample_rgb(uv + dir * (1.0 / 3.0 - 0.5)) + sample_rgb(uv + dir * (2.0 / 3.0 - 0.5)));
++    let rgb_b = rgb_a * 0.5 + 0.25 * (sample_rgb(uv - dir * 0.5) + sample_rgb(uv + dir * 0.5));
++    let l_b = luma(rgb_b);
++    if (l_b < l_min || l_b > l_max) {
++        return vec4<f32>(rgb_a, 1.0);
++    }
++    return vec4<f32>(rgb_b, 1.0);
++}
++
++@fragment
++fn fs_post(in: VertexOutput) -> @location(0) vec4<f32> {
++    let p = vec2<i32>(floor(in.position.xy));
++    let dims = vec2<f32>(textureDimensions(t));
++    let e = load_rgb(p);
++    var color = e;
++    var edge = 0.0;
++    if ((uniforms.post_flags & 1u) != 0u) {
++        let r = fxaa(in.position.xy / dims, 1.0 / dims, e);
++        color = r.rgb;
++        edge = r.a;
++    }
++    if (uniforms.sharpen > 0.0) {
++        // AMD FidelityFX CAS (simplified): sharpens less where the local contrast is already high.
++        let a = load_rgb(p + vec2<i32>(-1, -1));
++        let b = load_rgb(p + vec2<i32>(0, -1));
++        let c = load_rgb(p + vec2<i32>(1, -1));
++        let d = load_rgb(p + vec2<i32>(-1, 0));
++        let f = load_rgb(p + vec2<i32>(1, 0));
++        let g = load_rgb(p + vec2<i32>(-1, 1));
++        let h = load_rgb(p + vec2<i32>(0, 1));
++        let i = load_rgb(p + vec2<i32>(1, 1));
++        var mn = min(min(min(d, e), min(f, b)), h);
++        mn = mn + min(mn, min(min(a, c), min(g, i)));
++        var mx = max(max(max(d, e), max(f, b)), h);
++        mx = mx + max(mx, max(max(a, c), max(g, i)));
++        let amp = sqrt(clamp(min(mn, vec3<f32>(2.0) - mx) / max(mx, vec3<f32>(1e-5)), vec3<f32>(0.0), vec3<f32>(1.0)));
++        let peak = -1.0 / mix(8.0, 5.0, clamp(uniforms.sharpen, 0.0, 1.0));
++        let w = amp * peak * (1.0 - edge);
++        color = clamp((color + w * (b + d + f + h)) / (vec3<f32>(1.0) + 4.0 * w), vec3<f32>(0.0), vec3<f32>(1.0));
++    }
++    if (uniforms.vibrance != 0.0) {
++        // Boosts the saturation of dull colors more than that of already saturated ones.
++        let l = luma(color);
++        let sat = max(color.r, max(color.g, color.b)) - min(color.r, min(color.g, color.b));
++        color = clamp(mix(vec3<f32>(l), color, 1.0 + uniforms.vibrance * (1.0 - sat)), vec3<f32>(0.0), vec3<f32>(1.0));
++    }
++    return vec4<f32>(color, 1.0);
++}
+ )"sv;
+ 
+ wgpu::TextureFormat to_linear(wgpu::TextureFormat format) {
+@@ -320,6 +416,12 @@
+   return g_graphicsConfig.msaaSamples > 1 ? g_frameBufferResolved : g_frameBuffer;
+ }
+ 
++void set_post_process(bool fxaa, float sharpen, float vibrance) noexcept {
++  g_postFxaa.store(fxaa, std::memory_order_relaxed);
++  g_postSharpen.store(std::clamp(sharpen, 0.f, 1.f), std::memory_order_relaxed);
++  g_postVibrance.store(std::clamp(vibrance, -1.f, 1.f), std::memory_order_relaxed);
++}
++
+ void set_resampler(AuroraSampler sampler) noexcept {
+   switch (sampler) {
+   case SAMPLER_AREA:
+@@ -643,12 +745,26 @@
+   };
+   g_ResamplePipeline = g_device.CreateRenderPipeline(&pipelineDescriptor);
+ 
++  const wgpu::FragmentState postFragmentState{
++      .module = module,
++      .entryPoint = "fs_post",
++      .targetCount = colorTargets.size(),
++      .targets = colorTargets.data(),
++  };
++  auto postPipelineDescriptor = pipelineDescriptor;
++  postPipelineDescriptor.label = "Present Post-Process Pipeline";
++  postPipelineDescriptor.fragment = &postFragmentState;
++  g_PostPipeline = g_device.CreateRenderPipeline(&postPipelineDescriptor);
++
+   const wgpu::BufferDescriptor uniformBufferDescriptor{
+       .label = "Present Resample Uniform Buffer",
+       .usage = wgpu::BufferUsage::CopyDst | wgpu::BufferUsage::Uniform,
+       .size = AURORA_ALIGN(sizeof(ResampleUniformBlock), 16),
+   };
+   g_ResampleUniformBuffer = g_device.CreateBuffer(&uniformBufferDescriptor);
++  auto postUniformBufferDescriptor = uniformBufferDescriptor;
++  postUniformBufferDescriptor.label = "Present Post-Process Uniform Buffer";
++  g_PostUniformBuffer = g_device.CreateBuffer(&postUniformBufferDescriptor);
+ }
+ 
+ wgpu::BindGroup create_copy_bind_group(const TextureWithSampler& source) {
+@@ -670,6 +786,74 @@
+   return g_device.CreateBindGroup(&bindGroupDescriptor);
+ }
+ 
++static const TextureWithSampler& post_process(const wgpu::CommandEncoder& encoder, const TextureWithSampler& source) {
++  const bool fxaa = g_postFxaa.load(std::memory_order_relaxed);
++  const float sharpen = g_postSharpen.load(std::memory_order_relaxed);
++  const float vibrance = g_postVibrance.load(std::memory_order_relaxed);
++  if (!g_PostPipeline || (!fxaa && sharpen <= 0.f && vibrance == 0.f)) {
++    return source;
++  }
++  const uint32_t width = source.size.width;
++  const uint32_t height = source.size.height;
++  if (!g_postFrameBuffer.view || g_postFrameBuffer.size.width != width || g_postFrameBuffer.size.height != height ||
++      g_postFrameBuffer.format != source.format) {
++    g_postFrameBuffer = create_render_texture(width, height, false);
++  }
++
++  const ResampleUniformBlock uniform{
++      .samplerMode = 0,
++      .frameWidth = static_cast<float>(width),
++      .frameHeight = static_cast<float>(height),
++      .postFlags = fxaa ? 1u : 0u,
++      .sharpen = sharpen,
++      .vibrance = vibrance,
++  };
++  g_queue.WriteBuffer(g_PostUniformBuffer, 0, &uniform, sizeof(uniform));
++
++  const std::array bindGroupEntries{
++      wgpu::BindGroupEntry{
++          .binding = 0,
++          .buffer = g_PostUniformBuffer,
++          .size = AURORA_ALIGN(sizeof(ResampleUniformBlock), 16),
++      },
++      wgpu::BindGroupEntry{
++          .binding = 1,
++          .sampler = source.sampler,
++      },
++      wgpu::BindGroupEntry{
++          .binding = 2,
++          .textureView = source.view,
++      },
++  };
++  const wgpu::BindGroupDescriptor bindGroupDescriptor{
++      .layout = g_ResampleBindGroupLayout,
++      .entryCount = bindGroupEntries.size(),
++      .entries = bindGroupEntries.data(),
++  };
++  const auto bindGroup = g_device.CreateBindGroup(&bindGroupDescriptor);
++
++  const std::array attachments{
++      wgpu::RenderPassColorAttachment{
++          .view = g_postFrameBuffer.view,
++          .loadOp = wgpu::LoadOp::Clear,
++          .storeOp = wgpu::StoreOp::Store,
++      },
++  };
++  const wgpu::RenderPassDescriptor renderPassDescriptor{
++      .label = "Present post-process render pass",
++      .colorAttachmentCount = attachments.size(),
++      .colorAttachments = attachments.data(),
++      .timestampWrites = gpu_prof::pass_writes("Present post-process"),
++  };
++  const auto pass = encoder.BeginRenderPass(&renderPassDescriptor);
++  pass.SetPipeline(g_PostPipeline);
++  pass.SetBindGroup(0, bindGroup, 0, nullptr);
++  pass.SetViewport(0.f, 0.f, static_cast<float>(width), static_cast<float>(height), 0.f, 1.f);
++  pass.Draw(3);
++  pass.End();
++  return g_postFrameBuffer;
++}
++
+ const TextureWithSampler& resample_present_source(const wgpu::CommandEncoder& encoder, const Viewport& viewport) {
+   const auto& source = present_source();
+   const uint32_t width = viewport_extent(viewport.width);
+@@ -729,7 +913,7 @@
+   pass.Draw(3);
+   pass.End();
+ 
+-  return g_resampledFrameBuffer;
++  return post_process(encoder, g_resampledFrameBuffer);
+ }
+ 
+ static wgpu::BackendType to_wgpu_backend(AuroraBackend backend) {
+@@ -1096,6 +1280,9 @@
+   g_CopyBindGroup = {};
+   g_ResampleBindGroupLayout = {};
+   g_ResamplePipeline = {};
++  g_PostPipeline = {};
++  g_PostUniformBuffer = {};
++  g_postFrameBuffer = {};
+   g_ResampleUniformBuffer = {};
+   g_resampledFrameBuffer = {};
+   g_frameBuffer = {};

@@ -83,6 +83,18 @@ void Load(FILE* f) {
             }
         } else if (key == "eclairage_par_pixel") {
             g_settings.pixelLighting = ParseBool(value);
+        } else if (key == "fxaa") {
+            g_settings.fxaa = ParseBool(value);
+        } else if (key == "nettete") {
+            const float f = float(std::atof(value.c_str()));
+            if (f >= 0.0f && f <= 1.0f) {
+                g_settings.sharpen = f;
+            }
+        } else if (key == "couleurs_vives") {
+            const float f = float(std::atof(value.c_str()));
+            if (f >= -1.0f && f <= 1.0f) {
+                g_settings.vibrance = f;
+            }
         } else if (key == "langue" && (value == "fr" || value == "en" || value == "es")) {
             g_settings.language = value;
         }
@@ -130,6 +142,14 @@ void Save(const std::string& path) {
                  "; Rayons de soleil la ou le jeu affiche un reflet du soleil : 0 = desactive,\n"
                  "; sinon intensite (jusqu'a 2)\n"
                  "rayons_soleil = %.1f\n"
+                 "; Eclairage calcule pour chaque pixel au lieu de chaque sommet (reliefs plus lisses)\n"
+                 "eclairage_par_pixel = %d\n"
+                 "; Anticrenelage FXAA de l'image finale (utile sans surechantillonnage ni msaa)\n"
+                 "fxaa = %d\n"
+                 "; Nettete de l'image finale : 0 = desactivee, jusqu'a 1\n"
+                 "nettete = %.2f\n"
+                 "; Couleurs plus vives : 0 = Wii, jusqu'a 1 (valeurs negatives = plus ternes)\n"
+                 "couleurs_vives = %.2f\n"
                  "\n"
                  "; Mode deux joueurs (co-star) : avec deux manettes, la deuxieme pilote le pointeur\n"
                  "; etoile du second joueur (1 = active)\n"
@@ -138,7 +158,8 @@ void Save(const std::string& path) {
                  g_settings.anisotropy, g_settings.alphaToCoverage ? 1 : 0, g_settings.textureMipmaps ? 1 : 0,
                  g_settings.vsync ? 1 : 0, g_settings.backend.c_str(), g_settings.supersampling,
                  g_settings.language.c_str(), g_settings.drawDistance, g_settings.particleDensity,
-                 g_settings.godRays, g_settings.pixelLighting ? 1 : 0, g_settings.coStar ? 1 : 0);
+                 g_settings.godRays, g_settings.pixelLighting ? 1 : 0, g_settings.fxaa ? 1 : 0, g_settings.sharpen,
+                 g_settings.vibrance, g_settings.coStar ? 1 : 0);
     std::fclose(f);
 }
 
@@ -170,6 +191,15 @@ void pc_display_configure(AuroraConfig* config, bool forceFullscreen) {
     }
     if (const char* env = std::getenv("SMGPC_PIXEL_LIGHTING")) {
         g_settings.pixelLighting = ParseBool(env);
+    }
+    if (const char* env = std::getenv("SMGPC_FXAA")) {
+        g_settings.fxaa = ParseBool(env);
+    }
+    if (const char* env = std::getenv("SMGPC_SHARPEN")) {
+        g_settings.sharpen = float(std::atof(env));
+    }
+    if (const char* env = std::getenv("SMGPC_VIBRANCE")) {
+        g_settings.vibrance = float(std::atof(env));
     }
     if (const char* env = std::getenv("SMGPC_CO_STAR")) {
         g_settings.coStar = ParseBool(env);
@@ -205,10 +235,15 @@ void pc_display_apply_after_init() {
     AuroraSetAutoMipmaps(g_settings.textureMipmaps ? 1 : 0);
     pc_settings_apply_supersampling();
     pc_settings_apply_lighting();
+    pc_settings_apply_post_process();
 }
 
 void pc_settings_apply_lighting() {
     GXSetPerPixelLighting(g_settings.pixelLighting);
+}
+
+void pc_settings_apply_post_process() {
+    aurora_set_post_process(g_settings.fxaa, g_settings.sharpen, g_settings.vibrance);
 }
 
 void pc_settings_apply_supersampling() {
