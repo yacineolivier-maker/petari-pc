@@ -4,6 +4,7 @@
 #include "pc/user_files.h"
 
 #include <dolphin/gx/GXAurora.h>
+#include <dolphin/gx/GXExtra.h>
 #include <dolphin/vi.h>
 
 #include <cctype>
@@ -80,6 +81,8 @@ void Load(FILE* f) {
             if (f >= 0.0f && f <= 2.0f) {
                 g_settings.godRays = f;
             }
+        } else if (key == "eclairage_par_pixel") {
+            g_settings.pixelLighting = ParseBool(value);
         } else if (key == "langue" && (value == "fr" || value == "en" || value == "es")) {
             g_settings.language = value;
         }
@@ -135,7 +138,7 @@ void Save(const std::string& path) {
                  g_settings.anisotropy, g_settings.alphaToCoverage ? 1 : 0, g_settings.textureMipmaps ? 1 : 0,
                  g_settings.vsync ? 1 : 0, g_settings.backend.c_str(), g_settings.supersampling,
                  g_settings.language.c_str(), g_settings.drawDistance, g_settings.particleDensity,
-                 g_settings.godRays, g_settings.coStar ? 1 : 0);
+                 g_settings.godRays, g_settings.pixelLighting ? 1 : 0, g_settings.coStar ? 1 : 0);
     std::fclose(f);
 }
 
@@ -164,6 +167,9 @@ void pc_display_configure(AuroraConfig* config, bool forceFullscreen) {
     }
     if (const char* env = std::getenv("SMGPC_GOD_RAYS")) {
         g_settings.godRays = float(std::atof(env));
+    }
+    if (const char* env = std::getenv("SMGPC_PIXEL_LIGHTING")) {
+        g_settings.pixelLighting = ParseBool(env);
     }
     if (const char* env = std::getenv("SMGPC_CO_STAR")) {
         g_settings.coStar = ParseBool(env);
@@ -198,6 +204,11 @@ void pc_display_apply_after_init() {
     AuroraSetAlphaToCoverage(g_settings.alphaToCoverage && g_settings.msaa > 1 ? 1 : 0);
     AuroraSetAutoMipmaps(g_settings.textureMipmaps ? 1 : 0);
     pc_settings_apply_supersampling();
+    pc_settings_apply_lighting();
+}
+
+void pc_settings_apply_lighting() {
+    GXSetPerPixelLighting(g_settings.pixelLighting);
 }
 
 void pc_settings_apply_supersampling() {

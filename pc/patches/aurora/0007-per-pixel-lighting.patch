@@ -1,0 +1,255 @@
+diff --git a/include/dolphin/gx/GXExtra.h b/include/dolphin/gx/GXExtra.h
+--- a/include/dolphin/gx/GXExtra.h
++++ b/include/dolphin/gx/GXExtra.h
+@@ -22,6 +22,10 @@
+ 
+ void GXColor4f32(float r, float g, float b, float a);
+ 
++// Port addition (SMG): computes GX lighting per pixel instead of per vertex (smoother shading on
++// low-poly models). Takes effect on the next draws.
++void GXSetPerPixelLighting(bool enable);
++
+ #ifdef __cplusplus
+ }
+ #endif
+diff --git a/lib/dolphin/gx/GXExtra.cpp b/lib/dolphin/gx/GXExtra.cpp
+--- a/lib/dolphin/gx/GXExtra.cpp
++++ b/lib/dolphin/gx/GXExtra.cpp
+@@ -27,4 +27,6 @@
+     GX_WRITE_U64(reinterpret_cast<u64>(dest));
+   }
+ }
++
++void GXSetPerPixelLighting(bool enable) { aurora::gx::g_perPixelLighting.store(enable, std::memory_order_relaxed); }
+ }
+diff --git a/lib/gx/gx.cpp b/lib/gx/gx.cpp
+--- a/lib/gx/gx.cpp
++++ b/lib/gx/gx.cpp
+@@ -387,6 +387,8 @@
+   return g_device.CreateRenderPipeline(&descriptor);
+ }
+ 
++std::atomic_bool g_perPixelLighting{false};
++
+ void populate_pipeline_config(PipelineConfig& config, GXPrimitive primitive, GXVtxFmt fmt) noexcept {
+   ZoneScoped;
+ 
+@@ -394,6 +396,7 @@
+   config.shaderConfig = {};
+   config.shaderConfig.fogType = g_gxState.fog.type;
+   config.shaderConfig.fogRangeEnabled = g_gxState.fog.rangeEnabled;
++  config.shaderConfig.perPixelLighting = g_perPixelLighting.load(std::memory_order_relaxed);
+   u8 vtxOffset = 0;
+   for (int i = GX_VA_PNMTXIDX; i <= GX_VA_TEX7; ++i) {
+     const auto attr = static_cast<GXAttr>(i);
+diff --git a/lib/gx/gx.hpp b/lib/gx/gx.hpp
+--- a/lib/gx/gx.hpp
++++ b/lib/gx/gx.hpp
+@@ -7,6 +7,7 @@
+ #include "../gfx/texture.hpp"
+ 
+ #include <absl/container/flat_hash_map.h>
++#include <atomic>
+ #include <type_traits>
+ #include <cstring>
+ #include <bitset>
+@@ -47,7 +48,8 @@
+ namespace aurora::gx {
+ constexpr bool EnableNormalVisualization = false;
+ constexpr bool EnableDebugPrints = false;
+-constexpr bool UsePerPixelLighting = false;
++// Port addition (SMG): per-pixel lighting, switched at runtime by GXSetPerPixelLighting.
++extern std::atomic_bool g_perPixelLighting;
+ constexpr bool UseReversedZ = true;
+ 
+ constexpr u32 MaxTextures = GX_MAX_TEXMAP;
+@@ -494,7 +496,8 @@
+   u8 vtxStride = 0;
+   u8 lineMode : 2 = 0; // 1 = GX_LINES, 2 = GX_LINESTRIP, 3 = GX_POINTS
+   u8 fogRangeEnabled : 1 = false;
+-  u8 pad1 : 5 = 0;
++  u8 perPixelLighting : 1 = false;
++  u8 pad1 : 4 = 0;
+   u8 pad2 = 0;
+   std::array<AttrConfig, MaxVtxAttr> attrs;
+   std::array<TevSwap, MaxTevSwap> tevSwapTable;
+diff --git a/lib/gx/shader.cpp b/lib/gx/shader.cpp
+--- a/lib/gx/shader.cpp
++++ b/lib/gx/shader.cpp
+@@ -893,20 +893,23 @@
+ 
+ constexpr bool is_emboss_texgen(GXTexGenType type) noexcept { return type >= GX_TG_BUMP0 && type <= GX_TG_BUMP7; }
+ 
+-auto lighting_func(const ShaderConfig& config, const ColorChannelConfig& cc, u8 i, bool alpha) -> std::string {
++// perPixel: computed in the fragment shader (into rast<i>), else in the vertex shader (into out.cc<i>, or
++// into vcc<i> when vertexOutVar is set: per-pixel mode still needs the lit vertex color for color texgens).
++auto lighting_func(const ShaderConfig& config, const ColorChannelConfig& cc, u8 i, bool alpha, bool perPixel,
++                   bool vertexOutVar = false) -> std::string {
+   std::string_view swizzle = alpha ? ".a"sv : ""sv;
+   std::string outVar;
+   std::string_view posVar;
+-  if (UsePerPixelLighting) {
++  if (perPixel) {
+     outVar = fmt::format("rast{}", i);
+     posVar = "in.mv_pos"sv;
+   } else {
+-    outVar = fmt::format("out.cc{}", i);
++    outVar = vertexOutVar ? fmt::format("vcc{}", i) : fmt::format("out.cc{}", i);
+     posVar = "mv_pos"sv;
+   }
+   std::string ambSrc, matSrc;
+   if (cc.ambSrc == GX_SRC_VTX) {
+-    if (UsePerPixelLighting) {
++    if (perPixel) {
+       ambSrc = fmt::format("in.clr{}", i);
+     } else {
+       ambSrc = vtx_attr(config, static_cast<GXAttr>(GX_VA_CLR0 + i));
+@@ -915,7 +918,7 @@
+     ambSrc = fmt::format("ubuf.cc{0}{1}_amb", i, alpha ? "a"sv : ""sv);
+   }
+   if (cc.matSrc == GX_SRC_VTX) {
+-    if (UsePerPixelLighting) {
++    if (perPixel) {
+       matSrc = fmt::format("in.clr{}", i);
+     } else {
+       matSrc = vtx_attr(config, static_cast<GXAttr>(GX_VA_CLR0 + i));
+@@ -937,7 +940,7 @@
+           var dist_attn = dot(light.dist_att, vec3f(1.0, dist, dist2));
+           attn = max(0.0, cos_attn / dist_attn);)""");
+   } else if (cc.attnFn == GX_AF_SPEC) {
+-    std::string_view normal = UsePerPixelLighting ? "in.mv_nrm"sv : "mv_nrm"sv;
++    std::string_view normal = perPixel ? "pp_nrm"sv : "mv_nrm"sv;
+     std::string dist_attn = diffFn != GX_DF_NONE
+                                 ? "max(0.0, dot(normalize(light.dist_att), vec3f(1.0, attn, attn * attn)));"
+                                 : "max(0.0, dot(light.dist_att, vec3f(1.0, attn, attn * attn)));";
+@@ -952,14 +955,14 @@
+   if (diffFn == GX_DF_NONE) {
+     lightDiffFn = "1.0"sv;
+   } else if (diffFn == GX_DF_SIGN) {
+-    if (UsePerPixelLighting) {
+-      lightDiffFn = "dot(ldir, in.mv_nrm)"sv;
++    if (perPixel) {
++      lightDiffFn = "dot(ldir, pp_nrm)"sv;
+     } else {
+       lightDiffFn = "dot(ldir, mv_nrm)"sv;
+     }
+   } else if (diffFn == GX_DF_CLAMP) {
+-    if (UsePerPixelLighting) {
+-      lightDiffFn = "max(0.0, dot(ldir, in.mv_nrm))"sv;
++    if (perPixel) {
++      lightDiffFn = "max(0.0, dot(ldir, pp_nrm))"sv;
+     } else {
+       lightDiffFn = "max(0.0, dot(ldir, mv_nrm))"sv;
+     }
+@@ -1183,7 +1186,7 @@
+     vtxXfrAttrsPre += "\n    out.nrm = mv_nrm;";
+   }
+   const bool useNormalTarget = normalAttachment != UINT32_MAX && config.attrs[GX_VA_NRM].attrType != GX_NONE;
+-  if (useNormalTarget && !(UsePerPixelLighting && info.lightingEnabled)) {
++  if (useNormalTarget && !(config.perPixelLighting && info.lightingEnabled)) {
+     vtxOutAttrs += fmt::format("\n    @location({}) mv_nrm: vec3f,", vtxOutIdx++);
+     vtxXfrAttrsPre += "\n    out.mv_nrm = mv_nrm;";
+   }
+@@ -1273,12 +1276,13 @@
+         "    cos_att: vec3f,\n"
+         "    dist_att: vec3f,\n"
+         "};";
+-    if (UsePerPixelLighting) {
++    if (config.perPixelLighting) {
+       vtxOutAttrs += fmt::format("\n    @location({}) mv_pos: vec3f,", vtxOutIdx++);
+       vtxOutAttrs += fmt::format("\n    @location({}) mv_nrm: vec3f,", vtxOutIdx++);
+       vtxXfrAttrs += fmt::format(FMT_STRING(R"""(
+     out.mv_pos = mv_pos;
+     out.mv_nrm = mv_nrm;)"""));
++      fragmentFnPre += "\n    let pp_nrm = select(in.mv_nrm, normalize(in.mv_nrm), dot(in.mv_nrm, in.mv_nrm) > 1e-10);";
+     }
+   }
+ 
+@@ -1303,7 +1307,7 @@
+     }
+ 
+     // Output vertex color if necessary
+-    if (UsePerPixelLighting) {
++    if (config.perPixelLighting) {
+       if ((cc.lightingEnabled && cc.ambSrc == GX_SRC_VTX) || cc.matSrc == GX_SRC_VTX ||
+           (cca.lightingEnabled && cca.ambSrc == GX_SRC_VTX) || cca.matSrc == GX_SRC_VTX) {
+         vtxOutAttrs += fmt::format("\n    @location({}) clr{}: vec4f,", vtxOutIdx++, i);
+@@ -1311,14 +1315,17 @@
+       }
+     }
+ 
+-    if (UsePerPixelLighting) {
++    if (config.perPixelLighting) {
+       fragmentFnPre += fmt::format("\n    var rast{}: vec4f;", i);
+-      fragmentFnPre += lighting_func(config, cc, i, false);
+-      fragmentFnPre += lighting_func(config, cca, i, true);
++      fragmentFnPre += lighting_func(config, cc, i, false, true);
++      fragmentFnPre += lighting_func(config, cca, i, true, true);
++      vtxXfrAttrs += fmt::format("\n    var vcc{}: vec4f;", i);
++      vtxXfrAttrs += lighting_func(config, cc, i, false, false, true);
++      vtxXfrAttrs += lighting_func(config, cca, i, true, false, true);
+     } else {
+       vtxOutAttrs += fmt::format("\n    @location({}) cc{}: vec4f,", vtxOutIdx++, i);
+-      vtxXfrAttrs += lighting_func(config, cc, i, false);
+-      vtxXfrAttrs += lighting_func(config, cca, i, true);
++      vtxXfrAttrs += lighting_func(config, cc, i, false, false);
++      vtxXfrAttrs += lighting_func(config, cca, i, true, false);
+       fragmentFnPre += fmt::format("\n    var rast{0} = in.cc{0};", i);
+     }
+   }
+@@ -1361,9 +1368,8 @@
+       // The hardware feeds the lit color channel (after lighting) to color texgens, not the raw
+       // vertex color: toon shading relies on it (light intensity in red -> ramp coordinate).
+       const u32 chan = tcg.src == GX_TG_COLOR0 ? 0 : 1;
+-      if (UsePerPixelLighting) {
+-        vtxXfrAttrs += fmt::format("\n    var tc{} = {};", i,
+-                                   vtx_attr(config, static_cast<GXAttr>(GX_VA_CLR0 + chan)));
++      if (config.perPixelLighting) {
++        vtxXfrAttrs += fmt::format("\n    var tc{} = vcc{};", i, chan);
+       } else {
+         vtxXfrAttrs += fmt::format("\n    var tc{} = out.cc{};", i, chan);
+       }
+@@ -1426,6 +1432,43 @@
+       vtxXfrAttrs += fmt::format("\n    out.tex{0}_uv = tc{0}_proj.xy;", i);
+       fragmentFnPre += fmt::format("\n    var tex{0}_uv = in.tex{0}_uv.xy;", i);
+     }
++    // Port addition (SMG): with per-pixel lighting, texgens fed by the lit color (toon ramps) or the
++    // normal (rim light, sphere maps) are also evaluated per pixel. The vertex result above stays
++    // (emboss texgens may read it); the fragment recomputes the coordinate and overrides it.
++    const bool texgenSrcPerPixel = tcg.src == GX_TG_COLOR0 || tcg.src == GX_TG_COLOR1 || tcg.src == GX_TG_NRM;
++    // (16 inter-stage locations at most: the normal needs one more.)
++    if (config.perPixelLighting && texgenSrcPerPixel && config.lineMode == 0 && (tcg.src != GX_TG_NRM || vtxOutIdx < 14) &&
++        (tcg.type == GX_TG_MTX2x4 || tcg.type == GX_TG_MTX3x4) && !info.indexAttr.test(GX_VA_TEX0MTXIDX + i)) {
++      if (tcg.src == GX_TG_NRM) {
++        vtxOutAttrs += fmt::format("\n    @location({}) tcn{}: vec3f,", vtxOutIdx++, i);
++        vtxXfrAttrs += fmt::format("\n    out.tcn{} = {};", i, vtx_attr(config, GX_VA_NRM));
++        fragmentFnPre += fmt::format("\n    let ftc{0} = vec4f(in.tcn{0}, 1.0);", i);
++      } else {
++        fragmentFnPre += fmt::format("\n    let ftc{} = rast{};", i, tcg.src == GX_TG_COLOR0 ? 0 : 1);
++      }
++      if (tcg.mtx == GX_IDENTITY) {
++        fragmentFnPre += fmt::format("\n    var ftc{0}_tmp = ftc{0}.xyz;", i);
++      } else {
++        fragmentFnPre += fmt::format("\n    var ftc{0}_tmp = ftc{0} * ubuf.postex_mtx[{1}];", i, tcg.mtx / 3);
++      }
++      if (tcg.type == GX_TG_MTX2x4) {
++        fragmentFnPre += fmt::format("\n    ftc{0}_tmp.z = 1.0f;", i);
++      }
++      if (tcg.normalize) {
++        fragmentFnPre += fmt::format("\n    ftc{0}_tmp = normalize(ftc{0}_tmp);", i);
++      }
++      if (tcg.postMtx == GX_PTIDENTITY) {
++        fragmentFnPre += fmt::format("\n    let ftc{0}_proj = ftc{0}_tmp;", i);
++      } else {
++        fragmentFnPre += fmt::format("\n    let ftc{0}_proj = vec4f(ftc{0}_tmp.xyz, 1.0) * ubuf.postmtx[{1}];", i,
++                                     (tcg.postMtx - GX_PTTEXMTX0) / 3);
++      }
++      if (tcg.type == GX_TG_MTX3x4) {
++        fragmentFnPre += fmt::format("\n    tex{0}_uv = ftc{0}_proj.xy / ftc{0}_proj.z;", i);
++      } else {
++        fragmentFnPre += fmt::format("\n    tex{0}_uv = ftc{0}_proj.xy;", i);
++      }
++    }
+   }
+   // Multiple TEV stages may reference the same indirect stage,
+   // so we sample each indirect texture only once.

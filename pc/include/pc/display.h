@@ -20,6 +20,7 @@ struct PcSettings {
     float drawDistance = 2.0f;
     float particleDensity = 1.5f;
     float godRays = 0.6f;
+    bool pixelLighting = true;
     bool coStar = false;
     std::string language = "fr";
 };
@@ -31,6 +32,9 @@ void pc_settings_save();
 
 // Applies the internal resolution (supersampling) now.
 void pc_settings_apply_supersampling();
+
+// Applies the lighting mode (per pixel or per vertex) now.
+void pc_settings_apply_lighting();
 
 // Reads <user dir>/display.ini (creating it with the defaults) into the Aurora configuration.
 void pc_display_configure(AuroraConfig* config, bool forceFullscreen);

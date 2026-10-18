@@ -71,7 +71,12 @@ void LogoScene::init() {
         initNerve(GET_NERVE_ANON(LogoSceneCensorshipFadein));
     } else
 #endif
+#if TARGET_PC
+        // No Wii Remote strap on PC: skip the strap reminder, go straight to loading.
+        initNerve(GET_NERVE_ANON(LogoSceneWaitReadDoneSystemArchive));
+#else
         initNerve(GET_NERVE_ANON(LogoSceneStrapFadein));
+#endif
 
     SceneFunction::createHioBasicNode(this);
     SceneFunction::initForNameObj();

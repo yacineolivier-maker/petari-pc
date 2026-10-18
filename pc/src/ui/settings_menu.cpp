@@ -168,6 +168,11 @@ void pc_settings_menu_draw() {
     }
 
     ImGui::SeparatorText(T("Améliorations"));
+    if (ImGui::Checkbox(T("Éclairage par pixel"), &s.pixelLighting)) {
+        pc_settings_apply_lighting();
+        sDirty = true;
+    }
+    Hint(T("Lumière calculée pour chaque pixel au lieu de chaque sommet : reliefs et reflets plus lisses."));
     if (SliderStep(T("Distance d'affichage"), &s.drawDistance, 1.0f, 4.0f, 0.5f, "x%.1f")) {
         sDirty = true;
     }
