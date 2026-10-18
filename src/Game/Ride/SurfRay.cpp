@@ -834,7 +834,12 @@ void SurfRay::updateRotate() {
 
     if (isRotateStart()) {
         TVec3f accel(0.0f, 0.0f, 0.0f);
+#if TARGET_PC
+        // A PC gamepad has no accelerometer: the left stick rolls the remote.
+        MR::getCorePadAccelerationStickTilt(&accel, mPadChannel);
+#else
         MR::getCorePadAcceleration(&accel, mPadChannel);
+#endif
 
         if (accel.z > -0.7f || MR::abs(accel.x) > 0.15f) {
             f32 twistAngle = accel.x;

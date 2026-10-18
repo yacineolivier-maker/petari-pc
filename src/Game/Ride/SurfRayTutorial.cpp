@@ -46,7 +46,11 @@ SurfRayTutorial::SurfRayTutorial(LiveActor* pHost, TalkMessageCtrl* pTalkCtrl, c
 }
 
 bool SurfRayTutorial::update() {
+#if TARGET_PC
+    MR::getCorePadAccelerationStickTilt(&mPadAccel, WPAD_CHAN0);  // see SurfRay::updateRotate
+#else
     MR::getCorePadAcceleration(&mPadAccel, WPAD_CHAN0);
+#endif
     updateNerve();
 
     return mIsTutorialPass;

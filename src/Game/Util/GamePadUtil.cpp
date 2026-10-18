@@ -44,6 +44,13 @@ namespace MR {
         MR::getWPad(channel)->mCorePadAccel->getAcceleration(pAccel);
     }
 
+#if TARGET_PC
+    void getCorePadAccelerationStickTilt(TVec3f* pAccel, s32 channel) {
+        const f32 roll = getSubPadStickX(channel) * MR::toRadian(60.0f);
+        pAccel->set(MR::sin(roll), 0.0f, -MR::cos(roll));
+    }
+#endif
+
     bool testCorePadButtonUp(s32 channel) {
         return MR::getWPad(channel)->mButton->testButtonUp();
     }

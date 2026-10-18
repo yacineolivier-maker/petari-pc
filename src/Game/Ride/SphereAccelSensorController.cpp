@@ -76,6 +76,13 @@ void SphereAccelSensorController::update(const TVec3f&) {
 }
 
 void SphereAccelSensorController::clacXY(f32* pX, f32* pY) {
+#if TARGET_PC
+    // A PC gamepad has no accelerometer: the left stick tilts the Star Ball, through the game's
+    // own stick controller (used during development). TamakoroTutorial's "hold the remote
+    // upright" check passes with the emulated remote at rest.
+    SpherePadController::clacXY(pX, pY);
+    return;
+#endif
     f32 accelMargine = isCorePad() ? MR::toRadian(::sCoreAccelDegreMargine) : MR::toRadian(::sSubAccelDegreMargine);
     f32 accelRange = isCorePad() ? MR::toRadian(::sCoreAccelDegreeRange) : MR::toRadian(::sSubAccelDegreeRange);
     f32 accelRangeY = isCorePad() ? MR::toRadian(::sCoreAccelDegreeRangeY) : MR::toRadian(::sSubAccelDegreeRangeY);

@@ -26,6 +26,12 @@ namespace MR {
     /// @param channel The handle to the Wii Remote.
     void getCorePadAcceleration(TVec3f* pAccel, s32 channel);
 
+#if TARGET_PC
+    /// @brief PC (no accelerometer): the acceleration of a Wii Remote held flat and rolled by the
+    /// left stick, up to 60 degrees (Ray surfing).
+    void getCorePadAccelerationStickTilt(TVec3f* pAccel, s32 channel);
+#endif
+
     /// @brief Determines if up on the given Wii Remote's +Control Pad is pressed.
     /// @param channel The handle to the Wii Remote.
     /// @return `true` if up is pressed, `false` otherwise.

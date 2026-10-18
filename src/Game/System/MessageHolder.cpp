@@ -77,6 +77,124 @@ namespace {
         return p;
     }
 
+    // Picture tag of the Wii Remote (picture 3) or of the Nunchuk stick (picture 4)? (Tag payloads
+    // stay big-endian, see MessageEditorMessageTag::getTag.)
+    bool pcIsPicture(const wchar_t* p, int index) {
+        return pcIsPictureTag(p) && pcTagLength(p) == 3 && MessageEditorMessageTag(p + 1).getTag() == index;
+    }
+
+    // The payload character of a picture tag for picture `index` (big-endian bytes).
+    wchar_t pcPictureIndexChar(int index) {
+        wchar_t c = 0;
+        u8* bytes = reinterpret_cast< u8* >(&c);
+        bytes[0] = u8(index >> 8);
+        bytes[1] = u8(index);
+        return c;
+    }
+
+    // Like pcSkipTagsAndSpaces, line breaks included.
+    const wchar_t* pcSkipTagsAndBlanks(const wchar_t* p) {
+        while ((*p == 0x1A && !pcIsPictureTag(p)) || *p == L' ' || *p == L'\n') {
+            p += *p == 0x1A ? pcTagLength(p) : 1;
+        }
+        return p;
+    }
+
+    // Matches the words of `words` (separated by blanks / tags) at p; returns the end or nullptr.
+    const wchar_t* pcMatchWords(const wchar_t* p, const wchar_t* const* words) {
+        for (; *words != nullptr; words++) {
+            p = pcSkipTagsAndBlanks(p);
+            const size_t n = wcslen(*words);
+            if (wcsncmp(p, *words, n) != 0 || pcIsLetter(p[n])) {
+                return nullptr;
+            }
+            p += n;
+        }
+        return p;
+    }
+
+    // Star Ball / Ray tutorials (French): the left stick does the tilting on PC, so
+    // "Incline la [Wii Remote]" becomes "Incline le [stick]", "tiens la [Wii Remote]
+    // verticalement" becomes "utilise le [stick]" and "prends la [Wii Remote] et fais-la pivoter
+    // vers..." becomes "pousse le [stick] vers...". Returns whether `text` changed.
+    bool pcRewriteTiltMessage(std::wstring& text) {
+        static const wchar_t* const kVertical[] = {L"verticalement", nullptr};
+        static const wchar_t* const kTurn[] = {L"et", L"fais-la", L"pivoter", nullptr};
+        static const struct {
+            const wchar_t* from;
+            const wchar_t* to;
+            const wchar_t* const* dropped;  // words after the icon that are dropped
+        } kVerbs[] = {
+            {L"Incline", L"Incline", nullptr}, {L"incline", L"incline", nullptr}, {L"inclinant", L"inclinant", nullptr},
+            {L"Tiens", L"Utilise", kVertical}, {L"tiens", L"utilise", kVertical}, {L"prends", L"pousse", kTurn},
+        };
+        std::wstring out;
+        bool changed = false;
+        const wchar_t* const begin = text.c_str();
+        const wchar_t* p = begin;
+        while (*p != 0) {
+            if (*p == 0x1A) {
+                const size_t len = pcTagLength(p);
+                out.append(p, len);
+                p += len;
+                continue;
+            }
+            bool replaced = false;
+            if (p == begin || !pcIsLetter(p[-1])) {
+                for (const auto& verb : kVerbs) {
+                    const size_t n = wcslen(verb.from);
+                    if (wcsncmp(p, verb.from, n) != 0 || pcIsLetter(p[n])) {
+                        continue;
+                    }
+                    const wchar_t* q = pcSkipTagsAndBlanks(p + n);
+                    if (q[0] != L'l' || q[1] != L'a' || pcIsLetter(q[2])) {
+                        break;
+                    }
+                    const wchar_t* icon = pcSkipTagsAndBlanks(q + 2);
+                    if (!pcIsPicture(icon, 3)) {
+                        break;
+                    }
+                    const wchar_t* next = icon + 3;
+                    const wchar_t* after = next;
+                    if (verb.dropped != nullptr) {
+                        after = pcMatchWords(next, verb.dropped);
+                        if (after == nullptr) {
+                            break;
+                        }
+                    }
+                    out += verb.to;
+                    out.append(p + n, q - (p + n));
+                    out += L"le";
+                    out.append(q + 2, icon - (q + 2));
+                    out.append(icon, 2);
+                    out += pcPictureIndexChar(4);  // Nunchuk stick picture = the left stick on PC
+                    if (verb.dropped != nullptr) {
+                        // Keep the tags among the dropped words.
+                        for (const wchar_t* t = next; t < after;) {
+                            if (*t == 0x1A) {
+                                const size_t len = pcTagLength(t);
+                                out.append(t, len);
+                                t += len;
+                            } else {
+                                t++;
+                            }
+                        }
+                    }
+                    p = after;
+                    replaced = changed = true;
+                    break;
+                }
+            }
+            if (!replaced) {
+                out += *p++;
+            }
+        }
+        if (changed) {
+            text = std::move(out);
+        }
+        return changed;
+    }
+
     // The French texts tell to shake the Wii Remote with its icon: "Secoue la [Wii Remote]". On PC
     // the icon is the gamepad's spin button (see pc/src/ui/xbox_glyphs_gdi.cpp), so the sentence
     // becomes "Appuie sur [B]" (same for "Secouez"/"secouer"). Control tags are kept as they are.
@@ -96,6 +214,7 @@ namespace {
         } kVerbs[] = {
             {L"Secouez", L"Appuyez"}, {L"secouez", L"appuyez"}, {L"Secouer", L"Appuyer"},
             {L"secouer", L"appuyer"}, {L"Secoue", L"Appuie"},   {L"secoue", L"appuie"},
+            {L"Secouant", L"Appuyant"}, {L"secouant", L"appuyant"},
         };
 
         std::wstring out;
@@ -115,12 +234,12 @@ namespace {
                     if (wcsncmp(p, verb.from, n) != 0 || pcIsLetter(p[n])) {
                         continue;
                     }
-                    // "<verb> [tags] la [tags] <icon tag>"
-                    const wchar_t* q = pcSkipTagsAndSpaces(p + n);
+                    // "<verb> [tags] la [tags] <icon tag>" (line breaks allowed)
+                    const wchar_t* q = pcSkipTagsAndBlanks(p + n);
                     if (q[0] != L'l' || q[1] != L'a' || pcIsLetter(q[2])) {
                         break;
                     }
-                    const wchar_t* icon = pcSkipTagsAndSpaces(q + 2);
+                    const wchar_t* icon = pcSkipTagsAndBlanks(q + 2);
                     if (!pcIsPictureTag(icon)) {
                         break;
                     }
@@ -136,6 +255,9 @@ namespace {
             if (!replaced) {
                 out += *p++;
             }
+        }
+        if (pc_settings_language() == 3 && pcRewriteTiltMessage(out)) {
+            changed = true;
         }
         std::wstring& entry = sCache[pOriginal];
         if (changed) {
