@@ -60,6 +60,8 @@ void Load(FILE* f) {
             g_settings.textureMipmaps = ParseBool(value);
         } else if (key == "vsync") {
             g_settings.vsync = ParseBool(value);
+        } else if (key == "pause_arriere_plan") {
+            g_settings.pauseUnfocused = ParseBool(value);
         } else if (key == "backend") {
             g_settings.backend = value;
         } else if (key == "supersampling" && n >= 1 && n <= 4) {
@@ -140,6 +142,8 @@ void Save(const std::string& path) {
                  "texture_mipmaps = %d\n"
                  "; Synchronisation verticale\n"
                  "vsync = %d\n"
+                 "; Mettre le jeu en pause quand sa fenetre n'est plus active (Alt+Tab...)\n"
+                 "pause_arriere_plan = %d\n"
                  "; API graphique : auto, d3d12, vulkan ou d3d11\n"
                  "backend = %s\n"
                  "; Surechantillonnage : rendu interne a N fois la taille de la fenetre, puis reduit\n"
@@ -178,7 +182,7 @@ void Save(const std::string& path) {
                  "volume_general = %.2f\n",
                  g_settings.fullscreen ? 1 : 0, g_settings.windowWidth, g_settings.windowHeight, g_settings.msaa,
                  g_settings.anisotropy, g_settings.alphaToCoverage ? 1 : 0, g_settings.textureMipmaps ? 1 : 0,
-                 g_settings.vsync ? 1 : 0, g_settings.backend.c_str(), g_settings.supersampling,
+                 g_settings.vsync ? 1 : 0, g_settings.pauseUnfocused ? 1 : 0, g_settings.backend.c_str(), g_settings.supersampling,
                  g_settings.language.c_str(), g_settings.drawDistance, g_settings.particleDensity,
                  g_settings.godRays, g_settings.pixelLighting ? 1 : 0, g_settings.fxaa ? 1 : 0, g_settings.sharpen,
                  g_settings.vibrance, g_settings.coStar ? 1 : 0, g_settings.pointerSpeed,
@@ -199,6 +203,9 @@ void pc_display_configure(AuroraConfig* config, bool forceFullscreen) {
     // Test overrides (not saved, unless the settings menu saves them).
     if (const char* env = std::getenv("SMGPC_VSYNC")) {
         g_settings.vsync = ParseBool(env);
+    }
+    if (const char* env = std::getenv("SMGPC_PAUSE_UNFOCUSED")) {
+        g_settings.pauseUnfocused = ParseBool(env);
     }
     if (const char* env = std::getenv("SMGPC_SUPERSAMPLE")) {
         g_settings.supersampling = std::atoi(env);
@@ -247,6 +254,7 @@ void pc_display_configure(AuroraConfig* config, bool forceFullscreen) {
     config->msaa = uint32_t(g_settings.msaa);
     config->maxTextureAnisotropy = uint16_t(g_settings.anisotropy);
     config->vsync = g_settings.vsync;
+    config->pauseOnFocusLost = g_settings.pauseUnfocused;
     // SMGPC_BACKEND overrides the file (tests).
     std::string backend = g_settings.backend;
     if (const char* env = std::getenv("SMGPC_BACKEND")) {

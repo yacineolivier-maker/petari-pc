@@ -15,6 +15,7 @@ struct PcSettings {
     bool alphaToCoverage = true;
     bool textureMipmaps = true;
     bool vsync = true;
+    bool pauseUnfocused = true;  // pause while the window isn't the active one
     std::string backend = "auto";
     int supersampling = 2;
     float drawDistance = 2.0f;

@@ -155,6 +155,10 @@ void pc_settings_menu_draw() {
         sDirty = true;
     }
     Hint(T("Rendu interne à N fois la taille de la fenêtre, puis réduit : image plus fine, demande plus de puissance."));
+    if (ImGui::Checkbox(T("Pause quand la fenêtre est inactive"), &s.pauseUnfocused)) {
+        aurora_set_pause_on_focus_lost(s.pauseUnfocused);
+        sDirty = true;
+    }
     if (ImGui::Checkbox(T("Synchronisation verticale"), &s.vsync)) {
         sDirty = true;
     }
