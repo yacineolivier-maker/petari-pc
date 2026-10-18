@@ -26,6 +26,7 @@ struct PcSettings {
     float vibrance = 0.1f;    // saturation boost of dull colors, -1-1
     bool coStar = false;
     float pointerSpeed = 1.0f;  // right stick Star Pointer speed, 0.5-2
+    float masterVolume = 1.0f;   // whole game audio, 0-1
     float speakerVolume = 0.8f;  // Wii Remote speaker sounds on the PC output, 0 = TV fallbacks
     std::string language = "fr";
 };

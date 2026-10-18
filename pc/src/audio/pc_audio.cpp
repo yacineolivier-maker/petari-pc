@@ -176,6 +176,7 @@ struct {
 }  // namespace smgpc::audio
 
 float pc_settings_speaker_volume();
+float pc_settings_master_volume();
 
 namespace smgpc::audio {
 namespace {
@@ -218,6 +219,14 @@ void RenderSubframe(f32* interleaved) {
     }
     MixExternal(interleaved);
     MixSpeaker(interleaved);
+    // display.ini volume_general (squared: closer to perceived loudness).
+    const f32 volume = pc_settings_master_volume();
+    if (volume < 1.0f) {
+        const f32 gain = volume * volume;
+        for (int i = 0; i < kSubframeSize * kChannels; i++) {
+            interleaved[i] *= gain;
+        }
+    }
 }
 
 // Renders a whole audio frame (getSubFrames() subframes, like one DSP sync). Returns bytes written.

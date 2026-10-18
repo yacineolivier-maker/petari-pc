@@ -217,6 +217,9 @@ void pc_settings_menu_draw() {
         sDirty = true;
     }
     Hint(T("Vitesse du pointeur étoile déplacé au stick droit."));
+    if (SliderStep(T("Volume général"), &s.masterVolume, 0.0f, 1.0f, 0.05f, s.masterVolume == 0.0f ? T("muet") : "%.2f")) {
+        sDirty = true;
+    }
     if (SliderStep(T("Sons de la Wiimote"), &s.speakerVolume, 0.0f, 1.0f, 0.05f,
                    s.speakerVolume == 0.0f ? T("remplacés par ceux du jeu") : "%.2f")) {
         sDirty = true;
