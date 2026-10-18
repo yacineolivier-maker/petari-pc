@@ -214,6 +214,14 @@ void pc_display_configure(AuroraConfig* config, bool forceFullscreen) {
     if (const char* env = std::getenv("SMGPC_LANGUAGE")) {
         g_settings.language = env;
     }
+    // SMGPC_WINDOW_SIZE=<w>x<h> (e.g. 2100x900 to test an ultrawide window).
+    if (const char* env = std::getenv("SMGPC_WINDOW_SIZE")) {
+        int w = 0, h = 0;
+        if (std::sscanf(env, "%dx%d", &w, &h) == 2 && w >= 320 && h >= 240) {
+            g_settings.windowWidth = w;
+            g_settings.windowHeight = h;
+        }
+    }
     config->startFullscreen = g_settings.fullscreen || forceFullscreen;
     config->windowWidth = uint32_t(g_settings.windowWidth);
     config->windowHeight = uint32_t(g_settings.windowHeight);
