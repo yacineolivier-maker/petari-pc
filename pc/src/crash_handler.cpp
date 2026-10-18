@@ -2,6 +2,8 @@
 // be located without a debugger attached.
 #include "pc/crash_handler.h"
 
+#include "pc/user_files.h"
+
 #ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN
 #define NOMINMAX
@@ -100,6 +102,23 @@ static void pc_print_raw_frames(const CONTEXT& context) {
     std::fflush(stderr);
 }
 
+// Without a console (started from the shortcut), tell the player instead of vanishing.
+static void pc_show_crash_message() {
+    const char* log = pc_log_file_path();
+    if (log == nullptr || log[0] == '\0') {
+        return;
+    }
+    wchar_t logW[MAX_PATH * 2] = {};
+    MultiByteToWideChar(CP_ACP, 0, log, -1, logW, MAX_PATH * 2);
+    wchar_t text[MAX_PATH * 3];
+    _snwprintf_s(text, _TRUNCATE,
+                 L"Le jeu a rencontr\u00e9 une erreur et doit se fermer.\n\n"
+                 L"Votre derni\u00e8re sauvegarde n'est pas touch\u00e9e.\n\n"
+                 L"Rapport d'erreur :\n%s",
+                 logW);
+    MessageBoxW(nullptr, text, L"Super Mario Galaxy", MB_OK | MB_ICONERROR | MB_TOPMOST | MB_SETFOREGROUND);
+}
+
 static LONG WINAPI pc_unhandled_exception(EXCEPTION_POINTERS* info) {
     HANDLE process = GetCurrentProcess();
     HANDLE thread = GetCurrentThread();
@@ -120,6 +139,7 @@ static LONG WINAPI pc_unhandled_exception(EXCEPTION_POINTERS* info) {
 
     pc_print_stack(process, thread, *info->ContextRecord);
     std::fflush(stderr);
+    pc_show_crash_message();
     return EXCEPTION_EXECUTE_HANDLER;
 }
 
@@ -134,6 +154,7 @@ static void pc_abort_handler(int) {
     std::fprintf(stderr, "\n=== abort() ===\n");
     pc_print_stack(process, GetCurrentThread(), ctx);
     std::fflush(stderr);
+    pc_show_crash_message();
     TerminateProcess(process, 3);
 }
 

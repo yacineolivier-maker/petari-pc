@@ -12,6 +12,9 @@ const char* pc_user_dir(void);
 // stdout/stderr to logs\smgpc-<date>.log.
 void pc_log_file_init(void);
 
+// The log file pc_log_file_init opened, or "" (console, or not called).
+const char* pc_log_file_path(void);
+
 #ifdef __cplusplus
 }
 #endif
