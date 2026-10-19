@@ -86,6 +86,11 @@ void Load(FILE* f) {
             if (f >= 0.0f && f <= 1.0f) {
                 g_settings.speakerVolume = f;
             }
+        } else if (key == "vibrations") {
+            const float f = float(std::atof(value.c_str()));
+            if (f >= 0.0f && f <= 1.0f) {
+                g_settings.rumble = f;
+            }
         } else if (key == "vitesse_pointeur") {
             const float f = float(std::atof(value.c_str()));
             if (f >= 0.5f && f <= 2.0f) {
@@ -179,14 +184,16 @@ void Save(const std::string& path) {
                  "; joues sur les haut-parleurs du PC : 0 a 1 (0 = sons de remplacement du jeu)\n"
                  "sons_wiimote = %.2f\n"
                  "; Volume general du jeu : 0 a 1\n"
-                 "volume_general = %.2f\n",
+                 "volume_general = %.2f\n"
+                 "; Force des vibrations de la manette : 0 (desactivees) a 1\n"
+                 "vibrations = %.2f\n",
                  g_settings.fullscreen ? 1 : 0, g_settings.windowWidth, g_settings.windowHeight, g_settings.msaa,
                  g_settings.anisotropy, g_settings.alphaToCoverage ? 1 : 0, g_settings.textureMipmaps ? 1 : 0,
                  g_settings.vsync ? 1 : 0, g_settings.pauseUnfocused ? 1 : 0, g_settings.backend.c_str(), g_settings.supersampling,
                  g_settings.language.c_str(), g_settings.drawDistance, g_settings.particleDensity,
                  g_settings.godRays, g_settings.pixelLighting ? 1 : 0, g_settings.fxaa ? 1 : 0, g_settings.sharpen,
                  g_settings.vibrance, g_settings.coStar ? 1 : 0, g_settings.pointerSpeed,
-                 g_settings.speakerVolume, g_settings.masterVolume);
+                 g_settings.speakerVolume, g_settings.masterVolume, g_settings.rumble);
     std::fclose(f);
 }
 
@@ -342,6 +349,10 @@ float pc_settings_pointer_speed() {
 
 float pc_settings_speaker_volume() {
     return g_settings.speakerVolume;
+}
+
+float pc_settings_rumble() {
+    return g_settings.rumble;
 }
 
 float pc_settings_master_volume() {

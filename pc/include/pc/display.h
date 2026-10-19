@@ -29,6 +29,7 @@ struct PcSettings {
     float pointerSpeed = 1.0f;  // right stick Star Pointer speed, 0.5-2
     float masterVolume = 1.0f;   // whole game audio, 0-1
     float speakerVolume = 0.8f;  // Wii Remote speaker sounds on the PC output, 0 = TV fallbacks
+    float rumble = 0.5f;         // gamepad rumble strength, 0 = off
     std::string language = "fr";
 };
 

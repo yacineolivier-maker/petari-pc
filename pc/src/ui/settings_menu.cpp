@@ -229,6 +229,9 @@ void pc_settings_menu_draw() {
         sDirty = true;
     }
     Hint(T("Volume des sons que la Wiimote jouait sur son haut-parleur (fragments d'étoile, toupie, menus...)."));
+    if (SliderStep(T("Vibrations"), &s.rumble, 0.0f, 1.0f, 0.05f, s.rumble == 0.0f ? T("désactivées") : "%.2f")) {
+        sDirty = true;
+    }
     static const char* const kLanguages[] = {"fr", "en", "es"};
     static const char* const kLanguageNames[] = {T("Français"), T("English"), T("Español")};
     int lang = s.language == "en" ? 1 : s.language == "es" ? 2 : 0;

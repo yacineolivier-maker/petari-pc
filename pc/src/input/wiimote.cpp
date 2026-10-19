@@ -39,6 +39,7 @@
 bool pc_settings_co_star();
 float pc_settings_pointer_speed();
 float pc_settings_speaker_volume();
+float pc_settings_rumble();
 bool pc_settings_menu_open();
 void pc_settings_menu_toggle();
 
@@ -113,6 +114,10 @@ int sCoStarPort[2] = {-1, -1};
 int sCoStarDiffFrames[PAD_MAX_CONTROLLERS] = {};
 constexpr int kCoStarDiffFrames = 10;
 
+bool sRumbleOn[PAD_MAX_CONTROLLERS] = {};
+constexpr u32 kRumbleMs = 150;
+void Rumble(int port, bool on);
+
 // Sticks: Aurora's GameCube clamp (PADClamp) would limit them to an octagon of radius 72 (and 57
 // on the diagonals) and its dead zone is per axis, which snaps the stick to the axes. A Nunchuk
 // stick reads about -1..1 in a circle: use the full range with a radial dead zone instead.
@@ -164,6 +169,11 @@ void ReadPads() {
     }
     PADStatus raw[PAD_MAX_CONTROLLERS];
     PADRead(raw);
+    for (int port = 0; port < PAD_MAX_CONTROLLERS; port++) {
+        if (sRumbleOn[port]) {
+            Rumble(port, true);
+        }
+    }
     // Aurora's Xbox layout leaves LB unmapped: read it from SDL (the port is the player index).
     for (int port = 0; port < PAD_MAX_CONTROLLERS; port++) {
         if (raw[port].err != PAD_ERR_NONE) {
@@ -545,13 +555,13 @@ BOOL WPADCanSendStreamData(s32) { return FALSE; }  // the speaker stream doesn't
 
 void WPADControlMotor(s32 chan, u32 command) {
     if (chan >= 0 && chan < PAD_MAX_CONTROLLERS && sPadPort[chan] >= 0) {  // co-star mode
-        PADControlMotor(sPadPort[chan], command != 0 ? PAD_MOTOR_RUMBLE : PAD_MOTOR_STOP);
+        Rumble(sPadPort[chan], command != 0);
         return;
     }
     // The first remote is all the gamepads (see ReadPads): rumble every port.
     if (chan == 0) {
         for (int port = 0; port < PAD_MAX_CONTROLLERS; port++) {
-            PADControlMotor(port, command != 0 ? PAD_MOTOR_RUMBLE : PAD_MOTOR_STOP);
+            Rumble(port, command != 0);
         }
     }
 }
@@ -560,6 +570,20 @@ void WPADSetAutoSleepTime(u8) {}
 u8 WPADGetSensorBarPosition(void) { return 0; }
 
 }  // extern "C"
+
+// Rumble goes straight to SDL (the port is the player index) with a short duration, renewed every
+// frame by ReadPads while it is on: if the game stops running (paused in the background, menu,
+// crash) the gamepad stops vibrating by itself.
+namespace {
+void Rumble(int port, bool on) {
+    sRumbleOn[port] = on;
+    if (SDL_Gamepad* g = SDL_GetGamepadFromPlayerIndex(port)) {
+        // Strength from display.ini "vibrations" (0.5 = Aurora's default intensity).
+        const u16 v = on ? u16(pc_settings_rumble() * 65535.0f) : 0;
+        SDL_RumbleGamepad(g, v, v, on ? kRumbleMs : 0);
+    }
+}
+}  // namespace
 
 // Whether the game was already told this channel is connected (for SpkSpeakerCtrl::setup).
 bool pc_wpad_announced_connected(s32 chan) {
