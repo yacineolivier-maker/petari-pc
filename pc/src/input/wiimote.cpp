@@ -7,8 +7,12 @@
 //   Left stick ........ Nunchuk stick          A ........... A (jump)
 //   Right stick ....... pointer (Star Pointer) B / X ....... shake (spin)
 //   RB / RT ........... B (shoot Star Bits)    LT .......... Z (crouch)
-//   LB ................ C                      Start ....... +   Back ....... -
+//   LB ................ C (camera behind Mario) Start ...... +   Back ....... -
 //   D-pad ............. D-pad                  Y ........... 1   R3 ......... recentre pointer
+//
+// Co-star (display.ini deux_joueurs = 1): the second Wii Remote only appears once a second gamepad
+// has been used on its own (a connected but idle or turned-off pad, or a virtual copy of the first
+// one, doesn't show a second Star Pointer). Until then every gamepad drives the first remote.
 //
 // Mouse (PC addition): moving it inside the window places the pointer there; left button = A,
 // right button = B. SMGPC_NO_MOUSE=1 turns it off.
@@ -21,6 +25,7 @@
 
 #include <dolphin/pad.h>
 
+#include <SDL3/SDL_gamepad.h>
 #include <SDL3/SDL_mouse.h>
 #include <SDL3/SDL_video.h>
 
@@ -102,14 +107,43 @@ int sPadPort[PAD_MAX_CONTROLLERS] = {-1, -1, -1, -1};
 u32 sLastPadReadFrame = 0xFFFFFFFF;
 u32 sFrame = 0;
 
-f32 StickAxis(s8 v) {
-    // Aurora reports sticks in the GameCube range (about -100..100 after clamping).
-    f32 f = v / 100.0f;
-    if (f > 1.0f) f = 1.0f;
-    if (f < -1.0f) f = -1.0f;
-    const f32 dead = 0.15f;
-    if (std::fabs(f) < dead) return 0.0f;
-    return (f - std::copysign(dead, f)) / (1.0f - dead);
+// Co-star: gamepad port of the first and second player (-1: not chosen yet), and for each port the
+// number of consecutive frames it was used differently from the first player's gamepad.
+int sCoStarPort[2] = {-1, -1};
+int sCoStarDiffFrames[PAD_MAX_CONTROLLERS] = {};
+constexpr int kCoStarDiffFrames = 10;
+
+// Sticks: Aurora's GameCube clamp (PADClamp) would limit them to an octagon of radius 72 (and 57
+// on the diagonals) and its dead zone is per axis, which snaps the stick to the axes. A Nunchuk
+// stick reads about -1..1 in a circle: use the full range with a radial dead zone instead.
+struct StickVec {
+    f32 x = 0.0f, y = 0.0f;
+};
+
+StickVec StickVector(s8 rawX, s8 rawY) {
+    const f32 x = rawX / 127.0f;
+    const f32 y = rawY / 127.0f;
+    const f32 m = std::sqrt(x * x + y * y);
+    const f32 dead = 0.18f, full = 0.95f;
+    if (m <= dead) {
+        return {};
+    }
+    f32 scaled = (m - dead) / (full - dead);
+    if (scaled > 1.0f) scaled = 1.0f;
+    return {x / m * scaled, y / m * scaled};
+}
+
+bool PadUsed(const PADStatus& p) {
+    return p.button != 0 || p.extButton != 0 || std::abs((int)p.stickX) > 50 || std::abs((int)p.stickY) > 50 ||
+           std::abs((int)p.substickX) > 50 || std::abs((int)p.substickY) > 50 || p.triggerLeft > 0x60 ||
+           p.triggerRight > 0x60;
+}
+
+bool PadsAlike(const PADStatus& a, const PADStatus& b) {
+    auto within = [](int u, int v, int tol) { return std::abs(u - v) <= tol; };
+    return a.button == b.button && a.extButton == b.extButton && within(a.stickX, b.stickX, 16) &&
+           within(a.stickY, b.stickY, 16) && within(a.substickX, b.substickX, 16) && within(a.substickY, b.substickY, 16) &&
+           within(a.triggerLeft, b.triggerLeft, 48) && within(a.triggerRight, b.triggerRight, 48);
 }
 
 void ReadPads() {
@@ -122,9 +156,25 @@ void ReadPads() {
         return;
     }
     sLastPadReadFrame = sFrame;
+    for (u32 port = 0; port < PAD_MAX_CONTROLLERS; port++) {
+        if (PADDeadZones* dz = PADGetDeadZones(port)) {
+            dz->useDeadzones = false;     // radial dead zone in StickVector instead
+            dz->emulateTriggers = false;  // PAD_TRIGGER_L is LB below, the analog values stay
+        }
+    }
     PADStatus raw[PAD_MAX_CONTROLLERS];
     PADRead(raw);
-    PADClamp(raw);
+    // Aurora's Xbox layout leaves LB unmapped: read it from SDL (the port is the player index).
+    for (int port = 0; port < PAD_MAX_CONTROLLERS; port++) {
+        if (raw[port].err != PAD_ERR_NONE) {
+            continue;
+        }
+        if (SDL_Gamepad* g = SDL_GetGamepadFromPlayerIndex(port)) {
+            if (SDL_GetGamepadButton(g, SDL_GAMEPAD_BUTTON_LEFT_SHOULDER)) {
+                raw[port].button |= PAD_TRIGGER_L;
+            }
+        }
+    }
     // View + Menu on any gamepad opens/closes the settings menu; the game gets no input while
     // it is open (nor on the frame the buttons are released).
     static bool sComboHeld = false;
@@ -146,21 +196,43 @@ void ReadPads() {
             p.err = err;
         }
     }
-    // Co-star (display.ini "deux_joueurs"): with two gamepads, the second one is the second Wii
-    // Remote (the co-star's Star Pointer).
-    if (pc_settings_co_star()) {
-        int ports[PAD_MAX_CONTROLLERS];
-        int count = 0;
-        for (int i = 0; i < PAD_MAX_CONTROLLERS; i++) {
-            if (raw[i].err == PAD_ERR_NONE) {
-                ports[count++] = i;
+    // Co-star (display.ini "deux_joueurs"): the first gamepad used is the first player; another one
+    // becomes the second Wii Remote (the co-star's Star Pointer) once it has been used on its own for
+    // a few frames. Gamepads that only mirror the first one never do.
+    for (int& port : sCoStarPort) {
+        if (port >= 0 && raw[port].err != PAD_ERR_NONE) {
+            port = -1;
+        }
+    }
+    if (sCoStarPort[0] < 0) {
+        sCoStarPort[1] = -1;
+    }
+    if (!pc_settings_co_star()) {
+        sCoStarPort[1] = -1;
+    } else {
+        if (sCoStarPort[0] < 0 && !suppress) {
+            for (int i = 0; i < PAD_MAX_CONTROLLERS; i++) {
+                if (raw[i].err == PAD_ERR_NONE && PadUsed(raw[i])) {
+                    sCoStarPort[0] = i;
+                    break;
+                }
             }
         }
-        if (count >= 2) {
+        for (int i = 0; i < PAD_MAX_CONTROLLERS; i++) {
+            const bool candidate = sCoStarPort[0] >= 0 && sCoStarPort[1] < 0 && i != sCoStarPort[0] &&
+                                   raw[i].err == PAD_ERR_NONE && !suppress && PadUsed(raw[i]) &&
+                                   !PadsAlike(raw[i], raw[sCoStarPort[0]]);
+            sCoStarDiffFrames[i] = candidate ? sCoStarDiffFrames[i] + 1 : 0;
+            if (sCoStarDiffFrames[i] >= kCoStarDiffFrames) {
+                sCoStarPort[1] = i;
+                std::fprintf(stderr, "[pc] co-star: gamepad %d is the second player\n", i);
+            }
+        }
+        if (sCoStarPort[1] >= 0) {
             for (int i = 0; i < PAD_MAX_CONTROLLERS; i++) {
-                sPadPort[i] = i < 2 ? ports[i] : -1;
+                sPadPort[i] = i < 2 ? sCoStarPort[i] : -1;
                 if (i < 2) {
-                    sPads[i] = raw[ports[i]];
+                    sPads[i] = raw[sCoStarPort[i]];
                 } else {
                     sPads[i] = {};
                     sPads[i].err = PAD_ERR_NO_CONTROLLER;
@@ -212,9 +284,9 @@ u32 MapButtons(const PADStatus& pad, bool& shakeButton) {
     if (btn & PAD_BUTTON_RIGHT) b |= WPAD_BUTTON_RIGHT;
     // RB (Aurora: Z) or the right trigger: B (Star Bits).
     if ((btn & PAD_TRIGGER_Z) || pad.triggerRight > 0x60) b |= WPAD_BUTTON_B;
-    // Left trigger: Nunchuk Z. LB: Nunchuk C.
+    // Left trigger: Nunchuk Z. LB (PAD_TRIGGER_L, see ReadPads): Nunchuk C.
     if (pad.triggerLeft > 0x60) b |= WPAD_BUTTON_Z;
-    if (btn & PAD_TRIGGER_L && pad.triggerLeft <= 0x60) b |= WPAD_BUTTON_C;
+    if (btn & PAD_TRIGGER_L) b |= WPAD_BUTTON_C;
     shakeButton = (btn & PAD_BUTTON_B) || (btn & PAD_BUTTON_X);
     return b;
 }
@@ -359,8 +431,9 @@ s32 KPADRead(s32 chan, KPADStatus status[], u32 count) {
 
     bool shakeButton = false;
     u32 hold = MapButtons(pad, shakeButton);
-    f32 stickX = StickAxis(pad.stickX);
-    f32 stickY = StickAxis(pad.stickY);
+    const StickVec left = StickVector(pad.stickX, pad.stickY);
+    f32 stickX = left.x;
+    f32 stickY = left.y;
     MouseInput mouse;
     if (chan == 0) {
         ApplyScript(sFrame, hold, shakeButton, stickX, stickY, ch.pointerX, ch.pointerY);
@@ -373,8 +446,9 @@ s32 KPADRead(s32 chan, KPADStatus status[], u32 count) {
     ch.prevHold = hold;
 
     // Pointer: the right stick moves it (velocity control); R3 recentres it.
-    f32 rx = StickAxis(pad.substickX);
-    f32 ry = StickAxis(pad.substickY);
+    const StickVec right = StickVector(pad.substickX, pad.substickY);
+    f32 rx = right.x;
+    f32 ry = right.y;
     if (chan != 0) {
         // The co-star has no Nunchuk: either stick moves the pointer.
         if (std::fabs(stickX) > std::fabs(rx)) rx = stickX;
@@ -382,8 +456,8 @@ s32 KPADRead(s32 chan, KPADStatus status[], u32 count) {
         stickX = stickY = 0.0f;
     }
     const f32 speed = 0.035f * pc_settings_pointer_speed();
-    ch.pointerX += rx * std::fabs(rx) * speed * 1.6f + rx * speed * 0.4f;
-    ch.pointerY -= ry * std::fabs(ry) * speed * 1.6f + ry * speed * 0.4f;
+    ch.pointerX += rx * std::fabs(rx) * speed * 0.5f + rx * speed * 0.14f;
+    ch.pointerY -= ry * std::fabs(ry) * speed * 0.5f + ry * speed * 0.14f;
     if (pad.extButton & PAD_BUTTON_RIGHT_STICK) {
         ch.pointerX = ch.pointerY = 0.0f;
     }

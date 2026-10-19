@@ -64,7 +64,8 @@ python tools/gen_pc_files.py                            # regenerate files.cmake
   0006 = GXPeekZ depth snapshot taken where the game peeks, not at the end of the frame,
   0007 = optional per-pixel lighting `GXSetPerPixelLighting` (also COLOR/NRM texgens), 0008 = final
   post-process pass `aurora_set_post_process` (FXAA, CAS sharpening, vibrance; validate its WGSL
-  with `Outils_Claude/naga/bin/naga.exe`), applied at configure time. To make a new patch, copy
+  with `Outils_Claude/naga/bin/naga.exe`), 0009 = stick Y conversion overflow (full up read as full
+  down), applied at configure time. To make a new patch, copy
   the files to a scratch folder first, then `diff -u --label a/<f> --label b/<f>`; keep CRLF files
   CRLF. `GXSetArray` on PC takes `(attr, data, size, stride, little_endian)`.
 - `OPNEW_SIZE_T` = size type of operator new/delete (u32 on Wii, size_t on PC).
@@ -88,6 +89,9 @@ python tools/gen_pc_files.py                            # regenerate files.cmake
   each other, va_list copies (`va_copy`), worker/waiter races (the Wii is single-core with strict
   priorities: set state before waking the other thread).
 - The PPC's integer division by zero doesn't trap: pc/src/crash_handler.cpp emulates it (quotient 0).
+- Gamepads (pc/src/input/wiimote.cpp): PADClamp and Aurora's per-axis dead zones are bypassed
+  (full-range sticks, radial dead zone); LB is read from SDL (Nunchuk C); in co-star mode the second
+  remote only connects once a second gamepad is used on its own.
 - PC-only behaviour so far: the Wii strap screen is skipped (LogoScene), the 3D aspect and the HUD's
   location-adjust scale follow the window when it isn't 16:9 (`pc_display_wide_aspect`, platform.cpp).
 
