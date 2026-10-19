@@ -5,6 +5,7 @@
 #include "pc/display.h"
 
 #include <imgui.h>
+#include <backends/imgui_impl_sdl3.h>
 
 #include <SDL3/SDL_video.h>
 
@@ -69,6 +70,8 @@ void pc_settings_menu_init() {
     sAtLaunch = pc_settings();
     ImGuiIO& io = ImGui::GetIO();
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard | ImGuiConfigFlags_NavEnableGamepad;
+    // Every gamepad navigates (the default is only the first one SDL lists, which may be idle).
+    ImGui_ImplSDL3_SetGamepadMode(ImGui_ImplSDL3_GamepadMode_AutoAll);
     io.IniFilename = nullptr;  // no imgui.ini next to the saves
     // Segoe UI (accents, readable); ImGui's built-in font otherwise.
     const char* windir = std::getenv("WINDIR");
