@@ -38,11 +38,22 @@ set(AURORA_ENABLE_CARD OFF CACHE BOOL "" FORCE)
 set(AURORA_ENABLE_THP ON CACHE BOOL "" FORCE)
 set(AURORA_ENABLE_RMLUI OFF CACHE BOOL "" FORCE)
 
-# Local fixes to the pinned Aurora commit, kept as patches in pc/patches/aurora. Each is applied
-# once (skipped when it already reverse-applies).
+# Local fixes to the pinned Aurora commit, kept as patches in pc/patches/aurora, applied in order
+# once each. The applied ones are listed in extern/aurora/.smg_applied_patches (a later patch can
+# change the context of an earlier one, so "reverse-applies" only identifies the last ones).
 find_package(Git REQUIRED)
-file(GLOB SMG_AURORA_PATCHES ${CMAKE_SOURCE_DIR}/pc/patches/aurora/*.patch)
+file(GLOB SMG_AURORA_PATCHES CONFIGURE_DEPENDS ${CMAKE_SOURCE_DIR}/pc/patches/aurora/*.patch)
+list(SORT SMG_AURORA_PATCHES)
+set(SMG_AURORA_STAMP ${CMAKE_SOURCE_DIR}/extern/aurora/.smg_applied_patches)
+set(SMG_AURORA_APPLIED "")
+if (EXISTS ${SMG_AURORA_STAMP})
+    file(STRINGS ${SMG_AURORA_STAMP} SMG_AURORA_APPLIED)
+endif ()
 foreach (patch IN LISTS SMG_AURORA_PATCHES)
+    get_filename_component(patch_name ${patch} NAME)
+    if (patch_name IN_LIST SMG_AURORA_APPLIED)
+        continue()
+    endif ()
     execute_process(COMMAND ${GIT_EXECUTABLE} apply --reverse --check --ignore-whitespace ${patch}
             WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/extern/aurora RESULT_VARIABLE already_applied
             OUTPUT_QUIET ERROR_QUIET)
@@ -54,6 +65,7 @@ foreach (patch IN LISTS SMG_AURORA_PATCHES)
         endif ()
         message(STATUS "Applied ${patch}")
     endif ()
+    file(APPEND ${SMG_AURORA_STAMP} "${patch_name}\n")
 endforeach ()
 
 # Aurora (and fmt) need /utf-8. The game doesn't get it: see smg_game_headers (Shift-JIS strings).
@@ -159,10 +171,13 @@ smg_add_lib(smg_pc
         pc/src/ui/xbox_glyphs_gdi.cpp
         pc/src/ui/window_icon.cpp
         pc/src/ui/settings_menu.cpp
-        pc/src/fx/god_rays.cpp)
+        pc/src/fx/god_rays.cpp
+        pc/src/fx/ssao.cpp)
 if (WIN32)
     target_link_libraries(smg_pc PUBLIC dbghelp psapi)
 endif ()
+# pc/src/fx/ssao.cpp uses Aurora's gfx API (WebGPU types).
+target_link_libraries(smg_pc PRIVATE dawn::webgpu_dawn)
 
 # Data tables the decomp still links from the original binary (embedded BCSV tables), copied out
 # of the user's main.dol at build time (never committed).

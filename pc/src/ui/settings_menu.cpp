@@ -209,6 +209,10 @@ void pc_settings_menu_draw() {
         sDirty = true;
     }
     Hint(T("Ravive les couleurs ternes sans saturer celles qui sont déjà vives."));
+    if (SliderStep(T("Occlusion ambiante"), &s.ssao, 0.0f, 1.0f, 0.05f, s.ssao == 0.0f ? T("désactivée") : "%.2f")) {
+        sDirty = true;
+    }
+    Hint(T("Ombres douces dans les recoins, sous les objets et là où les surfaces se rejoignent."));
     if (ImGui::Checkbox(T("Anticrénelage FXAA"), &s.fxaa)) {
         pc_settings_apply_post_process();
         sDirty = true;

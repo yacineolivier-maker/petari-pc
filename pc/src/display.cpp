@@ -112,6 +112,11 @@ void Load(FILE* f) {
             if (f >= 0.0f && f <= 1.0f) {
                 g_settings.sharpen = f;
             }
+        } else if (key == "occlusion_ambiante") {
+            const float f = float(std::atof(value.c_str()));
+            if (f >= 0.0f && f <= 1.0f) {
+                g_settings.ssao = f;
+            }
         } else if (key == "couleurs_vives") {
             const float f = float(std::atof(value.c_str()));
             if (f >= -1.0f && f <= 1.0f) {
@@ -174,6 +179,9 @@ void Save(const std::string& path) {
                  "nettete = %.2f\n"
                  "; Couleurs plus vives : 0 = Wii, jusqu'a 1 (valeurs negatives = plus ternes)\n"
                  "couleurs_vives = %.2f\n"
+                 "; Occlusion ambiante (ombres douces dans les recoins et sous les objets) :\n"
+                 "; 0 = desactivee, jusqu'a 1\n"
+                 "occlusion_ambiante = %.2f\n"
                  "\n"
                  "; Mode deux joueurs (co-star) : avec deux manettes, la deuxieme pilote le pointeur\n"
                  "; etoile du second joueur (1 = active)\n"
@@ -192,7 +200,7 @@ void Save(const std::string& path) {
                  g_settings.vsync ? 1 : 0, g_settings.pauseUnfocused ? 1 : 0, g_settings.backend.c_str(), g_settings.supersampling,
                  g_settings.language.c_str(), g_settings.drawDistance, g_settings.particleDensity,
                  g_settings.godRays, g_settings.pixelLighting ? 1 : 0, g_settings.fxaa ? 1 : 0, g_settings.sharpen,
-                 g_settings.vibrance, g_settings.coStar ? 1 : 0, g_settings.pointerSpeed,
+                 g_settings.vibrance, g_settings.ssao, g_settings.coStar ? 1 : 0, g_settings.pointerSpeed,
                  g_settings.speakerVolume, g_settings.masterVolume, g_settings.rumble);
     std::fclose(f);
 }
@@ -237,6 +245,9 @@ void pc_display_configure(AuroraConfig* config, bool forceFullscreen) {
     }
     if (const char* env = std::getenv("SMGPC_VIBRANCE")) {
         g_settings.vibrance = float(std::atof(env));
+    }
+    if (const char* env = std::getenv("SMGPC_SSAO")) {
+        g_settings.ssao = float(std::atof(env));
     }
     if (const char* env = std::getenv("SMGPC_SPEAKER")) {
         g_settings.speakerVolume = float(std::atof(env));
@@ -349,6 +360,10 @@ float pc_settings_pointer_speed() {
 
 float pc_settings_speaker_volume() {
     return g_settings.speakerVolume;
+}
+
+float pc_settings_ssao() {
+    return g_settings.ssao;
 }
 
 float pc_settings_rumble() {

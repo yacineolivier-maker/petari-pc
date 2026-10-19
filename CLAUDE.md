@@ -65,7 +65,8 @@ python tools/gen_pc_files.py                            # regenerate files.cmake
   0007 = optional per-pixel lighting `GXSetPerPixelLighting` (also COLOR/NRM texgens), 0008 = final
   post-process pass `aurora_set_post_process` (FXAA, CAS sharpening, vibrance; validate its WGSL
   with `Outils_Claude/naga/bin/naga.exe`), 0009 = stick Y conversion overflow (full up read as full
-  down), applied at configure time. To make a new patch, copy
+  down), applied at configure time in order; the applied ones are listed in
+  `extern/aurora/.smg_applied_patches` (delete it after resetting the submodule). To make a new patch, copy
   the files to a scratch folder first, then `diff -u --label a/<f> --label b/<f>`; keep CRLF files
   CRLF. `GXSetArray` on PC takes `(attr, data, size, stride, little_endian)`.
 - `OPNEW_SIZE_T` = size type of operator new/delete (u32 on Wii, size_t on PC).
@@ -92,6 +93,10 @@ python tools/gen_pc_files.py                            # regenerate files.cmake
 - Gamepads (pc/src/input/wiimote.cpp): PADClamp and Aurora's per-axis dead zones are bypassed
   (full-range sticks, radial dead zone); LB is read from SDL (Nunchuk C); in co-star mode the second
   remote only connects once a second gamepad is used on its own.
+- Ambient occlusion (pc/src/fx/ssao.cpp, display.ini occlusion_ambiante, default 0): GTAO ported
+  from Dusklight's ao_mod (Bevy/XeGTAO, licenses in pc/src/fx/licenses) on Aurora's public gfx API
+  (aurora/gfx.hpp: resolve_pass depth snapshot, push_encoder_task compute chain, push_custom_draw
+  multiply); called from GameScene::draw3D after the opaque draws; normals rebuilt from depth.
 - PC-only behaviour so far: the Wii strap screen is skipped (LogoScene), the 3D aspect and the HUD's
   location-adjust scale follow the window when it isn't 16:9 (`pc_display_wide_aspect`, platform.cpp).
 
@@ -107,7 +112,7 @@ python tools/gen_pc_files.py                            # regenerate files.cmake
   memory), `SMGPC_TRACE_BIG_ALLOC=<MB>` (stack of big malloc/realloc), `SMGPC_TRACE_HOST_NEW=<first>:<last>:<dump>`
   (game `new`s left in host memory and still alive), `SMGPC_HOST_NEW` (all plain `new` on the host), `SMGPC_DUMP_TEXTURES` (dumps to <user cache>/texture_dumps;
   Dolphin-format HD packs load from `textures/` next to the exe, same hashes as Dolphin), `SMGPC_BACKEND=d3d12|vulkan|d3d11`,
-  `SMGPC_SUPERSAMPLE=N`, `SMGPC_SETTINGS_MENU=<frame>` (opens the F1 settings menu, pc/src/ui/settings_menu.cpp; `SMGPC_SUPERSAMPLE_LIVE=N` switches supersampling then), `SMGPC_LANGUAGE=fr|en|es`, `SMGPC_PIXEL_LIGHTING`, `SMGPC_FXAA`, `SMGPC_SHARPEN`, `SMGPC_VIBRANCE`, `SMGPC_WINDOW_SIZE=<w>x<h>`, `SMGPC_PAUSE_UNFOCUSED=0` (test scripts), `SMGPC_SPEAKER=<0-1>` (Wii Remote speaker sounds, SpkSpeakerCtrl::renderForPc mixed by pc_audio.cpp) (display.ini: supersampling, langue, eclairage_par_pixel, fxaa, nettete, couleurs_vives); Aurora: `AURORA_DEBUG_NOCULL`,
+  `SMGPC_SUPERSAMPLE=N`, `SMGPC_SETTINGS_MENU=<frame>` (opens the F1 settings menu, pc/src/ui/settings_menu.cpp; `SMGPC_SUPERSAMPLE_LIVE=N` switches supersampling then), `SMGPC_LANGUAGE=fr|en|es`, `SMGPC_PIXEL_LIGHTING`, `SMGPC_FXAA`, `SMGPC_SHARPEN`, `SMGPC_VIBRANCE`, `SMGPC_WINDOW_SIZE=<w>x<h>`, `SMGPC_PAUSE_UNFOCUSED=0` (test scripts), `SMGPC_SSAO=<0-1>` (`SMGPC_SSAO_DEBUG=1` shows the AO alone), `SMGPC_SPEAKER=<0-1>` (Wii Remote speaker sounds, SpkSpeakerCtrl::renderForPc mixed by pc_audio.cpp) (display.ini: supersampling, langue, eclairage_par_pixel, fxaa, nettete, couleurs_vives); Aurora: `AURORA_DEBUG_NOCULL`,
   `AURORA_DEBUG_NODEPTH` (patch 0003).
 - Local helper scripts (not in git) live in `D:\SUPER_MARIO_GALAXY\Outils_Claude`: `shots.ps1`
   (screenshots of a frozen copy of the build, without taking the focus), `sweep.ps1` (loads every

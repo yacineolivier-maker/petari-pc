@@ -396,6 +396,10 @@ void GameScene::draw3D() const {
     SceneFunction::executeDrawBufferListNormalOpa();
     SceneFunction::executeDrawListOpa();
     CategoryList::drawOpa(MR::DrawBufferType_UNK_0x18);
+#if TARGET_PC
+    extern void pc_ssao_draw();
+    pc_ssao_draw();  // PC enhancement: ambient occlusion over the opaque scene (display.ini "occlusion_ambiante")
+#endif
     SceneFunction::executeDrawBufferListNormalXlu();
     SceneFunction::executeDrawListXlu();
     CategoryList::drawXlu(MR::DrawBufferType_UNK_0x18);
