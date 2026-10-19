@@ -216,7 +216,7 @@ void pc_settings_menu_draw() {
     if (ImGui::Checkbox(T("Mode deux joueurs (co-star)"), &s.coStar)) {
         sDirty = true;
     }
-    Hint(T("Avec deux manettes, la deuxième pilote le pointeur étoile du second joueur."));
+    Hint(T("Une deuxième manette pilote le pointeur étoile du second joueur (il apparaît quand on l'utilise) : il ramasse et tire des fragments, immobilise les ennemis, fait sauter Mario avec A."));
     if (SliderStep(T("Vitesse du pointeur"), &s.pointerSpeed, 0.5f, 2.0f, 0.1f, "x%.1f")) {
         sDirty = true;
     }
@@ -242,6 +242,36 @@ void pc_settings_menu_draw() {
     }
 
     ImGui::PopItemWidth();
+
+    // Gamepad layout (pc/src/input/wiimote.cpp).
+    ImGui::SeparatorText(T("Commandes (manette Xbox)"));
+    static const char* const kControls[][2] = {
+        {T("Stick gauche"), T("Déplacer Mario")},
+        {T("A"), T("Sauter")},
+        {T("X ou B"), T("Toupie (secouer la Wiimote)")},
+        {T("Stick droit"), T("Déplacer le pointeur étoile")},
+        {T("Clic stick droit"), T("Recentrer le pointeur")},
+        {T("RB ou RT"), T("Tirer des fragments d'étoile (bouton B)")},
+        {T("LT"), T("S'accroupir, attaque au sol (bouton Z)")},
+        {T("LB"), T("Caméra derrière Mario (bouton C)")},
+        {T("Croix"), T("Caméra / vue subjective")},
+        {T("Menu"), T("Pause (bouton +)")},
+        {T("Affichage"), T("Bouton -")},
+        {T("Y"), T("Bouton 1")},
+        {T("Affichage + Menu"), T("Ce menu de réglages")},
+    };
+    if (ImGui::BeginTable("controls", 2, ImGuiTableFlags_RowBg | ImGuiTableFlags_SizingFixedFit)) {
+        for (const auto& row : kControls) {
+            ImGui::TableNextRow();
+            ImGui::TableSetColumnIndex(0);
+            ImGui::TextUnformatted(row[0]);
+            ImGui::TableSetColumnIndex(1);
+            ImGui::TextUnformatted(row[1]);
+        }
+        ImGui::EndTable();
+    }
+    ImGui::TextDisabled(T("Souris : le pointeur suit la souris, clic gauche = A, clic droit = B."));
+
     ImGui::Spacing();
     if (ImGui::Button(T("Fermer"), ImVec2(200.0f * scale, 0.0f))) {
         open = false;
