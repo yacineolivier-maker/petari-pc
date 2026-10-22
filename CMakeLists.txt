@@ -5,7 +5,7 @@
 # The GameCube/Wii SDK (GX, OS, VI, DVD, PAD, MTX) is provided by Aurora (extern/aurora).
 # pc/include holds shims that map the Wii SDK header layout (revolution/*) onto Aurora's
 # (dolphin/*); the Wii-only SDK parts (WPAD, KPAD, NAND, SC, AX) are implemented in pc/src.
-# The layout follows the Wind Waker port (D:\ZELDA_WINDWAKER_PC) and Dusklight (TP's PC port).
+# The layout follows a Wind Waker decomp port and Dusklight (TP's PC port).
 cmake_minimum_required(VERSION 3.25)
 
 if (NOT CMAKE_BUILD_TYPE)

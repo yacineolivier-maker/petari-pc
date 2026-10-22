@@ -5,25 +5,23 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Project goal
 
 A native PC port (x86-64 Windows) of Super Mario Galaxy, in French, playable with an Xbox controller,
-with optional enhancements. This repo is a private fork of the
+with optional enhancements. This repo is a fork of the
 [SMGCommunity/Petari](https://github.com/SMGCommunity/Petari) decompilation (branch `pc-port`).
 The decomp build still rebuilds the original Wii `main.dol` byte for byte; the PC build compiles the
 same C++ for x86-64 and replaces the Wii hardware/SDK with PC backends.
 
-Target version: **RMGE01** (NTSC-U, includes French in `files/UsFrench`), because that's the disc
-the user owns: `D:\SUPER_MARIO_GALAXY\Rom\Super Mario Galaxy (USA) (En,Fr,Es).rvz`. It is extracted
-to `orig/RMGE01/` (gitignored). Never commit game data.
+Target version: **RMGE01** (NTSC-U, includes French in `files/UsFrench`). The disc image lives in
+`../Rom/` (an `.rvz`); it is extracted to `orig/RMGE01/` (gitignored). Never commit game data.
 
-Upstream does not accept AI-generated contributions: keep everything in this fork, never open PRs.
-The `upstream` remote has its push URL disabled. AstroCore (Luma's Workshop) is a separate,
+Upstream does not accept AI-generated contributions: never open PRs or issues there.
+The `upstream` remote has its push URL disabled; the public repo is the `origin` remote. AstroCore (Luma's Workshop) is a separate,
 unreleased PC port; don't copy from it.
 
-Folder layout: this repo is `D:\SUPER_MARIO_GALAXY\Developpement`. Next to it: `Jeu\` (installed
-game the user plays), `Rom\` (the RVZ), `References\` and `Outils_Claude\` (local helper scripts,
-not in git; `vs.cmd` sets up MSVC + CMake + Ninja). Reference projects (read-only):
-`D:\ZELDA_WINDWAKER_PC\Developpement` (the user's Wind Waker port, same approach, see its
-CLAUDE.md), `D:\ZELDA_WINDWAKER_PC\References\{aurora,dusklight}` (Dusklight = Twilight Princess PC
-port; its JSystem/JAudio2 PC changes are the best guide for ours).
+Local folder layout (the repo sits in a `Developpement` folder): next to it `Jeu\` (installed
+game), `Rom\` (the RVZ), `References\` and `Outils_Claude\` (local helper scripts, not in git;
+`vs.cmd` sets up MSVC + CMake + Ninja). Reference projects (read-only): a Wind Waker port with the
+same approach, Aurora, and Dusklight (Twilight Princess PC port; its JSystem/JAudio2 PC changes are
+the best guide for ours).
 
 ## Commands (Windows)
 
@@ -36,8 +34,8 @@ Re-run the matching build after touching shared headers: PC changes must not bre
 
 PC build (MSVC 14.51 / VS 18, CMake + Ninja):
 ```
-cmd //c "D:\SUPER_MARIO_GALAXY\Outils_Claude\vs.cmd cmake -S . -B build/pc -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo"
-cmd //c "D:\SUPER_MARIO_GALAXY\Outils_Claude\vs.cmd cmake --build build/pc -- -k 0"
+cmd //c "..\Outils_Claude\vs.cmd cmake -S . -B build/pc -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo"
+cmd //c "..\Outils_Claude\vs.cmd cmake --build build/pc -- -k 0"
 python tools/pc/compile_one.py src/Game/Foo/Bar.cpp     # one TU, safe in parallel
 python tools/gen_pc_files.py                            # regenerate files.cmake from configure.py
 ```
@@ -64,7 +62,7 @@ python tools/gen_pc_files.py                            # regenerate files.cmake
   0006 = GXPeekZ depth snapshot taken where the game peeks, not at the end of the frame,
   0007 = optional per-pixel lighting `GXSetPerPixelLighting` (also COLOR/NRM texgens), 0008 = final
   post-process pass `aurora_set_post_process` (FXAA, CAS sharpening, vibrance; validate its WGSL
-  with `Outils_Claude/naga/bin/naga.exe`), 0009 = stick Y conversion overflow (full up read as full
+  with naga, `../Outils_Claude/naga/bin/naga.exe`), 0009 = stick Y conversion overflow (full up read as full
   down), applied at configure time in order; the applied ones are listed in
   `extern/aurora/.smg_applied_patches` (delete it after resetting the submodule). To make a new patch, copy
   the files to a scratch folder first, then `diff -u --label a/<f> --label b/<f>`; keep CRLF files
@@ -114,7 +112,7 @@ python tools/gen_pc_files.py                            # regenerate files.cmake
   Dolphin-format HD packs load from `textures/` next to the exe, same hashes as Dolphin), `SMGPC_BACKEND=d3d12|vulkan|d3d11`,
   `SMGPC_SUPERSAMPLE=N`, `SMGPC_SETTINGS_MENU=<frame>` (opens the F1 settings menu, pc/src/ui/settings_menu.cpp; `SMGPC_SUPERSAMPLE_LIVE=N` switches supersampling then), `SMGPC_LANGUAGE=fr|en|es`, `SMGPC_PIXEL_LIGHTING`, `SMGPC_FXAA`, `SMGPC_SHARPEN`, `SMGPC_VIBRANCE`, `SMGPC_WINDOW_SIZE=<w>x<h>`, `SMGPC_PAUSE_UNFOCUSED=0` (test scripts), `SMGPC_SSAO=<0-1>` (`SMGPC_SSAO_DEBUG=1` shows the AO alone), `SMGPC_SPEAKER=<0-1>` (Wii Remote speaker sounds, SpkSpeakerCtrl::renderForPc mixed by pc_audio.cpp) (display.ini: supersampling, langue, eclairage_par_pixel, fxaa, nettete, couleurs_vives); Aurora: `AURORA_DEBUG_NOCULL`,
   `AURORA_DEBUG_NODEPTH` (patch 0003).
-- Local helper scripts (not in git) live in `D:\SUPER_MARIO_GALAXY\Outils_Claude`: `shots.ps1`
+- Local helper scripts (not in git) live in `../Outils_Claude`: `shots.ps1`
   (screenshots of a frozen copy of the build, without taking the focus), `sweep.ps1` (loads every
   galaxy and records crashes), `install.ps1` (copies the build to `..\Jeu` + desktop shortcut),
   `dolphin_shots.ps1` (reference renders with the portable Dolphin in `Outils_Claude\Dolphin`),

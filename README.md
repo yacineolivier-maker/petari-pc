@@ -1,116 +1,101 @@
-Petari
-[![Build Status]][actions] [![Discord Badge]][discord]
-======
-![RMGJ01_Code]![RMGJ01_Link] ![RMGE01_Code]![RMGE01_Link] ![RMGP01_Code]![RMGP01_Link] ![RMGK01_Code]![RMGK01_Link]
+# petari-pc
 
-[Build Status]: https://github.com/SMGCommunity/Petari/actions/workflows/build.yml/badge.svg
-[actions]: https://github.com/SMGCommunity/Petari/actions/workflows/build.yml
+An unofficial, experimental **native x86-64 Windows build** of the
+[SMGCommunity/Petari](https://github.com/SMGCommunity/Petari) decompilation, using
+[Aurora](https://github.com/encounter/aurora) (GX on WebGPU/Dawn) in place of the Wii hardware.
 
-[RMGJ01_Code]: https://decomp.dev/SMGCommunity/Petari/RMGJ01.svg?mode=shield&measure=code&label=RMGJ01
-[RMGJ01_Link]: https://decomp.dev/SMGCommunity/Petari/RMGJ01.svg?mode=shield&measure=complete_code_percent&label=
-[RMGE01_Code]: https://decomp.dev/SMGCommunity/Petari/RMGE01.svg?mode=shield&measure=code&label=RMGE01
-[RMGE01_Link]: https://decomp.dev/SMGCommunity/Petari/RMGE01.svg?mode=shield&measure=complete_code_percent&label=
-[RMGP01_Code]: https://decomp.dev/SMGCommunity/Petari/RMGP01.svg?mode=shield&measure=code&label=RMGP01
-[RMGP01_Link]: https://decomp.dev/SMGCommunity/Petari/RMGP01.svg?mode=shield&measure=complete_code_percent&label=
-[RMGK01_Code]: https://decomp.dev/SMGCommunity/Petari/RMGK01.svg?mode=shield&measure=code&label=RMGK01
-[RMGK01_Link]: https://decomp.dev/SMGCommunity/Petari/RMGK01.svg?mode=shield&measure=complete_code_percent&label=
+*Français plus bas.*
 
-[Discord Badge]: https://img.shields.io/discord/727908905392275526?color=%237289DA&logo=discord&logoColor=%23FFFFFF
-[discord]: https://discord.gg/ZxEqyYeZbf
-[progress_link]: https://decomp.dev/SMGCommunity/Petari
+> [!IMPORTANT]
+> - **No game data is included or distributed here.** You need your own copy of the original disc
+>   (US version, **RMGE01**). No compiled executable will be published either: the build embeds
+>   data tables read from your own `main.dol`.
+> - **This port was written with heavy help from an AI assistant (Anthropic's Claude).** Petari does
+>   not accept AI-generated code, so none of this is meant for, or will be proposed to, Petari.
+>   Please do **not** report issues of this port to the Petari team.
+> - Not affiliated with Petari, Luma's Workshop / AstroCore, or Nintendo. If a rights holder asks
+>   for something to be removed, it will be removed.
 
-<!-- markdownlint-disable MD033 -->
-[<img src="https://decomp.dev/SMGCommunity/Petari.svg?w=512&h=256" width="512" height="256" alt="A visual">][progress_link]
-<!-- markdownlint-enable MD033 -->
+## What it does
 
-A work-in-progress decompilation of Super Mario Galaxy.
+- The decompiled C++ is compiled for x86-64; the Wii SDK (GX, VI, PAD, WPAD/KPAD, NAND, AX, DVD...)
+  is replaced by Aurora plus PC backends in `pc/`. PC changes are guarded with `#if TARGET_PC`, so
+  the decomp build still rebuilds the original `main.dol` byte for byte.
+- Reads the disc image directly (`.rvz`, `.iso`, `.wbfs`, `.ciso`).
+- Xbox / SDL3 gamepads (the left stick is the Nunchuk, the right stick moves the star pointer,
+  B/X spin), mouse pointer, keyboard; two-player co-star mode with a second gamepad; rumble.
+- Settings menu (F1, or View + Menu on a gamepad) and `%APPDATA%\Super Mario Galaxy\display.ini`:
+  window / fullscreen, supersampling, MSAA, anisotropic filtering, vsync, D3D12 / Vulkan / D3D11,
+  game language (English, French, Spanish from the US disc; French by default, `langue = en`
+  for English).
+- Optional enhancements, off or close to the original by default: widescreen and any window aspect,
+  draw distance, more particles, per-pixel lighting, FXAA, sharpening, vibrance, ambient occlusion
+  (GTAO), sun rays. Dolphin-format HD texture packs load from `textures/` next to the executable.
+- Saves use the Wii save format (`nand/` under the same folder).
 
-This repository does **not** contain any game assets or assembly whatsoever. An existing copy of the game is required.
+Status: the whole game boots, loads every galaxy and is playable, but it is a work in progress and
+has only been tested on one Windows PC. Expect bugs.
 
-This project is **not** meant to be an effort to create a PC port. Join the Discord server to learn more and ask about our work-in-progress PC port "AstroCore".
+## Building (Windows)
 
-## Regarding AI Usage
+Requirements: Visual Studio 2022 or later with the C++ workload (its CMake and Ninja are fine),
+Git, Python 3. Other dependencies (SDL3, Dawn, nod, libpng...) are fetched by CMake.
 
-A lot of discussion and accusations have been made claiming we used AI/LLMs to accelerate the decompilation process. **We did not**.
+```
+git clone --recursive https://github.com/yacineolivier-maker/petari-pc.git
+cd petari-pc
+```
 
-Although AI was allowed for tasks that did not directly affect progress, such as variable naming, code cleanup, and documentation, **it never ended up playing a role in this project**. The fast progress acceleration of the project was a result of **new collaborators**, a ton of **motivation**, and **great community efforts**. It was not a result of AI usage or any other kind of automated decompilation work.
+1. Put your disc's `main.dol` at `orig/RMGE01/sys/main.dol` (Dolphin: right click the game >
+   Properties > Filesystem > right click the disc > *Extract System Data*, then copy `sys/`).
+   Expected SHA-1: `9a71008ae1ee9010e267fa67d1f0b0d4f0e895dd`.
+2. From a *x64 Native Tools Command Prompt*:
+   ```
+   cmake -S . -B build/pc -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo
+   cmake --build build/pc
+   ```
+   The configure step applies the Aurora patches in `pc/patches/aurora`.
+3. Copy `build/pc/smgpc.exe` and the `.dll` files next to it into a folder, and put your disc image
+   in a `Rom` folder beside (or above) it, or pass its path as the first argument:
+   `smgpc.exe "D:\Games\disc.rvz"`.
 
-If you don't trust this statement enough, read the source code yourself and form your own conclusions.
+The original decomp build (`python configure.py --version RMGE01` then `ninja`) is unchanged; see
+[docs/README_decomp.md](docs/README_decomp.md) and [docs/getting_started.md](docs/getting_started.md).
 
-Below are our AI usage guidelines:
+## Credits and licenses
 
-> [!NOTE]
-> AI may be used for code cleanup, formatting, documentation, and naming assistance. AI-generated decompilation work is not allowed. Pull requests containing obvious AI-generated decompilation output or other AI slop will be rejected. Contributors should be able to explain and justify any decompilation work they submit. This also applies to all tool-generated code. We want to keep this project as human as possible.
+- [Petari](https://github.com/SMGCommunity/Petari) and its contributors: the decompilation this
+  is built on (CC0). Their original README is in [docs/README_decomp.md](docs/README_decomp.md).
+- [Aurora](https://github.com/encounter/aurora) by Luke Street and contributors (MIT); local
+  patches in `pc/patches/aurora`.
+- Ideas and code patterns from the Twilight Princess PC port Dusklight and from community Wind Waker
+  ports. The ambient occlusion is a port of Bevy's / XeGTAO's GTAO (MIT / Apache-2.0, see
+  `pc/src/fx/licenses`).
+- The PC port code added here is released under CC0 like Petari, except where a file says otherwise.
 
-Dependencies
-============
+---
 
-Windows
--------
+## Français
 
-On Windows, it is **highly recommended** to use native tooling. WSL or msys2 are **not** required.  
-When running under WSL, [objdiff](#diffing) is unable to get filesystem notifications for automatic rebuilds.
+Portage PC natif (Windows x86-64), **non officiel et expérimental**, de la décompilation
+[Petari](https://github.com/SMGCommunity/Petari), avec [Aurora](https://github.com/encounter/aurora)
+à la place du matériel Wii.
 
-- Install [Python](https://www.python.org/downloads/) and add it to `%PATH%`.
-  - Also available from the [Windows Store](https://apps.microsoft.com/store/detail/python-311/9NRWMJP3717K).
-- Download [ninja](https://github.com/ninja-build/ninja/releases) and add it to `%PATH%`.
-  - Quick install via pip: `pip install ninja`
+> [!IMPORTANT]
+> - **Aucune donnée du jeu n'est fournie.** Il faut votre propre copie du disque original (version
+>   US, **RMGE01**, qui contient le français). Aucun exécutable compilé ne sera publié : la
+>   compilation intègre des tables lues dans votre propre `main.dol`.
+> - **Ce portage a été écrit avec l'aide importante d'une IA (Claude, d'Anthropic).** Petari
+>   n'accepte pas le code généré par IA : rien de ceci ne lui est destiné. Merci de ne **pas**
+>   signaler les problèmes de ce portage à l'équipe Petari.
+> - Sans lien avec Petari, Luma's Workshop / AstroCore ou Nintendo. Toute demande de retrait d'un
+>   ayant droit sera respectée.
 
-macOS
------
+Fonctions : lecture directe de l'image disque (`.rvz`...), manettes Xbox (stick gauche = Nunchuk,
+stick droit = pointeur étoile, B/X = toupie), souris, mode deux joueurs, vibrations, menu de
+réglages (F1), écran large, suréchantillonnage, améliorations graphiques optionnelles, packs de
+textures HD au format Dolphin, langue du jeu (français par défaut possible).
 
-- Install [ninja](https://github.com/ninja-build/ninja/releases):
-
-  ```sh
-  brew install ninja
-  ```
-
-[wibo](https://github.com/decompals/wibo), a minimal 32-bit Windows binary wrapper, will be automatically downloaded and used.
-
-Linux
------
-
-- Install [ninja](https://github.com/ninja-build/ninja/releases).
-
-[wibo](https://github.com/decompals/wibo), a minimal 32-bit Windows binary wrapper, will be automatically downloaded and used.
-
-Building
-========
-
-- Clone the repository:
-
-  ```sh
-  git clone https://github.com/SMGCommunity/Petari.git
-  ```
-
-- Using [Dolphin Emulator](https://dolphin-emu.org/), extract your desired region of the game to `orig/RMGX01/`, where `X` is the region code.
-![](assets/dolphin-extract.png)
-  - To save space, the only necessary files are the following. Any others can be deleted.
-    - `sys/main.dol`
-- Configure:
-
-  ```sh
-  python configure.py
-  ```
-
-  To use a version other than `RMGK01` (Korea), specify it with `--version`.
-- Build:
-
-  ```sh
-  ninja
-  ```
-
-Diffing
-=======
-
-Once the initial build succeeds, an `objdiff.json` should exist in the project root.
-
-Download the latest release from [encounter/objdiff](https://github.com/encounter/objdiff). Under project settings, set `Project directory`. The configuration should be loaded automatically.
-
-Select an object from the left sidebar to begin diffing. Changes to the project will rebuild automatically: changes to source files, headers, `configure.py`, `splits.txt` or `symbols.txt`.
-
-![](assets/objdiff.png)
-
-Credits
-=======
-Big thanks to the [doldecomp team](https://github.com/doldecomp) for their efforts on bte, [tp](https://github.com/zeldaret/tp) for JSystem, and [ogws](https://github.com/doldecomp/ogws/tree/master), where this repository has sourced code and headers from.
+Compilation : voir la section *Building* ci-dessus (Visual Studio 2022+, Git, Python 3 ; placer
+`main.dol` dans `orig/RMGE01/sys/`, puis `cmake` ; mettre l'image disque dans un dossier `Rom` à
+côté de l'exécutable).

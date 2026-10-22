@@ -66,8 +66,8 @@ void AuroraLog(AuroraLogLevel level, const char* module, const char* message, un
     }
 }
 
-// The disc image: the first argument that isn't an option, else the user's RVZ next to the game
-// folder (D:\SUPER_MARIO_GALAXY\Rom), else orig/RMGE01 (the extracted disc, for development).
+// The disc image: the first argument that isn't an option, else a disc image in a Rom folder next
+// to (or above) the working directory, else orig/RMGE01 (the extracted disc, for development).
 const char* FindDisc(int argc, char* argv[]) {
     for (int i = 1; i < argc; i++) {
         if (argv[i][0] != '-') {
