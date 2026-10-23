@@ -99,7 +99,7 @@ target_include_directories(smg_game_headers INTERFACE
         ${CMAKE_SOURCE_DIR}/libs/nw4r/include
         ${CMAKE_SOURCE_DIR}/libs/RVLFaceLib/include
         ${CMAKE_SOURCE_DIR}/libs/RVL_SDK/include
-        ${CMAKE_SOURCE_DIR}/build/RMGE01/include
+        ${CMAKE_BINARY_DIR}/generated/include
 )
 target_link_libraries(smg_game_headers INTERFACE aurora::core)
 if (CMAKE_CXX_COMPILER_FRONTEND_VARIANT STREQUAL "MSVC")
@@ -183,6 +183,16 @@ target_link_libraries(smg_pc PRIVATE dawn::webgpu_dawn)
 # of the user's main.dol at build time (never committed).
 find_package(Python3 REQUIRED COMPONENTS Interpreter)
 set(SMG_DOL ${CMAKE_SOURCE_DIR}/orig/RMGE01/sys/main.dol)
+if (NOT EXISTS ${SMG_DOL})
+    message(FATAL_ERROR "Put your disc's main.dol at ${SMG_DOL} (see README.md)")
+endif ()
+# The assets/*.hpp headers (config.yml `extract:`), written at configure time like the decomp build's.
+execute_process(COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tools/pc/gen_assets.py ${SMG_DOL}
+                ${CMAKE_SOURCE_DIR}/config/RMGE01/config.yml ${CMAKE_SOURCE_DIR}/config/RMGE01/symbols.txt
+                ${CMAKE_BINARY_DIR}/generated/include
+        COMMAND_ERROR_IS_FATAL ANY)
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS ${SMG_DOL}
+        ${CMAKE_SOURCE_DIR}/config/RMGE01/config.yml ${CMAKE_SOURCE_DIR}/tools/pc/gen_assets.py)
 set(SMG_DOL_DATA ${CMAKE_BINARY_DIR}/generated/dol_data.cpp)
 add_custom_command(OUTPUT ${SMG_DOL_DATA}
         COMMAND Python3::Interpreter ${CMAKE_SOURCE_DIR}/tools/pc/gen_dol_data.py ${SMG_DOL}
