@@ -15,7 +15,17 @@
 // one, doesn't show a second Star Pointer). Until then every gamepad drives the first remote.
 //
 // Mouse (PC addition): moving it inside the window places the pointer there; left button = A,
-// right button = B. SMGPC_NO_MOUSE=1 turns it off.
+// right button = B, middle button = shake. SMGPC_NO_MOUSE=1 turns it off.
+//
+// Keyboard (PC addition, first remote, keys by position so ZQSD on AZERTY is WASD on QWERTY):
+//
+//   Z Q S D ........... Nunchuk stick          Space ....... A (jump)
+//   Left Ctrl (held) .. walk (half stick)      E ........... shake (spin)
+//   Left Shift ........ Z (crouch)             F ........... B (shoot Star Bits)
+//   R ................. C (camera behind Mario) Arrows ..... D-pad
+//   Escape ............ +   Tab ....... -      1 / 2 ....... 1 / 2
+//
+// SMGPC_NO_KEYBOARD=1 turns it off.
 //
 // The spin is detected by the game from accelerometer changes (WPadHVSwing); pressing the
 // shake button produces a short synthetic shake of the remote's accelerometer.
@@ -26,6 +36,7 @@
 #include <dolphin/pad.h>
 
 #include <SDL3/SDL_gamepad.h>
+#include <SDL3/SDL_keyboard.h>
 #include <SDL3/SDL_mouse.h>
 #include <SDL3/SDL_video.h>
 
@@ -54,6 +65,7 @@ struct MouseInput {
     bool moved = false;
     f32 x = 0.0f, y = 0.0f;
     u32 buttons = 0;
+    bool shake = false;
 };
 
 MouseInput ReadMouse() {
@@ -85,7 +97,54 @@ MouseInput ReadMouse() {
     m.y = my / h * 2.0f - 1.0f;
     if (b & SDL_BUTTON_LMASK) m.buttons |= WPAD_BUTTON_A;
     if (b & SDL_BUTTON_RMASK) m.buttons |= WPAD_BUTTON_B;
+    m.shake = (b & SDL_BUTTON_MMASK) != 0;
     return m;
+}
+
+// Keyboard state for the first remote (see the table at the top).
+struct KeyboardInput {
+    u32 buttons = 0;
+    bool shake = false;
+    f32 stickX = 0.0f, stickY = 0.0f;
+};
+
+KeyboardInput ReadKeyboard() {
+    static const bool sDisabled = std::getenv("SMGPC_NO_KEYBOARD") != nullptr;
+    // Keys held while the settings menu was open (Escape closes it) stay ignored until released.
+    static bool sBlocked = false;
+    KeyboardInput k;
+    if (sDisabled) {
+        return k;
+    }
+    const bool* keys = SDL_GetKeyboardState(nullptr);
+    static const struct { SDL_Scancode key; u32 bit; } kButtons[] = {
+        {SDL_SCANCODE_SPACE, WPAD_BUTTON_A},      {SDL_SCANCODE_F, WPAD_BUTTON_B},
+        {SDL_SCANCODE_LSHIFT, WPAD_BUTTON_Z},     {SDL_SCANCODE_R, WPAD_BUTTON_C},
+        {SDL_SCANCODE_ESCAPE, WPAD_BUTTON_PLUS},  {SDL_SCANCODE_TAB, WPAD_BUTTON_MINUS},
+        {SDL_SCANCODE_1, WPAD_BUTTON_1},          {SDL_SCANCODE_2, WPAD_BUTTON_2},
+        {SDL_SCANCODE_UP, WPAD_BUTTON_UP},        {SDL_SCANCODE_DOWN, WPAD_BUTTON_DOWN},
+        {SDL_SCANCODE_LEFT, WPAD_BUTTON_LEFT},    {SDL_SCANCODE_RIGHT, WPAD_BUTTON_RIGHT},
+    };
+    for (const auto& b : kButtons) {
+        if (keys[b.key]) k.buttons |= b.bit;
+    }
+    k.shake = keys[SDL_SCANCODE_E];
+    k.stickX = f32(keys[SDL_SCANCODE_D]) - f32(keys[SDL_SCANCODE_A]);
+    k.stickY = f32(keys[SDL_SCANCODE_W]) - f32(keys[SDL_SCANCODE_S]);
+    const bool any = k.buttons != 0 || k.shake || k.stickX != 0.0f || k.stickY != 0.0f;
+    if (pc_settings_menu_open()) {
+        sBlocked = true;
+    } else if (!any) {
+        sBlocked = false;
+    }
+    if (sBlocked) {
+        return {};
+    }
+    // Same length on the diagonals; Ctrl walks.
+    const f32 scale = (k.stickX != 0.0f && k.stickY != 0.0f ? 0.7071f : 1.0f) * (keys[SDL_SCANCODE_LCTRL] ? 0.5f : 1.0f);
+    k.stickX *= scale;
+    k.stickY *= scale;
+    return k;
 }
 
 struct ChannelState {
@@ -449,6 +508,14 @@ s32 KPADRead(s32 chan, KPADStatus status[], u32 count) {
         ApplyScript(sFrame, hold, shakeButton, stickX, stickY, ch.pointerX, ch.pointerY);
         mouse = ReadMouse();
         hold |= mouse.buttons;
+        shakeButton = shakeButton || mouse.shake;
+        const KeyboardInput keyboard = ReadKeyboard();
+        hold |= keyboard.buttons;
+        shakeButton = shakeButton || keyboard.shake;
+        if (keyboard.stickX != 0.0f || keyboard.stickY != 0.0f) {
+            stickX = keyboard.stickX;
+            stickY = keyboard.stickY;
+        }
     }
     s.hold = hold;
     s.trig = hold & ~ch.prevHold;

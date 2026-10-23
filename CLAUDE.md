@@ -90,7 +90,9 @@ python tools/gen_pc_files.py                            # regenerate files.cmake
 - The PPC's integer division by zero doesn't trap: pc/src/crash_handler.cpp emulates it (quotient 0).
 - Gamepads (pc/src/input/wiimote.cpp): PADClamp and Aurora's per-axis dead zones are bypassed
   (full-range sticks, radial dead zone); LB is read from SDL (Nunchuk C); in co-star mode the second
-  remote only connects once a second gamepad is used on its own.
+  remote only connects once a second gamepad is used on its own. Keyboard fallback for the first
+  remote (scancodes, ZQSD on AZERTY: Space A, E shake, LShift Z, F B, R C, Escape +, Ctrl walks;
+  table at the top of wiimote.cpp and in the F1 menu), `SMGPC_NO_KEYBOARD`.
 - Ambient occlusion (pc/src/fx/ssao.cpp, display.ini occlusion_ambiante, default 0): GTAO ported
   from Dusklight's ao_mod (Bevy/XeGTAO, licenses in pc/src/fx/licenses) on Aurora's public gfx API
   (aurora/gfx.hpp: resolve_pass depth snapshot, push_encoder_task compute chain, push_custom_draw

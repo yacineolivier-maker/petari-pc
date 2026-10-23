@@ -23,7 +23,9 @@ An unofficial, experimental **native x86-64 Windows build** of the
   the decomp build still rebuilds the original `main.dol` byte for byte.
 - Reads the disc image directly (`.rvz`, `.iso`, `.wbfs`, `.ciso`).
 - Xbox / SDL3 gamepads (the left stick is the Nunchuk, the right stick moves the star pointer,
-  B/X spin), mouse pointer, keyboard; two-player co-star mode with a second gamepad; rumble.
+  B/X spin), mouse pointer; keyboard and mouse as a fallback (ZQSD on AZERTY / WASD on QWERTY
+  to move, Space to jump, E or middle click to spin, Shift to crouch, Escape to pause; the full list
+  is in the F1 menu); two-player co-star mode with a second gamepad; rumble.
 - Settings menu (F1, or View + Menu on a gamepad) and `%APPDATA%\Super Mario Galaxy\display.ini`:
   window / fullscreen, supersampling, MSAA, anisotropic filtering, vsync, D3D12 / Vulkan / D3D11,
   game language (English, French, Spanish from the US disc; French by default, `langue = en`
@@ -92,7 +94,8 @@ Portage PC natif (Windows x86-64), **non officiel et expérimental**, de la déc
 >   ayant droit sera respectée.
 
 Fonctions : lecture directe de l'image disque (`.rvz`...), manettes Xbox (stick gauche = Nunchuk,
-stick droit = pointeur étoile, B/X = toupie), souris, mode deux joueurs, vibrations, menu de
+stick droit = pointeur étoile, B/X = toupie), souris, clavier + souris en dépannage (ZQSD pour se
+déplacer, Espace pour sauter, E ou clic molette pour la toupie, liste complète dans le menu F1), mode deux joueurs, vibrations, menu de
 réglages (F1), écran large, suréchantillonnage, améliorations graphiques optionnelles, packs de
 textures HD au format Dolphin, langue du jeu (français par défaut possible).
 

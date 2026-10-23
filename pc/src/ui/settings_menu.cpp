@@ -280,7 +280,34 @@ void pc_settings_menu_draw() {
         }
         ImGui::EndTable();
     }
-    ImGui::TextDisabled(T("Souris : le pointeur suit la souris, clic gauche = A, clic droit = B."));
+    ImGui::TextDisabled(T("Souris : le pointeur suit la souris, clic gauche = A, clic droit = B, clic molette = toupie."));
+
+    // Keyboard layout (keys by position: ZQSD on an AZERTY keyboard, WASD on QWERTY).
+    ImGui::SeparatorText(T("Commandes (clavier et souris)"));
+    static const char* const kKeyboard[][2] = {
+        {T("Z Q S D"), T("Déplacer Mario (Ctrl gauche maintenu : marcher)")},
+        {T("Espace"), T("Sauter")},
+        {T("E ou clic molette"), T("Toupie")},
+        {T("Souris"), T("Pointeur étoile (clic gauche = A)")},
+        {T("Clic droit ou F"), T("Tirer des fragments d'étoile (bouton B)")},
+        {T("Maj gauche"), T("S'accroupir, attaque au sol (bouton Z)")},
+        {T("R"), T("Caméra derrière Mario (bouton C)")},
+        {T("Flèches"), T("Caméra / vue subjective")},
+        {T("Échap"), T("Pause (bouton +)")},
+        {T("Tab"), T("Bouton -")},
+        {T("1 / 2"), T("Boutons 1 et 2")},
+        {T("F1"), T("Ce menu de réglages")},
+    };
+    if (ImGui::BeginTable("keyboard", 2, ImGuiTableFlags_RowBg | ImGuiTableFlags_SizingFixedFit)) {
+        for (const auto& row : kKeyboard) {
+            ImGui::TableNextRow();
+            ImGui::TableSetColumnIndex(0);
+            ImGui::TextUnformatted(row[0]);
+            ImGui::TableSetColumnIndex(1);
+            ImGui::TextUnformatted(row[1]);
+        }
+        ImGui::EndTable();
+    }
 
     ImGui::Spacing();
     if (ImGui::Button(T("Fermer"), ImVec2(200.0f * scale, 0.0f))) {
