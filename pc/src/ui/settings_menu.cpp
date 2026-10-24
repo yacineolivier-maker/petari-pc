@@ -223,7 +223,7 @@ void pc_settings_menu_draw() {
     if (ImGui::Checkbox(T("Mode deux joueurs (co-star)"), &s.coStar)) {
         sDirty = true;
     }
-    Hint(T("Une deuxième manette pilote le pointeur étoile du second joueur (il apparaît quand on l'utilise) : il ramasse et tire des fragments, immobilise les ennemis, fait sauter Mario avec A."));
+    Hint(T("Une deuxième manette pilote le pointeur étoile du second joueur. Pour le rejoindre, il appuie sur un bouton de sa manette sur l'écran titre ou de sélection de fichier ; sinon il reste inactif et son pointeur n'est pas affiché. Il ramasse et tire des fragments, immobilise les ennemis, fait sauter Mario avec A."));
     if (SliderStep(T("Vitesse du pointeur"), &s.pointerSpeed, 0.5f, 2.0f, 0.1f, "x%.1f")) {
         sDirty = true;
     }

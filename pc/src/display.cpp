@@ -184,7 +184,7 @@ void Save(const std::string& path) {
                  "occlusion_ambiante = %.2f\n"
                  "\n"
                  "; Mode deux joueurs (co-star) : avec deux manettes, la deuxieme pilote le pointeur\n"
-                 "; etoile du second joueur (1 = active)\n"
+                 "; etoile du second joueur, qui rejoint en appuyant sur un bouton sur l'ecran titre (1 = active)\n"
                  "deux_joueurs = %d\n"
                  "; Vitesse du pointeur etoile au stick droit : 0.5 a 2 (1 = normale)\n"
                  "vitesse_pointeur = %.2f\n"

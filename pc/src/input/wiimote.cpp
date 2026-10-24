@@ -10,9 +10,10 @@
 //   LB ................ C (camera behind Mario) Start ...... +   Back ....... -
 //   D-pad ............. D-pad                  Y ........... 1   R3 ......... recentre pointer
 //
-// Co-star (display.ini deux_joueurs = 1): the second Wii Remote only appears once a second gamepad
-// has been used on its own (a connected but idle or turned-off pad, or a virtual copy of the first
-// one, doesn't show a second Star Pointer). Until then every gamepad drives the first remote.
+// Co-star (display.ini deux_joueurs = 1): like picking up a second Wii Remote, the second player
+// joins by pressing a button on another gamepad on the title screen / file select. Until then
+// (and for the whole game if nobody joined there) every gamepad drives the first remote and no
+// second Star Pointer is shown.
 //
 // Mouse (PC addition): moving it inside the window places the pointer there; left button = A,
 // right button = B, middle button = shake. SMGPC_NO_MOUSE=1 turns it off.
@@ -39,6 +40,11 @@
 #include <SDL3/SDL_keyboard.h>
 #include <SDL3/SDL_mouse.h>
 #include <SDL3/SDL_video.h>
+
+#include "Game/System/GameSystem.hpp"
+#include "Game/System/GameSystemSceneController.hpp"
+#include "Game/Util/SceneUtil.hpp"
+#include "Game/Util/SingletonHolder.hpp"
 
 #include <cmath>
 #include <cstdio>
@@ -168,10 +174,10 @@ u32 sLastPadReadFrame = 0xFFFFFFFF;
 u32 sFrame = 0;
 
 // Co-star: gamepad port of the first and second player (-1: not chosen yet), and for each port the
-// number of consecutive frames it was used differently from the first player's gamepad.
+// number of consecutive frames it held a button the first player's gamepad didn't.
 int sCoStarPort[2] = {-1, -1};
-int sCoStarDiffFrames[PAD_MAX_CONTROLLERS] = {};
-constexpr int kCoStarDiffFrames = 10;
+int sCoStarJoinFrames[PAD_MAX_CONTROLLERS] = {};
+constexpr int kCoStarJoinFrames = 3;
 
 bool sRumbleOn[PAD_MAX_CONTROLLERS] = {};
 constexpr u32 kRumbleMs = 150;
@@ -197,17 +203,13 @@ StickVec StickVector(s8 rawX, s8 rawY) {
     return {x / m * scaled, y / m * scaled};
 }
 
-bool PadUsed(const PADStatus& p) {
-    return p.button != 0 || p.extButton != 0 || std::abs((int)p.stickX) > 50 || std::abs((int)p.stickY) > 50 ||
-           std::abs((int)p.substickX) > 50 || std::abs((int)p.substickY) > 50 || p.triggerLeft > 0x60 ||
-           p.triggerRight > 0x60;
-}
+// Buttons only (sticks and triggers can drift on an idle gamepad).
+u32 PadButtons(const PADStatus& p) { return p.err == PAD_ERR_NONE ? (u32(p.button) | u32(p.extButton) << 16) : 0; }
 
-bool PadsAlike(const PADStatus& a, const PADStatus& b) {
-    auto within = [](int u, int v, int tol) { return std::abs(u - v) <= tol; };
-    return a.button == b.button && a.extButton == b.extButton && within(a.stickX, b.stickX, 16) &&
-           within(a.stickY, b.stickY, 16) && within(a.substickX, b.substickX, 16) && within(a.substickY, b.substickY, 16) &&
-           within(a.triggerLeft, b.triggerLeft, 48) && within(a.triggerRight, b.triggerRight, 48);
+// Title screen and file select (stage "FileSelect"): the only place a second player can join.
+bool InFileSelect() {
+    const GameSystem* system = SingletonHolder< GameSystem >::get();
+    return system != nullptr && system->mSceneController != nullptr && MR::isStageFileSelect();
 }
 
 void ReadPads() {
@@ -265,9 +267,10 @@ void ReadPads() {
             p.err = err;
         }
     }
-    // Co-star (display.ini "deux_joueurs"): the first gamepad used is the first player; another one
-    // becomes the second Wii Remote (the co-star's Star Pointer) once it has been used on its own for
-    // a few frames. Gamepads that only mirror the first one never do.
+    // Co-star (display.ini "deux_joueurs"): the first gamepad whose button is pressed is the first
+    // player; another one becomes the second Wii Remote (the co-star's Star Pointer) when one of its
+    // buttons is pressed on the title screen / file select. Idle gamepads, drifting sticks and
+    // virtual copies of the first gamepad (same buttons) never join.
     for (int& port : sCoStarPort) {
         if (port >= 0 && raw[port].err != PAD_ERR_NONE) {
             port = -1;
@@ -281,20 +284,21 @@ void ReadPads() {
     } else {
         if (sCoStarPort[0] < 0 && !suppress) {
             for (int i = 0; i < PAD_MAX_CONTROLLERS; i++) {
-                if (raw[i].err == PAD_ERR_NONE && PadUsed(raw[i])) {
+                if (PadButtons(raw[i]) != 0) {
                     sCoStarPort[0] = i;
                     break;
                 }
             }
         }
+        const bool canJoin = sCoStarPort[0] >= 0 && sCoStarPort[1] < 0 && !suppress && InFileSelect();
         for (int i = 0; i < PAD_MAX_CONTROLLERS; i++) {
-            const bool candidate = sCoStarPort[0] >= 0 && sCoStarPort[1] < 0 && i != sCoStarPort[0] &&
-                                   raw[i].err == PAD_ERR_NONE && !suppress && PadUsed(raw[i]) &&
-                                   !PadsAlike(raw[i], raw[sCoStarPort[0]]);
-            sCoStarDiffFrames[i] = candidate ? sCoStarDiffFrames[i] + 1 : 0;
-            if (sCoStarDiffFrames[i] >= kCoStarDiffFrames) {
+            const bool candidate = canJoin && i != sCoStarPort[0] &&
+                                   (PadButtons(raw[i]) & ~PadButtons(raw[sCoStarPort[0]])) != 0;
+            sCoStarJoinFrames[i] = candidate ? sCoStarJoinFrames[i] + 1 : 0;
+            if (sCoStarJoinFrames[i] >= kCoStarJoinFrames) {
                 sCoStarPort[1] = i;
                 std::fprintf(stderr, "[pc] co-star: gamepad %d is the second player\n", i);
+                break;
             }
         }
         if (sCoStarPort[1] >= 0) {
@@ -316,7 +320,9 @@ void ReadPads() {
     // Single player: every connected gamepad (and the keyboard) drives the first Wii Remote, so it
     // doesn't matter which port SDL gives the Xbox controller. The other remotes stay disconnected
     // (otherwise the game shows a second player's "co-star" cursor).
-    auto dominant = [](s8 a, s8 b) { return std::abs((int)b) > std::abs((int)a) ? b : a; };
+    // Each stick comes whole from the gamepad pushing it furthest: mixing axes of different pads
+    // would let an idle pad's drift bend or slow the stick in some directions.
+    auto len2 = [](s8 x, s8 y) { return int(x) * x + int(y) * y; };
     PADStatus merged = {};
     for (const PADStatus& p : raw) {
         if (p.err != PAD_ERR_NONE) {
@@ -324,10 +330,14 @@ void ReadPads() {
         }
         merged.button |= p.button;
         merged.extButton |= p.extButton;
-        merged.stickX = dominant(merged.stickX, p.stickX);
-        merged.stickY = dominant(merged.stickY, p.stickY);
-        merged.substickX = dominant(merged.substickX, p.substickX);
-        merged.substickY = dominant(merged.substickY, p.substickY);
+        if (len2(p.stickX, p.stickY) > len2(merged.stickX, merged.stickY)) {
+            merged.stickX = p.stickX;
+            merged.stickY = p.stickY;
+        }
+        if (len2(p.substickX, p.substickY) > len2(merged.substickX, merged.substickY)) {
+            merged.substickX = p.substickX;
+            merged.substickY = p.substickY;
+        }
         merged.triggerLeft = p.triggerLeft > merged.triggerLeft ? p.triggerLeft : merged.triggerLeft;
         merged.triggerRight = p.triggerRight > merged.triggerRight ? p.triggerRight : merged.triggerRight;
     }

@@ -90,7 +90,8 @@ python tools/gen_pc_files.py                            # regenerate files.cmake
 - The PPC's integer division by zero doesn't trap: pc/src/crash_handler.cpp emulates it (quotient 0).
 - Gamepads (pc/src/input/wiimote.cpp): PADClamp and Aurora's per-axis dead zones are bypassed
   (full-range sticks, radial dead zone); LB is read from SDL (Nunchuk C); in co-star mode the second
-  remote only connects once a second gamepad is used on its own. Keyboard fallback for the first
+  remote only connects when another gamepad presses a button on the title screen / file select
+  (stage FileSelect); otherwise it stays disconnected for the whole game. Keyboard fallback for the first
   remote (scancodes, ZQSD on AZERTY: Space A, E shake, LShift Z, F B, R C, Escape +, Ctrl walks;
   table at the top of wiimote.cpp and in the F1 menu), `SMGPC_NO_KEYBOARD`.
 - Ambient occlusion (pc/src/fx/ssao.cpp, display.ini occlusion_ambiante, default 0): GTAO ported
