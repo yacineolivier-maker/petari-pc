@@ -46,11 +46,18 @@ static inline void GXCmd1f32(f32 v) {
     GXCmd1u32(bits);
 }
 
-// TODO(pc): Aurora does not implement GXSetZScaleOffset (depth scale/offset is lost).
-static inline void GXSetZScaleOffset(f32 scale, f32 offset) {
-    (void)scale;
-    (void)offset;
+#ifdef __cplusplus
+extern "C" {
+#endif
+// Aurora has no GXSetZScaleOffset. pc/src/sdk_stubs.cpp keeps the scale/offset like the Wii's GX
+// state and applies it to the viewport depth range, also on later GXSetViewport calls (the game's
+// GXSetViewport is redirected there).
+void GXSetZScaleOffset(f32 scale, f32 offset);
+void pc_GXSetViewport(f32 left, f32 top, f32 wd, f32 ht, f32 nearz, f32 farz);
+#ifdef __cplusplus
 }
+#endif
+#define GXSetViewport pc_GXSetViewport
 
 #ifdef __cplusplus
 extern "C" {

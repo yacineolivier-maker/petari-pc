@@ -15,6 +15,7 @@
 #include <revolution/nwc24.h>
 #include <revolution/vf.h>
 
+#include <algorithm>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -108,24 +109,70 @@ BOOL DVDCheckDiskAsync(DVDCommandBlock* block, DVDCBCallback callback) {
 }
 
 // --- GX ----------------------------------------------------------------------------------------
-// TODO(pc): EFB peeks/pokes and texture object queries are not available from Aurora.
+// TODO(pc): EFB peeks/pokes are not available from Aurora (BrightObj tests the sun's visibility
+// against the map collision instead).
 void GXPeekARGB(u16, u16, u32* color) {
     if (color != nullptr) {
         *color = 0;
     }
 }
 void GXPokeAlphaRead(GXAlphaReadMode) {}
-void GXSetScissorBoxOffset(s32, s32) {}
-void GXGetTexObjAll(const GXTexObj*, void** image, u16* width, u16* height, GXTexFmt* format, GXTexWrapMode* wrapS,
-                    GXTexWrapMode* wrapT, GXBool* mipmap) {
-    if (image) *image = nullptr;
-    if (width) *width = 0;
-    if (height) *height = 0;
-    if (format) *format = GX_TF_RGBA8;
-    if (wrapS) *wrapS = GX_CLAMP;
-    if (wrapT) *wrapT = GX_CLAMP;
-    if (mipmap) *mipmap = GX_FALSE;
+
+// GXSetZScaleOffset: the Wii scales and offsets the viewport depth range (__GXSetViewport:
+// zScale = scale * 0xFFFFFF + 1, zOffset = offset * 0xFFFFFF, depth = [near, far] * zScale + zOffset)
+// until the next GXSetZScaleOffset, viewport changes included. FallOutFieldDraw draws its fill at
+// the far plane with (0, 1), Mario's silhouette pass pushes him back with (1, 0.00001).
+static f32 sZScale = 1.0f;
+static f32 sZOffset = 0.0f;
+
+#undef GXSetViewport
+
+// Rewrites the XF viewport registers like Aurora's GXSetViewportJitter, with the scaled depth range
+// clamped to [0, 1] (WebGPU rejects viewport depths outside it).
+static void LoadScaledViewport() {
+    constexpr f32 kZMax = 16777215.0f;
+    f32 vp[6];
+    GXGetViewportv(vp);
+    const f32 zScale = sZScale * kZMax + 1.0f;
+    const f32 zOffset = sZOffset * kZMax;
+    const f32 zNear = std::clamp((vp[4] * zScale + zOffset) / kZMax, 0.0f, 1.0f);
+    const f32 zFar = std::clamp((vp[5] * zScale + zOffset) / kZMax, 0.0f, 1.0f);
+    GXCmd1u8(0x10);
+    GXCmd1u32(0x0005101A);
+    GXCmd1f32(vp[2] / 2.0f);
+    GXCmd1f32(-vp[3] / 2.0f);
+    GXCmd1f32((zFar - zNear) * kZMax);
+    GXCmd1f32(340.0f + vp[0] + vp[2] / 2.0f);
+    GXCmd1f32(340.0f + vp[1] + vp[3] / 2.0f);
+    GXCmd1f32(zFar * kZMax);
 }
+
+void GXSetZScaleOffset(f32 scale, f32 offset) {
+    sZScale = scale;
+    sZOffset = offset;
+    LoadScaledViewport();
+}
+
+void pc_GXSetViewport(f32 left, f32 top, f32 wd, f32 ht, f32 nearz, f32 farz) {
+    GXSetViewport(left, top, wd, ht, nearz, farz);
+    if (sZScale != 1.0f || sZOffset != 0.0f) {
+        LoadScaledViewport();
+    }
+}
+void GXSetScissorBoxOffset(s32, s32) {}
+void GXGetTexObjAll(const GXTexObj* obj, void** image, u16* width, u16* height, GXTexFmt* format, GXTexWrapMode* wrapS,
+                    GXTexWrapMode* wrapT, GXBool* mipmap) {
+    // Built from Aurora's single getters. LayoutManager::replaceIndDummyTexture needs it: it makes a
+    // layout TexMap out of the screen copy texture (its image pointer is what GXCopyTex wrote to).
+    if (image) *image = GXGetTexObjData(obj);
+    if (width) *width = GXGetTexObjWidth(obj);
+    if (height) *height = GXGetTexObjHeight(obj);
+    if (format) *format = GXGetTexObjFmt(obj);
+    if (wrapS) *wrapS = GXGetTexObjWrapS(obj);
+    if (wrapT) *wrapT = GXGetTexObjWrapT(obj);
+    if (mipmap) *mipmap = GXGetTexObjMipMap(obj);
+}
+// Aurora has no LOD getters: linear filtering without mipmaps, what the screen copy texture uses.
 void GXGetTexObjLODAll(const GXTexObj*, GXTexFilter* minFilt, GXTexFilter* magFilt, f32* minLod, f32* maxLod,
                        f32* lodBias, GXBool* biasClamp, GXBool* edgeLod, GXAnisotropy* maxAniso) {
     if (minFilt) *minFilt = GX_LINEAR;

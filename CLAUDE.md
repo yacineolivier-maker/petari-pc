@@ -88,6 +88,9 @@ python tools/gen_pc_files.py                            # regenerate files.cmake
   each other, va_list copies (`va_copy`), worker/waiter races (the Wii is single-core with strict
   priorities: set state before waking the other thread).
 - The PPC's integer division by zero doesn't trap: pc/src/crash_handler.cpp emulates it (quotient 0).
+- `GXSetZScaleOffset` (missing in Aurora) is emulated in pc/src/sdk_stubs.cpp: the scale/offset is kept
+  and applied to the viewport depth range, so the game's `GXSetViewport` is redirected to `pc_GXSetViewport`
+  (pc_extras/gx.h). `GXGetTexObjAll` is built from Aurora's single getters.
 - Gamepads (pc/src/input/wiimote.cpp): PADClamp and Aurora's per-axis dead zones are bypassed
   (full-range sticks, radial dead zone); LB is read from SDL (Nunchuk C); in co-star mode the second
   remote only connects when another gamepad presses a button on the title screen / file select
