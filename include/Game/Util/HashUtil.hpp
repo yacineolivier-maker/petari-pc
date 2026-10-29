@@ -4,58 +4,111 @@
 
 class HashSortTable {
 public:
-    HashSortTable(u32);
+    /// @brief Creates a new `HashSortTable` with the given maximum size.
+    /// @param numMax The maximum number of key-value pairs that can be stored.
+    HashSortTable(u32 numMax);
 
 #if TARGET_PC
     // Values are pointer-sized on PC: some users store pointers in the table (PlayerEvent,
     // EffectKeeper, MarioEffect). The u32* search overloads serve the users storing indices.
     typedef uintptr_t Value;
-
-    bool add(const char*, Value, bool);
-    bool add(u32, Value);
-    bool addOrSkip(u32, Value);
-    void sort();
-    bool search(u32, Value*);
-    bool search(const char*, Value*);
-    bool search(const char*, const char*, Value*);
-    bool search(u32, u32*);
-    bool search(const char*, u32*);
-    bool search(const char*, const char*, u32*);
-    bool search(u32 a1, decltype(nullptr)) { return search(a1, (Value*)nullptr); }
-    bool search(const char* a1, decltype(nullptr)) { return search(a1, (Value*)nullptr); }
-    bool search(const char* a1, const char* a2, decltype(nullptr)) { return search(a1, a2, (Value*)nullptr); }
-    void swap(const char*, const char*);
-
-    /* 0x00 */ bool mHasBeenSorted;
-    /* 0x04 */ u32* mHashCodes;
-    /* 0x08 */ Value* _8;
-    /* 0x0C */ u16* _C;
-    /* 0x10 */ u16* _10;
-    /* 0x14 */ u32 mCurrentLength;
-    /* 0x18 */ u32 mMaxLength;
-};
 #else
-
-    bool add(const char*, u32, bool);
-    bool add(u32, u32);
-    bool addOrSkip(u32, u32);
-    void sort();
-    bool search(u32, u32*);
-    bool search(const char*, u32*);
-    bool search(const char*, const char*, u32*);
-    void swap(const char*, const char*);
-
-    /* 0x00 */ bool mHasBeenSorted;
-    /* 0x04 */ u32* mHashCodes;
-    /* 0x08 */ u32* _8;
-    /* 0x0C */ u16* _C;
-    /* 0x10 */ u16* _10;
-    /* 0x14 */ u32 mCurrentLength;
-    /* 0x18 */ u32 mMaxLength;
-};
+    typedef u32 Value;
 #endif
 
+    /// @brief Appends the given key-value pair to the table.
+    /// @param[in] pName A pointer to the null-terminated string to hash for use as the key.
+    /// @param value An unsigned 32-bit integer for use as the value.
+    /// @param isSkip Determines if duplicate keys should be considered before adding the key-value pair to the table.
+    /// @return `true` if the key-value pair was added to the table, `false` otherwise.
+    bool add(const char* pName, Value value, bool isSkip);
+
+    /// @brief Appends the given key-value pair to the table without considering duplicate keys.
+    /// @param hash The hash code of the name for use as the key.
+    /// @param value An unsigned 32-bit integer for use as the value.
+    /// @return `true` if the key-value pair was added to the table, `false` otherwise.
+    bool add(u32 hash, Value value);
+
+    /// @brief Appends the given key-value pair to the table if the key does not already exist in it.
+    /// @param hash The hash code of the name for use as the key.
+    /// @param value An unsigned 32-bit integer for use as the value.
+    /// @return `true` if the key-value pair was added to the table, `false` otherwise.
+    bool addOrSkip(u32 hash, Value value);
+
+    /// @brief Sorts the key-value pairs in ascending order by its keys.
+    void sort();
+
+    /// @brief Finds the given key in the table.
+    /// @param hash The key to find.
+    /// @param[out] pDst An optional pointer to initialize with the given key's associated value.
+    /// @return `true` if the key was found in the table, `false` otherwise.
+    bool search(u32 hash, Value* pDst);
+
+    /// @brief Finds the given key in the table.
+    /// @param[in] pName A pointer to the null-terminated string to hash and find.
+    /// @param[out] pDst An optional pointer to initialize with the given key's associated value.
+    /// @return `true` if the key was found in the table, `false` otherwise.
+    bool search(const char* pName, Value* pDst);
+
+    /// @brief Finds the sum of two keys in the table.
+    /// @param[in] pName1 A pointer to the left-hand null-terminated string to hash.
+    /// @param[in] pName2 A pointer to the right-hand null-terminated string to hash.
+    /// @param[out] pDst An optional pointer to initialize with the given key's associated value.
+    /// @return `true` if the key was found in the table, `false` otherwise.
+    bool search(const char* pName1, const char* pName2, Value* pDst);
+
+#if TARGET_PC
+    bool search(u32 hash, u32* pDst);
+    bool search(const char* pName, u32* pDst);
+    bool search(const char* pName1, const char* pName2, u32* pDst);
+    bool search(u32 hash, decltype(nullptr)) { return search(hash, (Value*)nullptr); }
+    bool search(const char* pName, decltype(nullptr)) { return search(pName, (Value*)nullptr); }
+    bool search(const char* pName1, const char* pName2, decltype(nullptr)) {
+        return search(pName1, pName2, (Value*)nullptr);
+    }
+#endif
+
+    /// @brief Replaces `pOldName`'s hashed counterpart with `pNewName`'s hashed counterpart, or appends the former to the end of the table.
+    /// @param[in] pNewName A pointer to the null-terminated string to hash and be replaced in the table.
+    /// @param[in] pOldName A pointer to the null-terminated string to hash and replace the old one in the table.
+    void swap(const char* pOldName, const char* pNewName);
+
+    /// @brief Returns `true` if the table was sorted by its keys.
+    bool isSorted() const {
+        return mIsSorted;
+    }
+
+private:
+    /// @brief Determines if the table was sorted by its keys.
+    /* 0x00 */ bool mIsSorted;
+
+    /// @brief A pointer to an array of all the keys.
+    /* 0x04 */ u32* mHashArray;
+
+    /// @brief A pointer to an array of all the values.
+    /* 0x08 */ Value* mValueArray;
+
+    /// @brief A pointer to an array of indices corresponding to the start of each bucket.
+    /* 0x0C */ u16* mBucketArray;
+
+    /// @brief A pointer to an array of sizes for each bucket.
+    /* 0x10 */ u16* mBucketSizeArray;
+
+    /// @brief The current number of key-value pairs in the table.
+    /* 0x14 */ u32 mTableSize;
+
+    /// @brief The maximum number of key-value pairs that can be stored in the table.
+    /* 0x18 */ u32 mTableSizeMax;
+};
+
 namespace MR {
-    u32 getHashCode(const char*);
-    u32 getHashCodeLower(const char*);
+    /// @brief Computes a hash code for a given string.
+    /// @param[in] pStr A pointer to the null-terminated string to hash.
+    /// @return The hashed string.
+    u32 getHashCode(const char* pStr);
+
+    /// @brief Computes a hash code for a given string, converting each character to its ASCII lowercase equivalent.
+    /// @param[in] pStr A pointer to the null-terminated string to hash.
+    /// @return The hashed string.
+    u32 getHashCodeLower(const char* pStr);
 };  // namespace MR

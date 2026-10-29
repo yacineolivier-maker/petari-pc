@@ -1541,14 +1541,14 @@ config.libs = [
             Object(MatchingFor(), "Game/LiveActor/ShadowSurfaceBox.cpp"),
             Object(MatchingFor(KOR), "Game/LiveActor/ShadowSurfaceCircle.cpp"),
             Object(MatchingFor(KOR), "Game/LiveActor/ShadowSurfaceDrawer.cpp"),
-            Object(MatchingFor(), "Game/LiveActor/ShadowSurfaceOval.cpp"),
+            Object(MatchingFor(KOR), "Game/LiveActor/ShadowSurfaceOval.cpp"),
             Object(MatchingFor(ALL), "Game/LiveActor/ShadowVolumeBox.cpp"),
             Object(MatchingFor(), "Game/LiveActor/ShadowVolumeCylinder.cpp"),
             Object(MatchingFor(ALL), "Game/LiveActor/ShadowVolumeDrawer.cpp"),
             Object(MatchingFor(ALL), "Game/LiveActor/ShadowVolumeFlatModel.cpp"),
             Object(MatchingFor(ALL), "Game/LiveActor/ShadowVolumeLine.cpp"),
             Object(MatchingFor(ALL), "Game/LiveActor/ShadowVolumeModel.cpp"),
-            Object(MatchingFor(), "Game/LiveActor/ShadowVolumeOval.cpp"),
+            Object(MatchingFor(ALL), "Game/LiveActor/ShadowVolumeOval.cpp"),
             Object(
                 MatchingFor(ALL),
                 "Game/LiveActor/ShadowVolumeOvalPole.cpp",
@@ -2893,7 +2893,7 @@ config.libs = [
             Object(MatchingFor(ALL), "RVL_SDK/ipc/ipcProfile.c"),
         ],
     ),
-    SDKLib_KPAD("kpad", [Object(MatchingFor(JPN, KOR), "RVL_SDK/kpad/KPAD.c")]),
+    SDKLib_KPAD("kpad", [Object(MatchingFor(JPN, KOR, PAL), "RVL_SDK/kpad/KPAD.c")]),
     SDKLib(
         "mem",
         [
@@ -2936,7 +2936,7 @@ config.libs = [
     SDKLib_NWC24(
         "nwc24",
         [
-            Object(MatchingFor(KOR), "RVL_SDK/nwc24/NWC24StdAPI.c"),
+            Object(MatchingFor(ALL), "RVL_SDK/nwc24/NWC24StdAPI.c"),
             Object(MatchingFor(ALL), "RVL_SDK/nwc24/NWC24FileAPI.c"),
             Object(MatchingFor(ALL), "RVL_SDK/nwc24/NWC24Config.c"),
             Object(MatchingFor(ALL), "RVL_SDK/nwc24/NWC24Utils.c"),
@@ -2945,7 +2945,7 @@ config.libs = [
             Object(MatchingFor(ALL), "RVL_SDK/nwc24/NWC24MBoxCtrl.c"),
             Object(MatchingFor(ALL), "RVL_SDK/nwc24/NWC24Mime.c"),
             Object(MatchingFor(ALL), "RVL_SDK/nwc24/NWC24Parser.c"),
-            Object(MatchingFor(KOR), "RVL_SDK/nwc24/NWC24MsgCommit.c"),
+            Object(MatchingFor(ALL), "RVL_SDK/nwc24/NWC24MsgCommit.c"),
             Object(MatchingFor(ALL), "RVL_SDK/nwc24/NWC24Schedule.c"),
             Object(MatchingFor(ALL), "RVL_SDK/nwc24/NWC24DateParser.c"),
             Object(MatchingFor(ALL), "RVL_SDK/nwc24/NWC24FriendList.c"),
@@ -2953,7 +2953,7 @@ config.libs = [
             Object(MatchingFor(ALL), "RVL_SDK/nwc24/NWC24UserId.c"),
             Object(MatchingFor(ALL), "RVL_SDK/nwc24/NWC24Time.c"),
             Object(MatchingFor(KOR), "RVL_SDK/nwc24/NWC24Ipc.c"),
-            Object(MatchingFor(KOR), "RVL_SDK/nwc24/NWC24Download.c"),
+            Object(MatchingFor(ALL), "RVL_SDK/nwc24/NWC24Download.c"),
             Object(MatchingFor(ALL), "RVL_SDK/nwc24/NWC24System.c"),
         ],
     ),
